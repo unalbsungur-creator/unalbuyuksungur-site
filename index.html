@@ -259,6 +259,47 @@
 
     /* ── MÜZİK ── */
     #muzik { background: #fff; }
+    .featured-music{
+    display:flex;
+    align-items:center;
+    gap:30px;
+    background:#fff;
+    border:1px solid var(--border);
+    padding:30px;
+    margin-bottom:40px;
+}
+
+.featured-music img{
+    width:260px;
+    height:260px;
+    object-fit:cover;
+    border-radius:8px;
+}
+
+.featured-content{
+    flex:1;
+}
+
+.featured-content h3{
+    font-size:2rem;
+    color:var(--navy);
+    margin-bottom:15px;
+}
+
+.featured-content p{
+    color:#666;
+    line-height:1.7;
+    margin-bottom:20px;
+}
+
+.featured-btn{
+    display:inline-block;
+    background:#1db954;
+    color:#fff;
+    text-decoration:none;
+    padding:12px 24px;
+    border-radius:4px;
+}
     .music-grid {display:grid;
     grid-template-columns:repeat(4,1fr);
     gap:20px; }
@@ -435,14 +476,14 @@ Spotify, YouTube Music ve Apple Music'te yayınlanan çalışmalarımı keşfedi
     <div class="section-header">
       <p class="section-label">MÜZİKLERİM</p>
 
-      <h2 class="section-title">Dinle & Keşfet</h2>
+      <h2 class="section-title">Müzik Çalışmalarım</h2>
 
       <p style="font-size:1.1rem;font-weight:600;">
         🎵 8 Yayınlanmış Eser
       </p>
 
       <p>
-        Spotify, YouTube Music ve Apple Music'te yayınlanan çalışmalarımı keşfedin.
+        Sözlerini yazdığım ve dijital platformlarda yayınlanan çalışmalarım.
       </p>
 
       <div class="section-line"></div>
@@ -548,6 +589,28 @@ Spotify, YouTube Music ve Apple Music'te yayınlanan çalışmalarımı keşfedi
       </a>
     </div>
 <!-- Şarkılar grid -->
+ <div class="featured-music">
+
+    <img src="images/sebebi-sensin.jpg.png"
+         alt="Sebebi Sensin">
+
+    <div class="featured-content">
+
+        <h3>Sebebi Sensin</h3>
+
+        <p>
+        Sözleri bana ait olan ve dijital platformlarda yayınlanan çalışmalarımdan biri.
+        </p>
+
+        <a href="#"
+           class="featured-btn">
+           Spotify'da Dinle
+        </a>
+
+    </div>
+
+</div>
+
 <div class="music-grid">
 
 <div class="music-card">
