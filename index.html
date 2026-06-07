@@ -250,8 +250,8 @@
 
 .music-card:hover {
   border-color: var(--gold);
-  transform: translateY(-8px);
-  box-shadow: 0 15px 35px rgba(0,0,0,.12);
+    transform: translateY(-4px);
+    box-shadow: 0 12px 24px rgba(0,0,0,.15);
 }
 
 .music-art img {
@@ -270,12 +270,18 @@
 
     /* ── FOOTER ── */
     footer {
-      background: var(--navy); color: #555e75;
-      text-align: center; padding: 40px 24px;
-      font-size: 0.8rem; letter-spacing: 1px;
-      border-top: 1px solid rgba(201,168,76,0.2);
-    }
-    footer span { color: var(--gold); }
+      background: var(--navy);
+    color: #b0bac8;
+    text-align: center;
+    padding: 30px 20px;
+    margin-top: 60px;
+    border-top: 1px solid rgba(255,255,255,.08);
+}
+
+footer span {
+    color: var(--gold);
+    font-weight: 600;
+}
 
     /* ── MOBILE ── */
     @media (max-width: 640px) {
@@ -340,6 +346,9 @@ Düşüncelerimi, müziklerimi ve projelerimi tek bir platformda bir araya getir
     <div class="section-header">
       <p class="section-label">Beni Takip Et</p>
       <h2 class="section-title">Sosyal Medya</h2>
+      <p class="music-count">8 Yayınlanmış Eser</p>
+
+<p>Spotify, YouTube Music ve Apple Music'te yayınlanan çalışmalarım.</p>
       <div class="section-line"></div>
     </div>
     <div class="social-grid">
@@ -583,7 +592,11 @@ Düşüncelerimi, müziklerimi ve projelerimi tek bir platformda bir araya getir
 <!-- FOOTER -->
 <footer>
   <p>© 2026 <span>Ünal Büyüksungur</span> — Tüm hakları saklıdır.</p>
-  <p style="margin-top:8px; font-size:0.72rem;">unalbuyuksungur.com</p>
+    <p style="margin-top:8px;font-size:.72rem;">
+    <a href="https://unalbuyuksungur.com">
+        unalbuyuksungur.com
+    </a>
+    </p>
 </footer>
 
 </body>
