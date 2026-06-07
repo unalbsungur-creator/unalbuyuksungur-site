@@ -231,7 +231,9 @@
 
     /* ── MÜZİK ── */
     #muzik { background: #fff; }
-    .music-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; }
+    .music-grid {display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 20px; }
     .music-card {
       background: var(--cream); border: 1px solid var(--border);
       border-radius: 4px; padding: 28px 20px; text-align: center;
@@ -243,7 +245,6 @@
     height: 180px;
     margin: 0 auto 16px;
     overflow: hidden;
-    background: var(--navy);
     border-radius: 12px;
 }
 
