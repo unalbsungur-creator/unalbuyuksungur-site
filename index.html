@@ -240,17 +240,18 @@
     grid-template-columns:repeat(4,1fr);
     gap:20px; }
     .music-card {
-      background: var(--cream); border: 1px solid var(--border);
-      border-radius: 4px; padding: 28px 20px; text-align: center;
-      transition: border-color .2s, transform .2s;
-    }
-    .music-card:hover { border-color: var(--gold); transform: translateY(-3px); }
-    .music-art {
-    width: 180px;
-    height: 180px;
-    margin: 0 auto 16px;
-    overflow: hidden;
-    border-radius: 12px;
+      background: var(--cream);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 28px 20px;
+  text-align: center;
+  transition: all .3s ease;
+}
+
+.music-card:hover {
+  border-color: var(--gold);
+  transform: translateY(-8px);
+  box-shadow: 0 15px 35px rgba(0,0,0,.12);
 }
 
 .music-art img {
@@ -462,7 +463,9 @@ Düşüncelerimi, müziklerimi ve projelerimi tek bir platformda bir araya getir
 
     <h4 class="music-title">Çat Çat Çat</h4>
     <p class="music-meta">Single · 2026</p>
-        <a href="https://open.spotify.com/track/7cO5d7HGc4nKxtvD1pwMwx" target="_blank" class="music-link">Spotify'da Dinle</a>
+        <a href="https://open.spotify.com/track/7cO5d7HGc4nKxtvD1pwMwx"
+   target="_blank"
+   class="music-link">♫ Spotify'da Dinle</a>
       </div>
       <div class="music-card">
        <div class="music-art">
