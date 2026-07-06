@@ -583,7 +583,6 @@
      */
     function setFinalMessage(q1Answer) {
 
-        alert("BURASI ÇALIŞIYOR");
 
         const messageEl = document.getElementById("final-message");
         const titleEl = document.getElementById("final-title");
