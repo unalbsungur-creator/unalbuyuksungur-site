@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <!--
+    ============================================================
+    Stress Decision Game
+    Premium Instrument-Grade Mini Web Application
+    Pure HTML5 + CSS3 + Vanilla JavaScript
+
+    Tasarım dili: Apple Vision Pro / Nothing / Tesla / Linear / Arc
+    sentezi. Sessiz, kendinden emin, sinematik derinlik.
+    ============================================================
+    -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <meta name="description"
+        content="Perspective is a minimalist interactive reflection experience that encourages reflection through simple questions and helps users focus on what they can truly change.">
+
+    <meta name="keywords"
+        content="Perspective, mindfulness, reflection, psychology, stoicism, decision making, emotional intelligence, self awareness, philosophy">
+
+    <meta name="author" content="Ünal Büyüksungur">
+
+    <meta name="theme-color" content="#05060a">
+
+    <meta name="robots" content="index, follow">
+
+    <meta property="og:title" content="Perspective | A Different Way to Think">
+    <meta property="og:description"
+        content="A minimalist interactive reflection experience designed to help you see life from a different perspective.">
+    <meta property="og:type" content="website">
+
+    <title>Perspective | A Different Way to Think</title>
+
+    <!-- Google Fonts: Space Grotesk (display) + Inter (body) + JetBrains Mono (system readouts) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+
+    <!-- Main Stylesheet -->
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <!--
+    ============================================================
+    BACKGROUND LAYERS
+    Katman sırası (alttan üste): nebula -> aurora -> starfield ->
+    structure grid -> grain -> vignette -> mouse light -> orbs
+    ============================================================
+    -->
+
+    <!-- Deep colour wash, the base of the atmosphere -->
+    <div id="nebula" aria-hidden="true"></div>
+
+    <!-- Slow-moving aurora bands -->
+    <div id="aurora" aria-hidden="true">
+        <span class="aurora-band aurora-1"></span>
+        <span class="aurora-band aurora-2"></span>
+        <span class="aurora-band aurora-3"></span>
+    </div>
+
+    <!-- Canvas for animated starfield -->
+    <canvas id="starfield" aria-hidden="true"></canvas>
+
+    <!-- Faint structural grid, only a whisper of presence -->
+    <div id="neon-grid" aria-hidden="true"></div>
+
+    <!-- Film-grain texture for cinematic depth -->
+    <div id="grain" aria-hidden="true"></div>
+
+    <!-- Edge vignette -->
+    <div id="vignette" aria-hidden="true"></div>
+
+    <!-- Mouse-following light effect -->
+    <div id="mouse-light" aria-hidden="true"></div>
+
+    <!-- Parallax floating light blooms -->
+    <div class="parallax-orb orb-1" aria-hidden="true"></div>
+    <div class="parallax-orb orb-2" aria-hidden="true"></div>
+    <div class="parallax-orb orb-3" aria-hidden="true"></div>
+
+    <!--
+    ============================================================
+    MAIN APPLICATION CONTAINER
+    ============================================================
+    -->
+    <main id="app" role="main">
+
+        <!--
+        ============================================================
+        SCREEN 1: QUESTION 1
+        "Bir problemin mi var?"
+        ============================================================
+        -->
+        <section id="screen-q1" class="game-screen active" aria-label="İlk Soru">
+            <!-- Instrument ring container -->
+            <div class="neon-ring-container">
+                <!-- Outer instrument ring: tick marks + slow rotation -->
+                <div class="neon-ring ring-outer" aria-hidden="true">
+                    <div class="ring-ticks"></div>
+                    <div class="ring-pulse"></div>
+                </div>
+                <!-- Inner instrument ring: opposite rotation, secondary hue -->
+                <div class="neon-ring ring-inner" aria-hidden="true">
+                    <div class="ring-ticks ring-ticks-inner"></div>
+                    <div class="ring-pulse ring-pulse-inner"></div>
+                </div>
+                <!-- Soft glow core behind the glass card -->
+                <div class="ring-glow-core" aria-hidden="true"></div>
+                <!-- Glass card -->
+                <div class="glass-card">
+                    <!-- Question icon: SVG brain/thought icon -->
+                    <div class="question-icon">
+                        <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                            <defs>
+                                <linearGradient id="iconGrad1" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" style="stop-color:var(--accent-cyan)" />
+                                    <stop offset="100%" style="stop-color:var(--accent-violet)" />
+                                </linearGradient>
+                            </defs>
+                            <circle cx="32" cy="32" r="28" fill="none" stroke="url(#iconGrad1)" stroke-width="1.5"
+                                opacity="0.25" />
+                            <path
+                                d="M32 16 C24 16, 18 22, 18 30 C18 34, 20 37, 23 39 C21 41, 20 44, 20 47 C20 51, 24 54, 32 54 C40 54, 44 51, 44 47 C44 44, 43 41, 41 39 C44 37, 46 34, 46 30 C46 22, 40 16, 32 16Z"
+                                fill="none" stroke="url(#iconGrad1)" stroke-width="1.75" stroke-linecap="round"
+                                stroke-linejoin="round" />
+                            <circle cx="26" cy="30" r="1.6" fill="var(--accent-cyan)" />
+                            <circle cx="38" cy="30" r="1.6" fill="var(--accent-violet)" />
+                            <path d="M26 38 Q32 42, 38 38" fill="none" stroke="var(--accent-cyan)" stroke-width="1.5"
+                                stroke-linecap="round" />
+                        </svg>
+                    </div>
+                    <!-- Question text -->
+                    <p class="section-label">SELF REFLECTION</p>
+
+                    <h1 class="question-title">
+                        Bir problemin mi var?
+                    </h1>
+                    <p class="question-subtitle">Düşün ve cevap ver...</p>
+                    <!-- Answer buttons -->
+                    <div class="button-group">
+                        <button class="neon-btn btn-yes" data-answer="yes" data-question="1"
+                            aria-label="Evet, bir problemim var">
+                            <span class="btn-ripple"></span>
+                            <span class="btn-text">EVET</span>
+                        </button>
+                        <button class="neon-btn btn-no" data-answer="no" data-question="1"
+                            aria-label="Hayır, problemim yok">
+                            <span class="btn-ripple"></span>
+                            <span class="btn-text">HAYIR</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!--
+        ============================================================
+        SCREEN 2: QUESTION 2
+        "Bunun için bir şey yapabiliyor musun?"
+        ============================================================
+        -->
+        <section id="screen-q2" class="game-screen" aria-label="İkinci Soru">
+            <div class="neon-ring-container">
+                <div class="neon-ring ring-outer" aria-hidden="true">
+                    <div class="ring-ticks"></div>
+                    <div class="ring-pulse"></div>
+                </div>
+                <div class="neon-ring ring-inner" aria-hidden="true">
+                    <div class="ring-ticks ring-ticks-inner"></div>
+                    <div class="ring-pulse ring-pulse-inner"></div>
+                </div>
+                <div class="ring-glow-core" aria-hidden="true"></div>
+                <div class="glass-card">
+                    <!-- Question icon: SVG action/hand icon -->
+                    <div class="question-icon">
+                        <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                            <defs>
+                                <linearGradient id="iconGrad2" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" style="stop-color:var(--accent-success)" />
+                                    <stop offset="100%" style="stop-color:var(--accent-cyan)" />
+                                </linearGradient>
+                            </defs>
+                            <circle cx="32" cy="32" r="28" fill="none" stroke="url(#iconGrad2)" stroke-width="1.5"
+                                opacity="0.25" />
+                            <path d="M22 40 L22 26 L28 26 L28 40Z" fill="none" stroke="url(#iconGrad2)"
+                                stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                            <path d="M30 40 L30 22 L36 22 L36 40Z" fill="none" stroke="url(#iconGrad2)"
+                                stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                            <path d="M38 40 L38 18 L44 18 L44 40Z" fill="none" stroke="url(#iconGrad2)"
+                                stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                            <path d="M18 44 L48 44" fill="none" stroke="url(#iconGrad2)" stroke-width="1.5"
+                                stroke-linecap="round" />
+                            <path d="M26 14 L32 8 L38 14" fill="none" stroke="var(--accent-success)" stroke-width="1.5"
+                                stroke-linecap="round" stroke-linejoin="round" />
+                            <circle cx="32" cy="8" r="1.6" fill="var(--accent-success)" />
+                        </svg>
+                    </div>
+                    <p class="section-label">ANALYSIS</p>
+
+                    <h1 class="question-title">
+                        Bunun için bir şey<br>yapabiliyor musun?
+                    </h1>
+                    <p class="question-subtitle">Kendine sor ve dürüst ol...</p>
+                    <div class="button-group">
+                        <button class="neon-btn btn-yes" data-answer="yes" data-question="2"
+                            aria-label="Evet, yapabiliyorum">
+                            <span class="btn-ripple"></span>
+                            <span class="btn-text">EVET</span>
+                        </button>
+                        <button class="neon-btn btn-no" data-answer="no" data-question="2"
+                            aria-label="Hayır, yapamıyorum">
+                            <span class="btn-ripple"></span>
+                            <span class="btn-text">HAYIR</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!--
+        ============================================================
+        SCREEN 3: FINAL SCREEN
+        System analysis sequence, then dynamic message
+        ============================================================
+        -->
+        <section id="screen-final" class="game-screen" aria-label="Sonuç Ekranı">
+            <div class="neon-ring-container final-ring">
+                <div class="neon-ring ring-outer" aria-hidden="true">
+                    <div class="ring-ticks"></div>
+                    <div class="ring-pulse"></div>
+                </div>
+                <div class="neon-ring ring-inner" aria-hidden="true">
+                    <div class="ring-ticks ring-ticks-inner"></div>
+                    <div class="ring-pulse ring-pulse-inner"></div>
+                </div>
+                <div class="ring-glow-core" aria-hidden="true"></div>
+                <div class="glass-card final-card">
+
+                    <!-- System analysis readout: shown first, quietly -->
+                    <div class="analysis-sequence" id="analysis-sequence" aria-live="polite">
+                        <p class="analysis-eyebrow">Sistem Analizi</p>
+                        <p class="analysis-status" id="analysis-status">Taranıyor</p>
+                        <div class="analysis-progress">
+                            <div class="analysis-progress-fill" id="analysis-progress-fill"></div>
+                        </div>
+                    </div>
+
+                    <!-- Revealed content: appears after analysis completes -->
+                    <div class="final-content" id="final-content">
+                        <!-- Final icon: SVG heart/sparkle icon -->
+                        <div class="question-icon final-icon">
+                            <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                                <defs>
+                                    <linearGradient id="iconGrad3" x1="0%" y1="0%" x2="100%" y2="100%">
+                                        <stop offset="0%" style="stop-color:var(--accent-cyan)" />
+                                        <stop offset="50%" style="stop-color:var(--accent-violet)" />
+                                        <stop offset="100%" style="stop-color:var(--accent-success)" />
+                                    </linearGradient>
+                                </defs>
+                                <circle cx="32" cy="32" r="28" fill="none" stroke="url(#iconGrad3)" stroke-width="1.5"
+                                    opacity="0.25" />
+                                <path
+                                    d="M32 50 C32 50, 14 38, 14 26 C14 20, 18 16, 24 16 C27 16, 30 17.5, 32 20 C34 17.5, 37 16, 40 16 C46 16, 50 20, 50 26 C50 38, 32 50, 32 50Z"
+                                    fill="none" stroke="url(#iconGrad3)" stroke-width="1.75" stroke-linecap="round"
+                                    stroke-linejoin="round" />
+                                <circle cx="24" cy="26" r="1.2" fill="var(--accent-cyan)" opacity="0.8" />
+                                <circle cx="40" cy="22" r="0.9" fill="var(--accent-violet)" opacity="0.6" />
+                            </svg>
+                        </div>
+                        <!-- Dynamic title -->
+                        <p class="section-label">RESULT</p>
+
+                        <h1 class="question-title final-title">
+                            Neden üzülüyorsun?
+                        </h1>
+                        <!-- Dynamic message -->
+                        <div class="final-message-container">
+                            <p id="final-message" class="final-message"></p>
+                        </div>
+                        <!-- Replay button -->
+                        <button id="replay-btn" class="neon-btn btn-replay" aria-label="Oyunu tekrar oyna">
+                            <span class="btn-ripple"></span>
+                            <span class="btn-text">
+                                <!-- Replay SVG icon inline -->
+                                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" width="16" height="16"
+                                    style="vertical-align: middle; margin-right: 8px;">
+                                    <path
+                                        d="M17.65 6.35A7.958 7.958 0 0 0 12 4C7.58 4 4.01 7.58 4.01 12S7.58 20 12 20c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"
+                                        fill="currentColor" />
+                                </svg>
+                                Tekrar Oyna
+                            </span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!--
+    ============================================================
+    FOOTER / CREDITS
+    ============================================================
+    -->
+    <footer class="app-footer">
+
+        <p class="footer-brand">
+            Perspective
+        </p>
+
+        <p class="footer-author">
+            Created by Ünal Büyüksungur
+        </p>
+
+    </footer>
+
+    <!-- Main JavaScript -->
+    <script src="script.js"></script>
+</body>
+
+</html>

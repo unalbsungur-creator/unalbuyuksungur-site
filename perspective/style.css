@@ -1,0 +1,1547 @@
+/*
+============================================================
+Stress Decision Game - Main Stylesheet
+Premium Instrument Theme
+Pure CSS3 - No Frameworks
+
+Tasarım dili: Apple Vision Pro'nun sakin camı, Nothing'in
+disiplinli minimalizmi, Tesla/Linear'ın kendinden emin
+sadeliği ve Jarvis HUD'ın enstrüman hissi - hepsi tek,
+sessiz ve kendine ait bir kimlikte birleşiyor.
+
+Renk dili kasıtlı olarak düşük doygunlukta tutuldu: parlak
+neon yerine "loş enstrüman ışığı" hissi tercih edildi.
+============================================================
+*/
+
+/*
+============================================================
+CSS CUSTOM PROPERTIES (DESIGN TOKENS)
+============================================================
+*/
+:root {
+    /* Accent colors - deliberately desaturated, used sparingly */
+    --accent-cyan: #6FD8E0;
+    --accent-violet: #9A93D6;
+    --accent-success: #6FCFA0;
+    --accent-danger: #E27A88;
+
+    /* Glass */
+    --color-glass: rgba(255, 255, 255, 0.035);
+    --color-glass-border: rgba(255, 255, 255, 0.09);
+    --color-glass-hover: rgba(255, 255, 255, 0.055);
+    --color-glass-sheen: rgba(255, 255, 255, 0.16);
+
+    /* Background */
+    --color-bg-void: #05060a;
+    --color-bg-deep: #0a0c14;
+
+    /* Text */
+    --color-text-primary: #F3F4F8;
+    --color-text-secondary: rgba(243, 244, 248, 0.68);
+    --color-text-muted: rgba(243, 244, 248, 0.42);
+
+    /* Hairlines */
+    --line-soft: rgba(255, 255, 255, 0.07);
+    --line-strong: rgba(255, 255, 255, 0.14);
+
+    /* Glow - kept quiet, never blown out */
+    --glow-cyan: 0 0 24px rgba(111, 216, 224, 0.22);
+    --glow-violet: 0 0 24px rgba(154, 147, 214, 0.2);
+    --glow-success: 0 0 22px rgba(111, 207, 160, 0.22);
+    --glow-danger: 0 0 22px rgba(226, 122, 136, 0.2);
+
+    /* Typography */
+
+    .section-label {
+        font-family: var(--font-mono);
+        font-size: 0.72rem;
+        font-weight: 500;
+        letter-spacing: 0.28em;
+        text-transform: uppercase;
+        color: var(--color-text-muted);
+        opacity: .65;
+        margin-bottom: 18px;
+    }
+
+    --font-display: 'Space Grotesk',
+    sans-serif;
+    --font-body: 'Inter',
+    sans-serif;
+    --font-mono: 'JetBrains Mono',
+    monospace;
+
+    /* Spacing */
+    --spacing-xs: 0.5rem;
+    --spacing-sm: 1rem;
+    --spacing-md: 1.5rem;
+    --spacing-lg: 2rem;
+    --spacing-xl: 3rem;
+    --spacing-2xl: 4rem;
+
+    /* Border Radius */
+    --radius-sm: 8px;
+    --radius-md: 18px;
+    --radius-lg: 26px;
+    --radius-xl: 32px;
+    --radius-full: 50%;
+
+    /* Transitions - unhurried, cinematic */
+    --transition-fast: 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+    --transition-base: 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+    --transition-slow: 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+    --transition-reveal: 0.9s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/*
+============================================================
+RESET & BASE STYLES
+============================================================
+*/
+*,
+*::before,
+*::after {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html {
+    font-size: 16px;
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+    font-family: var(--font-body);
+    background-color: var(--color-bg-void);
+    color: var(--color-text-primary);
+    min-height: 100vh;
+    overflow-x: hidden;
+    position: relative;
+    line-height: 1.6;
+    font-weight: 400;
+}
+
+/*
+============================================================
+BACKGROUND LAYERS
+Sıra: nebula < aurora < starfield < grid < grain < vignette
+< mouse-light < orbs
+============================================================
+*/
+
+/* Base colour wash - deep, slightly warm-cool gradient. Almost
+   never noticed consciously, but everything else sits on it. */
+#nebula {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background:
+        radial-gradient(ellipse 80% 60% at 20% 0%, rgba(60, 55, 95, 0.35), transparent 60%),
+        radial-gradient(ellipse 70% 55% at 100% 100%, rgba(20, 60, 65, 0.28), transparent 60%),
+        linear-gradient(160deg, var(--color-bg-deep) 0%, var(--color-bg-void) 55%, #030308 100%);
+}
+
+/* Aurora bands - slow, soft-edged colour drifting far in the
+   background. GPU-friendly: only transform + opacity animate. */
+#aurora {
+    position: fixed;
+    inset: -10%;
+    z-index: 0;
+    pointer-events: none;
+    overflow: hidden;
+    filter: blur(60px);
+    opacity: 0.55;
+    mix-blend-mode: screen;
+}
+
+.aurora-band {
+    position: absolute;
+    width: 140%;
+    height: 55%;
+    border-radius: 50%;
+    will-change: transform;
+}
+
+.aurora-1 {
+    top: -10%;
+    left: -20%;
+    background: radial-gradient(ellipse at center, rgba(111, 216, 224, 0.18), transparent 70%);
+    animation: auroraDrift1 34s ease-in-out infinite;
+}
+
+.aurora-2 {
+    top: 30%;
+    left: 10%;
+    background: radial-gradient(ellipse at center, rgba(154, 147, 214, 0.16), transparent 70%);
+    animation: auroraDrift2 40s ease-in-out infinite;
+}
+
+.aurora-3 {
+    top: 55%;
+    left: -10%;
+    background: radial-gradient(ellipse at center, rgba(111, 207, 160, 0.1), transparent 70%);
+    animation: auroraDrift3 46s ease-in-out infinite;
+}
+
+@keyframes auroraDrift1 {
+
+    0%,
+    100% {
+        transform: translate(0, 0) scale(1);
+    }
+
+    50% {
+        transform: translate(6%, 4%) scale(1.08);
+    }
+}
+
+@keyframes auroraDrift2 {
+
+    0%,
+    100% {
+        transform: translate(0, 0) scale(1);
+    }
+
+    50% {
+        transform: translate(-5%, 5%) scale(1.05);
+    }
+}
+
+@keyframes auroraDrift3 {
+
+    0%,
+    100% {
+        transform: translate(0, 0) scale(1);
+    }
+
+    50% {
+        transform: translate(4%, -6%) scale(1.1);
+    }
+}
+
+/* Starfield Canvas */
+#starfield {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+    pointer-events: none;
+}
+
+/* Structural grid - reduced to a whisper, faded at the edges so
+   it never reads as a "hacker screen" grid */
+#neon-grid {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+    pointer-events: none;
+    background-image:
+        linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+    background-size: 72px 72px;
+    -webkit-mask-image: radial-gradient(ellipse 70% 70% at 50% 45%, black 0%, transparent 75%);
+    mask-image: radial-gradient(ellipse 70% 70% at 50% 45%, black 0%, transparent 75%);
+    animation: gridDrift 90s linear infinite;
+}
+
+@keyframes gridDrift {
+    0% {
+        transform: translate(0, 0);
+    }
+
+    100% {
+        transform: translate(72px, 72px);
+    }
+}
+
+/* Film grain - static, extremely subtle, adds a cinematic,
+   non-digital texture instead of flat colour fields */
+#grain {
+    position: fixed;
+    inset: 0;
+    z-index: 2;
+    pointer-events: none;
+    opacity: 0.05;
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* Vignette - keeps focus centred, adds depth at the edges */
+#vignette {
+    position: fixed;
+    inset: 0;
+    z-index: 2;
+    pointer-events: none;
+    background: radial-gradient(ellipse 75% 75% at 50% 50%, transparent 45%, rgba(3, 3, 8, 0.55) 100%);
+}
+
+/* Mouse-following Light Effect */
+#mouse-light {
+    position: fixed;
+    width: 560px;
+    height: 560px;
+    border-radius: var(--radius-full);
+    background: radial-gradient(circle, rgba(111, 216, 224, 0.05) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 3;
+    transform: translate(-50%, -50%);
+    transition: opacity var(--transition-base);
+    opacity: 0;
+}
+
+#mouse-light.active {
+    opacity: 1;
+}
+
+/* Parallax floating light blooms */
+.parallax-orb {
+    position: fixed;
+    border-radius: var(--radius-full);
+    pointer-events: none;
+    z-index: 1;
+    filter: blur(70px);
+    will-change: transform;
+}
+
+.orb-1 {
+    width: 320px;
+    height: 320px;
+    background: rgba(111, 216, 224, 0.06);
+    top: 10%;
+    left: 10%;
+    animation: floatOrb1 22s ease-in-out infinite;
+}
+
+.orb-2 {
+    width: 280px;
+    height: 280px;
+    background: rgba(154, 147, 214, 0.06);
+    top: 60%;
+    right: 10%;
+    animation: floatOrb2 26s ease-in-out infinite;
+}
+
+.orb-3 {
+    width: 220px;
+    height: 220px;
+    background: rgba(111, 207, 160, 0.05);
+    bottom: 10%;
+    left: 30%;
+    animation: floatOrb3 30s ease-in-out infinite;
+}
+
+@keyframes floatOrb1 {
+
+    0%,
+    100% {
+        transform: translate(0, 0) scale(1);
+    }
+
+    50% {
+        transform: translate(4%, -3%) scale(1.06);
+    }
+}
+
+@keyframes floatOrb2 {
+
+    0%,
+    100% {
+        transform: translate(0, 0) scale(1);
+    }
+
+    50% {
+        transform: translate(-4%, 3%) scale(1.04);
+    }
+}
+
+@keyframes floatOrb3 {
+
+    0%,
+    100% {
+        transform: translate(0, 0) scale(1);
+    }
+
+    50% {
+        transform: translate(3%, -4%) scale(1.08);
+    }
+}
+
+/*
+============================================================
+MAIN APPLICATION CONTAINER
+============================================================
+*/
+#app {
+    position: relative;
+    z-index: 10;
+
+    min-height: 100dvh;
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+
+    padding: 32px 24px 56px;
+    box-sizing: border-box;
+}
+
+/*
+============================================================
+GAME SCREENS
+============================================================
+*/
+.game-screen {
+    position: absolute;
+    width: 100%;
+    max-width: 700px;
+    opacity: 0;
+    visibility: hidden;
+    transform: scale(0.96) translateY(18px);
+    filter: blur(6px);
+    transition:
+        opacity var(--transition-slow),
+        transform var(--transition-slow),
+        filter var(--transition-slow),
+        visibility var(--transition-slow);
+    pointer-events: none;
+}
+
+.game-screen.active {
+    opacity: 1;
+    visibility: visible;
+    transform: scale(1) translateY(0);
+    filter: blur(0);
+    pointer-events: auto;
+    position: relative;
+}
+
+/* Screen transition animations */
+.game-screen.fade-in {
+    animation: screenFadeIn var(--transition-slow) forwards;
+}
+
+.game-screen.fade-out {
+    animation: screenFadeOut var(--transition-slow) forwards;
+}
+
+@keyframes screenFadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.96) translateY(18px);
+        filter: blur(6px);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+        filter: blur(0);
+    }
+}
+
+@keyframes screenFadeOut {
+    from {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+        filter: blur(0);
+    }
+
+    to {
+        opacity: 0;
+        transform: scale(0.96) translateY(-18px);
+        filter: blur(6px);
+    }
+}
+
+/*
+============================================================
+INSTRUMENT RING (signature element)
+A quiet calibration dial, not a neon hoop: thin tick marks
+plus a single travelling light that reads as "measuring",
+not "decorating".
+============================================================
+*/
+.neon-ring-container {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--spacing-2xl);
+}
+
+.neon-ring {
+    position: absolute;
+    border-radius: var(--radius-full);
+    border: 1px solid var(--line-soft);
+}
+
+.ring-outer {
+    width: 420px;
+    height: 420px;
+}
+
+.ring-inner {
+    width: 372px;
+    height: 372px;
+    border-color: rgba(255, 255, 255, 0.05);
+}
+
+/* Tick marks - a repeating conic-gradient masked down to a thin
+   rim. Rotation is a pure transform, so this stays cheap. */
+.ring-ticks {
+    position: absolute;
+    inset: 0;
+    border-radius: var(--radius-full);
+    background: repeating-conic-gradient(rgba(255, 255, 255, 0.16) 0deg 0.6deg,
+            transparent 0.6deg 6deg);
+    -webkit-mask-image: radial-gradient(circle, transparent 91%, #000 92%, #000 100%);
+    mask-image: radial-gradient(circle, transparent 91%, #000 92%, #000 100%);
+    animation: dialRotate 140s linear infinite;
+}
+
+.ring-ticks-inner {
+    background: repeating-conic-gradient(rgba(255, 255, 255, 0.1) 0deg 0.5deg,
+            transparent 0.5deg 9deg);
+    animation: dialRotateReverse 100s linear infinite;
+}
+
+/* A single travelling arc of light per ring - the "energy pulse"
+   read as instrumentation rather than ornament */
+.ring-pulse {
+    position: absolute;
+    inset: 0;
+    border-radius: var(--radius-full);
+    background: conic-gradient(from 0deg,
+            transparent 0deg,
+            rgba(111, 216, 224, 0.9) 6deg,
+            rgba(111, 216, 224, 0.15) 22deg,
+            transparent 40deg,
+            transparent 360deg);
+    -webkit-mask-image: radial-gradient(circle, transparent 90.5%, #000 92%, #000 100%);
+    mask-image: radial-gradient(circle, transparent 90.5%, #000 92%, #000 100%);
+    filter: blur(1.5px);
+    opacity: 0.7;
+    animation: dialRotate 11s linear infinite;
+}
+
+.ring-pulse-inner {
+    background: conic-gradient(from 180deg,
+            transparent 0deg,
+            rgba(154, 147, 214, 0.85) 5deg,
+            rgba(154, 147, 214, 0.12) 18deg,
+            transparent 34deg,
+            transparent 360deg);
+    animation: dialRotateReverse 15s linear infinite;
+    opacity: 0.6;
+}
+
+@keyframes dialRotate {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes dialRotateReverse {
+    from {
+        transform: rotate(360deg);
+    }
+
+    to {
+        transform: rotate(0deg);
+    }
+}
+
+/* Soft light bloom sitting behind the glass card, giving the
+   whole instrument a sense of volumetric depth */
+.ring-glow-core {
+    position: absolute;
+    width: 320px;
+    height: 320px;
+    border-radius: var(--radius-full);
+    background: radial-gradient(circle, rgba(111, 216, 224, 0.08), transparent 72%);
+    filter: blur(22px);
+    z-index: -1;
+}
+
+/* ============================================================
+   EXTRA HOLOGRAPHIC RING LAYERS
+============================================================ */
+
+.ring-outer::before,
+.ring-inner::before {
+
+    content: "";
+
+    position: absolute;
+
+    inset: -8px;
+
+    border-radius: 50%;
+
+    border: 1px solid rgba(255, 255, 255, .03);
+
+    pointer-events: none;
+
+    animation: ringBreath 7s ease-in-out infinite;
+
+}
+
+.ring-outer::after {
+
+    content: "";
+
+    position: absolute;
+
+    inset: -18px;
+
+    border-radius: 50%;
+
+    border: 1px solid rgba(111, 216, 224, .06);
+
+    filter: blur(1px);
+
+    opacity: .45;
+
+    animation: ringFloat 12s linear infinite;
+
+}
+
+.ring-inner::after {
+
+    content: "";
+
+    position: absolute;
+
+    inset: 12px;
+
+    border-radius: 50%;
+
+    border: 1px dashed rgba(255, 255, 255, .05);
+
+    animation: ringRotateSlow 80s linear infinite;
+
+}
+
+/* Final screen ring - slightly larger, warmer confidence tone */
+.final-ring .ring-outer {
+    width: 460px;
+    height: 460px;
+}
+
+.final-ring .ring-inner {
+    width: 408px;
+    height: 408px;
+}
+
+.final-ring .ring-pulse {
+    background: conic-gradient(from 0deg,
+            transparent 0deg,
+            rgba(111, 207, 160, 0.9) 6deg,
+            rgba(111, 207, 160, 0.15) 22deg,
+            transparent 40deg,
+            transparent 360deg);
+}
+
+.final-ring .ring-glow-core {
+    background: radial-gradient(circle, rgba(111, 207, 160, 0.09), transparent 72%);
+}
+
+/*
+============================================================
+GLASS CARD
+Apple-grade glass: high blur, near-invisible border, a single
+soft sheen along the top edge instead of a hard outline.
+============================================================
+*/
+.glass-card {
+    position: relative;
+    z-index: 5;
+
+    width: 100%;
+    max-width: 520px;
+
+    padding: 40px 40px 32px;
+
+    text-align: center;
+
+    border-radius: 32px;
+
+    overflow: hidden;
+
+    background:
+        linear-gradient(180deg,
+            rgba(255, 255, 255, .08) 0%,
+            rgba(255, 255, 255, .035) 30%,
+            rgba(255, 255, 255, .02) 100%);
+
+    border: 1px solid rgba(255, 255, 255, .09);
+
+    backdrop-filter:
+        blur(36px) saturate(180%) brightness(1.05);
+
+    -webkit-backdrop-filter:
+        blur(36px) saturate(180%) brightness(1.05);
+
+    box-shadow:
+        0 40px 90px rgba(0, 0, 0, .55),
+        0 0 80px rgba(111, 216, 224, .06),
+        inset 0 1px 0 rgba(255, 255, 255, .18),
+        inset 0 -1px 0 rgba(255, 255, 255, .03);
+
+    transition:
+        transform .55s cubic-bezier(.22, 1, .36, 1),
+        box-shadow .55s cubic-bezier(.22, 1, .36, 1),
+        border-color .45s ease;
+}
+
+.glass-card::before {
+
+    content: "";
+
+    position: absolute;
+
+    inset: 0;
+
+    border-radius: inherit;
+
+    pointer-events: none;
+
+    background:
+
+        linear-gradient(145deg,
+            rgba(255, 255, 255, .22) 0%,
+            rgba(255, 255, 255, .05) 18%,
+            transparent 45%,
+            transparent 70%,
+            rgba(111, 216, 224, .08) 100%);
+
+    mix-blend-mode: screen;
+
+    opacity: .95;
+
+}
+
+.glass-card::after {
+
+    content: "";
+
+    position: absolute;
+
+    inset: 1px;
+
+    border-radius: 30px;
+
+    pointer-events: none;
+
+    background:
+
+        radial-gradient(circle at top,
+            rgba(255, 255, 255, .10),
+            transparent 55%);
+
+    opacity: .65;
+
+}
+
+.glass-card::before {
+    /* Edge light refraction - a thin gradient rim that catches
+       the eye without ever reading as a border */
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(150deg, rgba(255, 255, 255, 0.22), transparent 30%, transparent 70%, rgba(111, 216, 224, 0.12));
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+}
+
+.glass-card:hover {
+
+    transform:
+        translateY(-4px) scale(1.01);
+
+    border-color:
+        rgba(111, 216, 224, .22);
+
+    box-shadow:
+
+        0 60px 120px rgba(0, 0, 0, .60),
+
+        0 0 120px rgba(111, 216, 224, .10),
+
+        inset 0 1px 0 rgba(255, 255, 255, .22),
+
+        inset 0 -1px 0 rgba(255, 255, 255, .05);
+
+}
+
+/* Mouse tilt effect applied via JS */
+.glass-card.tilt {
+    transform: perspective(1200px) rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg));
+}
+
+/*
+============================================================
+QUESTION ICON
+============================================================
+*/
+.question-icon {
+    width: 92px;
+    height: 92px;
+    margin: 0 auto var(--spacing-lg);
+    animation: floatIcon 6s ease-in-out infinite;
+}
+
+.question-icon svg {
+    width: 100%;
+    height: 100%;
+    filter: drop-shadow(0 0 16px rgba(111, 216, 224, 0.25));
+}
+
+.final-icon {
+    animation: floatIcon 6s ease-in-out infinite, pulseGlow 4s ease-in-out infinite;
+}
+
+@keyframes floatIcon {
+
+    0%,
+    100% {
+        transform: translateY(0);
+    }
+
+    50% {
+        transform: translateY(-6px);
+    }
+}
+
+@keyframes pulseGlow {
+
+    0%,
+    100% {
+        filter: drop-shadow(0 0 16px rgba(111, 207, 160, 0.22));
+    }
+
+    50% {
+        filter: drop-shadow(0 0 26px rgba(111, 207, 160, 0.4));
+    }
+}
+
+/*
+============================================================
+TYPOGRAPHY
+============================================================
+*/
+.question-title {
+    font-family: var(--font-display);
+    font-size: clamp(1.4rem, 3.6vw, 2rem);
+    font-weight: 600;
+    line-height: 1.35;
+    margin-bottom: var(--spacing-sm);
+    color: var(--color-text-primary);
+    letter-spacing: -0.01em;
+}
+
+.final-title {
+    font-size: clamp(1.7rem, 4.4vw, 2.4rem);
+}
+
+.question-subtitle {
+    font-family: var(--font-body);
+    font-size: clamp(0.85rem, 2vw, 0.98rem);
+    color: var(--color-text-muted);
+    margin-bottom: var(--spacing-xl);
+    font-weight: 400;
+    letter-spacing: 0.01em;
+}
+
+/*
+============================================================
+SYSTEM ANALYSIS SEQUENCE
+Final screen'in zirvesi: abartısız bir "ölçüm anı". Tek bir
+durum satırı, ince bir ilerleme çubuğu - sonra sessizce
+gerçek mesaja yol verir.
+============================================================
+*/
+.analysis-sequence {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-lg) 0;
+    opacity: 0;
+    transition: opacity var(--transition-base);
+}
+
+.analysis-sequence.active {
+    display: flex;
+    opacity: 1;
+}
+
+.analysis-eyebrow {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    font-weight: 500;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+}
+
+.analysis-status {
+    font-family: var(--font-mono);
+    font-size: clamp(1rem, 2.6vw, 1.2rem);
+    font-weight: 400;
+    letter-spacing: 0.04em;
+    color: var(--accent-cyan);
+    min-height: 1.4em;
+}
+
+.analysis-progress {
+    width: 180px;
+    height: 2px;
+    background: var(--line-soft);
+    border-radius: var(--radius-full);
+    overflow: hidden;
+    margin-top: var(--spacing-xs);
+}
+
+.analysis-progress-fill {
+    width: 100%;
+    height: 100%;
+    transform: scaleX(0);
+    transform-origin: left center;
+    background: linear-gradient(90deg, var(--accent-cyan), var(--accent-success));
+    transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Revealed content - hidden until the analysis sequence
+   finishes, then choreographed in with a gentle stagger */
+.final-content {
+    opacity: 0;
+    transform: translateY(10px);
+    pointer-events: none;
+    transition:
+        opacity var(--transition-reveal),
+        transform var(--transition-reveal);
+}
+
+.final-content.revealed {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+}
+
+.final-content .question-icon {
+    transition-delay: 0s;
+}
+
+.final-content.revealed .final-title {
+    animation: titleReveal var(--transition-reveal) both;
+}
+
+@keyframes titleReveal {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+        filter: blur(4px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+        filter: blur(0);
+    }
+}
+
+/*
+============================================================
+FINAL MESSAGE
+============================================================
+*/
+.final-message-container {
+    margin: 16px 0;
+    padding: 14px 22px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--line-soft);
+    border-radius: var(--radius-md);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.final-message {
+    font-family: var(--font-body);
+    font-size: clamp(0.98rem, 2.2vw, 1.1rem);
+    line-height: 1.85;
+    color: var(--color-text-secondary);
+    font-weight: 400;
+}
+
+.final-message strong {
+    color: var(--color-text-primary);
+    font-weight: 600;
+}
+
+/*
+============================================================
+BUTTON GROUP
+============================================================
+*/
+.button-group {
+    display: flex;
+    gap: var(--spacing-md);
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-top: var(--spacing-lg);
+}
+
+/*
+============================================================
+BUTTONS
+Sessiz cam yüzey + ışık takibi + hafif manyetik çekim.
+Dikkat çekmek için değil, dokunuşu ödüllendirmek için hareket
+eder.
+============================================================
+*/
+.neon-btn {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 136px;
+    padding: 15px 30px;
+    font-family: var(--font-display);
+    font-size: clamp(0.85rem, 1.8vw, 0.98rem);
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    color: var(--color-text-primary);
+    background: var(--color-glass);
+    border: 1px solid var(--color-glass-border);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    overflow: hidden;
+
+    transition:
+        transform .35s cubic-bezier(.22, 1, .36, 1),
+        box-shadow .35s cubic-bezier(.22, 1, .36, 1),
+        border-color .35s ease,
+        background .35s ease,
+        filter .35s ease;
+
+    text-transform: uppercase;
+    outline: none;
+
+    transform: translate(var(--magnet-x, 0px), var(--magnet-y, 0px));
+
+    transform-style: preserve-3d;
+    will-change: transform, box-shadow;
+    backface-visibility: hidden;
+}
+
+.neon-btn:active {
+
+    transform:
+        translate(var(--magnet-x, 0px), var(--magnet-y, 0px)) translateY(1px) scale(.97);
+
+    filter: brightness(.95);
+
+}
+
+/* Button ripple effect container */
+.btn-ripple {
+    position: absolute;
+    border-radius: var(--radius-full);
+    background: rgba(255, 255, 255, 0.18);
+    transform: scale(0);
+    animation: rippleEffect 0.6s linear;
+    pointer-events: none;
+}
+
+@keyframes rippleEffect {
+    to {
+        transform: scale(4);
+        opacity: 0;
+    }
+}
+
+@keyframes ringBreath {
+
+    0%,
+    100% {
+
+        transform: scale(1);
+
+        opacity: .25;
+
+    }
+
+    50% {
+
+        transform: scale(1.015);
+
+        opacity: .6;
+
+    }
+
+}
+
+@keyframes ringFloat {
+
+    from {
+
+        transform: rotate(0deg);
+
+    }
+
+    to {
+
+        transform: rotate(360deg);
+
+    }
+
+}
+
+@keyframes ringRotateSlow {
+
+    from {
+
+        transform: rotate(360deg);
+
+    }
+
+    to {
+
+        transform: rotate(0deg);
+
+    }
+
+}
+
+.btn-text {
+    position: relative;
+    z-index: 2;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.neon-btn:hover {
+
+    transform:
+        translateY(-3px) scale(1.015);
+
+}
+
+/* YES Button - success accent */
+.btn-yes {
+    border-color: rgba(111, 207, 160, 0.28);
+}
+
+.btn-yes:hover {
+    background: rgba(111, 207, 160, 0.08);
+    border-color: rgba(111, 207, 160, 0.55);
+    box-shadow: var(--glow-success);
+}
+
+/* NO Button - danger accent */
+.btn-no {
+    border-color: rgba(226, 122, 136, 0.28);
+}
+
+.btn-no:hover {
+    background: rgba(226, 122, 136, 0.08);
+    border-color: rgba(226, 122, 136, 0.55);
+    box-shadow: var(--glow-danger);
+}
+
+/* REPLAY Button - cyan accent */
+.btn-replay {
+    border-color: rgba(111, 216, 224, 0.28);
+    margin-top: var(--spacing-lg);
+    min-width: 190px;
+}
+
+.btn-replay:hover {
+    background: rgba(111, 216, 224, 0.08);
+    border-color: rgba(111, 216, 224, 0.55);
+    box-shadow: var(--glow-cyan);
+}
+
+/* Button focus styles for accessibility */
+.neon-btn:focus-visible {
+
+    box-shadow:
+        0 0 0 2px rgba(255, 255, 255, .12),
+        0 0 35px rgba(111, 216, 224, .18);
+
+    outline: 2px solid var(--accent-cyan);
+    outline-offset: 3px;
+
+}
+
+/* Button mouse light effect - follows the cursor across the
+   surface, the quiet "premium press" feel */
+.neon-btn::before {
+    content: '';
+    position: absolute;
+    top: var(--mouse-y, 50%);
+    left: var(--mouse-x, 50%);
+    width: 140px;
+    height: 140px;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.12) 0%, transparent 70%);
+    transform: translate(-50%, -50%);
+    opacity: 0;
+    transition: opacity var(--transition-fast);
+    pointer-events: none;
+}
+
+.neon-btn:hover::before {
+    opacity: .9;
+
+    filter: blur(2px);
+
+    transform:
+        translate(-50%, -50%) scale(1.15);
+}
+
+/*
+============================================================
+FOOTER
+============================================================
+*/
+.app-footer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    text-align: center;
+    padding: var(--spacing-sm);
+    z-index: 100;
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    color: var(--color-text-muted);
+    letter-spacing: 0.14em;
+}
+
+/*
+============================================================
+RESPONSIVE DESIGN
+============================================================
+*/
+
+/* Large Desktop / 4K / Ultrawide */
+@media (min-width: 1920px) {
+    :root {
+        font-size: 18px;
+    }
+
+    .ring-outer {
+        width: 500px;
+        height: 500px;
+    }
+
+    .ring-inner {
+        width: 452px;
+        height: 452px;
+    }
+
+    .final-ring .ring-outer {
+        width: 540px;
+        height: 540px;
+    }
+
+    .final-ring .ring-inner {
+        width: 488px;
+        height: 488px;
+    }
+}
+
+/* Tablet */
+@media (max-width: 1024px) {
+    .ring-outer {
+        width: 380px;
+        height: 380px;
+    }
+
+    .ring-inner {
+        width: 336px;
+        height: 336px;
+    }
+
+    .final-ring .ring-outer {
+        width: 420px;
+        height: 420px;
+    }
+
+    .final-ring .ring-inner {
+        width: 372px;
+        height: 372px;
+    }
+}
+
+/* Mobile Landscape */
+@media (max-width: 768px) {
+    :root {
+        font-size: 14px;
+    }
+
+    #app {
+        padding: var(--spacing-md);
+    }
+
+    .neon-ring-container {
+        padding: var(--spacing-lg);
+    }
+
+    .ring-outer {
+        width: 320px;
+        height: 320px;
+    }
+
+    .ring-inner {
+        width: 280px;
+        height: 280px;
+    }
+
+    .final-ring .ring-outer {
+        width: 360px;
+        height: 360px;
+    }
+
+    .final-ring .ring-inner {
+        width: 316px;
+        height: 316px;
+    }
+
+    .glass-card {
+        padding: var(--spacing-lg);
+    }
+
+    .question-icon {
+        width: 76px;
+        height: 76px;
+    }
+
+    .button-group {
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .neon-btn {
+        width: 100%;
+        max-width: 280px;
+    }
+}
+
+/* Mobile Portrait */
+@media (max-width: 480px) {
+    :root {
+        font-size: 13px;
+    }
+
+    .ring-outer {
+        width: 280px;
+        height: 280px;
+    }
+
+    .ring-inner {
+        width: 244px;
+        height: 244px;
+    }
+
+    .final-ring .ring-outer {
+        width: 320px;
+        height: 320px;
+    }
+
+    .final-ring .ring-inner {
+        width: 280px;
+        height: 280px;
+    }
+
+    .glass-card {
+        padding: var(--spacing-md);
+        border-radius: var(--radius-md);
+    }
+
+    .question-icon {
+        width: 66px;
+        height: 66px;
+        margin-bottom: var(--spacing-md);
+    }
+
+    .question-title {
+        font-size: 1.25rem;
+    }
+
+    .final-title {
+        font-size: 1.45rem;
+    }
+
+    .neon-btn {
+        padding: 13px 22px;
+        min-width: 120px;
+    }
+
+    .parallax-orb {
+        display: none;
+    }
+
+    #aurora {
+        opacity: 0.35;
+    }
+}
+
+/* Small Mobile */
+@media (max-width: 360px) {
+    .ring-outer {
+        width: 250px;
+        height: 250px;
+    }
+
+    .ring-inner {
+        width: 216px;
+        height: 216px;
+    }
+
+    .final-ring .ring-outer {
+        width: 290px;
+        height: 290px;
+    }
+
+    .final-ring .ring-inner {
+        width: 250px;
+        height: 250px;
+    }
+}
+
+/*
+============================================================
+ACCESSIBILITY
+============================================================
+*/
+
+/* Reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+
+    #neon-grid,
+    #aurora,
+    .parallax-orb,
+    .ring-ticks,
+    .ring-pulse {
+        animation: none;
+    }
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+    .glass-card {
+        background: rgba(0, 0, 0, 0.85);
+        border: 2px solid var(--accent-cyan);
+    }
+
+    .neon-btn {
+        border-width: 2px;
+    }
+
+    .question-title {
+        color: var(--color-text-primary);
+    }
+}
+
+/*
+============================================================
+UTILITY CLASSES
+============================================================
+*/
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* Loading state */
+.loading {
+    pointer-events: none;
+    opacity: 0.5;
+}
+
+/*
+============================================================
+CUSTOM SCROLLBAR
+============================================================
+*/
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--color-bg-void);
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+/* Firefox scrollbar */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.12) var(--color-bg-void);
+}
+
+.footer-brand {
+
+    font-family: var(--font-display);
+
+    font-size: .75rem;
+
+    letter-spacing: .30em;
+
+    text-transform: uppercase;
+
+    opacity: .55;
+
+}
+
+.footer-author {
+
+    font-family: var(--font-body);
+
+    font-size: .72rem;
+
+    opacity: .35;
+
+    margin-top: 4px;
+
+}
