@@ -582,21 +582,39 @@
      * @param {string} q1Answer - 'yes' or 'no'
      */
     function setFinalMessage(q1Answer) {
-        const messageEl = DOM.finalMessage;
 
-        if (q1Answer === 'yes') {
-            messageEl.innerHTML = `Hayatta her problemin bir çözümü vardır.<br><br>
-                Çözemediğin şeyler için üzülmek yerine <strong>çözebileceklerine</strong> odaklan.`;
-        } else {
+        alert("BURASI ÇALIŞIYOR");
+
+        const messageEl = document.getElementById("final-message");
+        const titleEl = document.getElementById("final-title");
+
+        if (q1Answer === "yes") {
+
+            titleEl.textContent = "Neden üzülüyorsun?";
+
             messageEl.innerHTML = `
-    Ortada seni gerçekten üzecek bir problem görünmüyor.<br><br>
+            Hayatta her problemin bir çözümü vardır.<br><br>
 
-    <strong>Belki de ihtiyacın olan şey,<br>
-    sadece farklı bir bakış açısıdır.</strong><br><br>
+            Çözemediğin şeyler için üzülmek yerine
+            <strong>çözebileceklerine odaklan.</strong>
+        `;
 
-    Bugünün tadını çıkarmayı unutma.
+        } else {
+
+            titleEl.textContent = "Bugün Güzel Bir Gün";
+
+            messageEl.innerHTML = `
+    Görünüşe göre şu anda seni gerçekten üzecek
+    bir problem yok.<br><br>
+
+    <strong>Bu güzel bir haber.</strong><br><br>
+
+    Bugünün tadını çıkar ve
+    küçük mutlulukları fark etmeyi unutma.
 `;
+
         }
+
     }
 
     /**
