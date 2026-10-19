@@ -1,0 +1,4 @@
+# V2: dosyalar depoda bayt bayt saklanır; Git satır sonu dönüşümü (core.autocrlf) uygulanmaz.
+# İçerik dosyaları LF, catalog.json CRLF'dir ve SHA-256 ile doğrulanır
+# (v2/music/tools/verify_content_integrity.py). Kural yalnızca v2/ altını etkiler.
+v2/** -text

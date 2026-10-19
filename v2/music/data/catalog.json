@@ -1,0 +1,5035 @@
+{
+  "$schema": "./schema.json",
+  "catalogVersion": 1,
+  "updatedAt": "2026-10-19",
+  "artist": "Ünal Büyüksungur",
+  "source": {
+    "coversDir": "UNAL_MUSIC_ARCHIVE/covers",
+    "lyricsDir": "UNAL_MUSIC_ARCHIVE/lyrics",
+    "storiesDir": "UNAL_MUSIC_ARCHIVE/stories"
+  },
+  "works": [
+    {
+      "id": "w-0001",
+      "title": "Ağlama",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "aglama",
+      "language": "tr",
+      "releaseStatus": "unknown",
+      "lyrics": {
+        "status": "published",
+        "file": "content/lyrics/w-0001.txt"
+      },
+      "story": {
+        "status": "published",
+        "file": "content/stories/w-0001.txt"
+      }
+    },
+    {
+      "id": "w-0002",
+      "title": "Akrep",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "akrep",
+      "language": "tr",
+      "releaseStatus": "unknown",
+      "lyrics": {
+        "status": "published",
+        "file": "content/lyrics/w-0002.txt"
+      },
+      "story": {
+        "status": "published",
+        "file": "content/stories/w-0002.txt"
+      }
+    },
+    {
+      "id": "w-0003",
+      "title": "Angaralı Hasret",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "angarali-hasret",
+      "language": "tr",
+      "releaseStatus": "unknown",
+      "lyrics": {
+        "status": "published",
+        "file": "content/lyrics/w-0003.txt"
+      },
+      "story": {
+        "status": "published",
+        "file": "content/stories/w-0003.txt"
+      }
+    },
+    {
+      "id": "w-0004",
+      "title": "Anneler Günü",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "anneler-gunu",
+      "language": "tr",
+      "releaseStatus": "unknown",
+      "lyrics": {
+        "status": "published",
+        "file": "content/lyrics/w-0004.txt"
+      },
+      "story": {
+        "status": "published",
+        "file": "content/stories/w-0004.txt"
+      }
+    },
+    {
+      "id": "w-0005",
+      "title": "Aslan",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "aslan",
+      "language": "tr",
+      "releaseStatus": "unknown",
+      "lyrics": {
+        "status": "published",
+        "file": "content/lyrics/w-0005.txt"
+      },
+      "story": {
+        "status": "published",
+        "file": "content/stories/w-0005.txt"
+      }
+    },
+    {
+      "id": "w-0006",
+      "title": "Aşkım",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "askim",
+      "language": "tr",
+      "releaseStatus": "unknown",
+      "lyrics": {
+        "status": "published",
+        "file": "content/lyrics/w-0006.txt"
+      },
+      "story": {
+        "status": "published",
+        "file": "content/stories/w-0006.txt"
+      }
+    },
+    {
+      "id": "w-0007",
+      "title": "Babalar Günü",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "babalar-gunu",
+      "language": "tr",
+      "releaseStatus": "unknown",
+      "lyrics": {
+        "status": "published",
+        "file": "content/lyrics/w-0007.txt"
+      },
+      "story": {
+        "status": "published",
+        "file": "content/stories/w-0007.txt"
+      }
+    },
+    {
+      "id": "w-0008",
+      "title": "Balık",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "balik",
+      "language": "tr",
+      "releaseStatus": "unknown",
+      "lyrics": {
+        "status": "published",
+        "file": "content/lyrics/w-0008.txt"
+      },
+      "story": {
+        "status": "published",
+        "file": "content/stories/w-0008.txt"
+      }
+    },
+    {
+      "id": "w-0009",
+      "title": "Başak",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "basak",
+      "language": "tr",
+      "releaseStatus": "unknown",
+      "lyrics": {
+        "status": "published",
+        "file": "content/lyrics/w-0009.txt"
+      },
+      "story": {
+        "status": "published",
+        "file": "content/stories/w-0009.txt"
+      }
+    },
+    {
+      "id": "w-0010",
+      "title": "Ben Boğa'yım",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "ben-bogayim",
+      "language": "tr",
+      "releaseStatus": "unknown",
+      "lyrics": {
+        "status": "published",
+        "file": "content/lyrics/w-0010.txt"
+      },
+      "story": {
+        "status": "published",
+        "file": "content/stories/w-0010.txt"
+      }
+    },
+    {
+      "id": "w-0011",
+      "title": "Beni Sal",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "beni-sal",
+      "language": "tr",
+      "releaseStatus": "unknown",
+      "lyrics": {
+        "status": "published",
+        "file": "content/lyrics/w-0011.txt"
+      },
+      "story": {
+        "status": "published",
+        "file": "content/stories/w-0011.txt"
+      }
+    },
+    {
+      "id": "w-0012",
+      "title": "Beni Yâr Seçtin",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "beni-yar-sectin",
+      "language": "tr",
+      "releaseStatus": "unknown",
+      "lyrics": {
+        "status": "published",
+        "file": "content/lyrics/w-0012.txt"
+      },
+      "story": {
+        "status": "published",
+        "file": "content/stories/w-0012.txt"
+      }
+    },
+    {
+      "id": "w-0013",
+      "title": "Benimle Yaşlanacaktın",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "benimle-yaslanacaktin",
+      "language": "tr",
+      "releaseStatus": "unknown",
+      "lyrics": {
+        "status": "published",
+        "file": "content/lyrics/w-0013.txt"
+      },
+      "story": {
+        "status": "published",
+        "file": "content/stories/w-0013.txt"
+      }
+    },
+    {
+      "id": "w-0014",
+      "title": "Biliyorum",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "biliyorum",
+      "language": "tr",
+      "releaseStatus": "unknown",
+      "lyrics": {
+        "status": "published",
+        "file": "content/lyrics/w-0014.txt"
+      },
+      "story": {
+        "status": "published",
+        "file": "content/stories/w-0014.txt"
+      }
+    },
+    {
+      "id": "w-0015",
+      "title": "Bir Güzel Sevdim",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "bir-guzel-sevdim",
+      "language": "tr",
+      "releaseStatus": "unknown",
+      "lyrics": {
+        "status": "published",
+        "file": "content/lyrics/w-0015.txt"
+      },
+      "story": {
+        "status": "published",
+        "file": "content/stories/w-0015.txt"
+      }
+    },
+    {
+      "id": "w-0016",
+      "title": "Bir Kedim Var",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "bir-kedim-var",
+      "language": "tr",
+      "releaseStatus": "unknown",
+      "lyrics": {
+        "status": "published",
+        "file": "content/lyrics/w-0016.txt"
+      },
+      "story": {
+        "status": "published",
+        "file": "content/stories/w-0016.txt"
+      }
+    },
+    {
+      "id": "w-0017",
+      "title": "Biten Sadece Zaman",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "biten-sadece-zaman",
+      "language": "tr",
+      "releaseStatus": "unknown",
+      "lyrics": {
+        "status": "published",
+        "file": "content/lyrics/w-0017.txt"
+      },
+      "story": {
+        "status": "published",
+        "file": "content/stories/w-0017.txt"
+      }
+    },
+    {
+      "id": "w-0018",
+      "title": "Boğa",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "boga",
+      "language": "tr",
+      "releaseStatus": "unknown",
+      "lyrics": {
+        "status": "published",
+        "file": "content/lyrics/w-0018.txt"
+      },
+      "story": {
+        "status": "published",
+        "file": "content/stories/w-0018.txt"
+      }
+    },
+    {
+      "id": "w-0019",
+      "title": "Boşver Geç",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "bosver-gec",
+      "language": "tr",
+      "releaseStatus": "unknown",
+      "lyrics": {
+        "status": "published",
+        "file": "content/lyrics/w-0019.txt"
+      },
+      "story": {
+        "status": "published",
+        "file": "content/stories/w-0019.txt"
+      }
+    },
+    {
+      "id": "w-0020",
+      "title": "Öyle Bir Şey",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "oyle-bir-sey",
+      "language": "tr",
+      "releaseStatus": "unknown",
+      "lyrics": {
+        "status": "published",
+        "file": "content/lyrics/w-0020.txt"
+      },
+      "story": {
+        "status": "published",
+        "file": "content/stories/w-0020.txt"
+      }
+    },
+    {
+      "id": "w-0021",
+      "title": "Bugün Benim Doğum Günüm",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "bugun-benim-dogum-gunum",
+      "language": "tr",
+      "releaseStatus": "unknown",
+      "lyrics": {
+        "status": "published",
+        "file": "content/lyrics/w-0021.txt"
+      },
+      "story": {
+        "status": "published",
+        "file": "content/stories/w-0021.txt"
+      }
+    },
+    {
+      "id": "w-0022",
+      "title": "Çarpıldım Sana",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "carpildim-sana",
+      "language": "tr",
+      "releaseStatus": "unknown",
+      "lyrics": {
+        "status": "published",
+        "file": "content/lyrics/w-0022.txt"
+      },
+      "story": {
+        "status": "published",
+        "file": "content/stories/w-0022.txt"
+      }
+    },
+    {
+      "id": "w-0023",
+      "title": "Çat Çat Çat",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "cat-cat-cat",
+      "language": "tr",
+      "releaseStatus": "unknown",
+      "lyrics": {
+        "status": "published",
+        "file": "content/lyrics/w-0023.txt"
+      },
+      "story": {
+        "status": "published",
+        "file": "content/stories/w-0023.txt"
+      }
+    },
+    {
+      "id": "w-0024",
+      "title": "Çekip Gittin",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "cekip-gittin",
+      "language": "tr",
+      "releaseStatus": "unknown",
+      "lyrics": {
+        "status": "published",
+        "file": "content/lyrics/w-0024.txt"
+      },
+      "story": {
+        "status": "published",
+        "file": "content/stories/w-0024.txt"
+      }
+    },
+    {
+      "id": "w-0025",
+      "title": "Çok Sevince İnsanı",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "cok-sevince-insani",
+      "language": "tr",
+      "releaseStatus": "unknown",
+      "lyrics": {
+        "status": "published",
+        "file": "content/lyrics/w-0025.txt"
+      },
+      "story": {
+        "status": "published",
+        "file": "content/stories/w-0025.txt"
+      }
+    },
+    {
+      "id": "w-0026",
+      "title": "Du bist der Grund",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "du-bist-der-grund",
+      "language": "de",
+      "releaseStatus": "unknown",
+      "lyrics": {
+        "status": "published",
+        "file": "content/lyrics/w-0026.txt"
+      },
+      "story": {
+        "status": "published",
+        "file": "content/stories/w-0026.txt"
+      }
+    },
+    {
+      "id": "w-0027",
+      "title": "Eksilmeyen",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "eksilmeyen",
+      "language": "tr",
+      "releaseStatus": "unknown",
+      "lyrics": {
+        "status": "published",
+        "file": "content/lyrics/w-0027.txt"
+      },
+      "story": {
+        "status": "published",
+        "file": "content/stories/w-0027.txt"
+      }
+    },
+    {
+      "id": "w-0028",
+      "title": "Elimi Sıktın",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "elimi-siktin",
+      "language": "tr",
+      "releaseStatus": "unknown",
+      "lyrics": {
+        "status": "published",
+        "file": "content/lyrics/w-0028.txt"
+      },
+      "story": {
+        "status": "published",
+        "file": "content/stories/w-0028.txt"
+      }
+    },
+    {
+      "id": "w-0029",
+      "title": "Fishka",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "fishka",
+      "language": "tr",
+      "releaseStatus": "unknown",
+      "lyrics": {
+        "status": "published",
+        "file": "content/lyrics/w-0029.txt"
+      },
+      "story": {
+        "status": "published",
+        "file": "content/stories/w-0029.txt"
+      }
+    },
+    {
+      "id": "w-0030",
+      "title": "Gece Olunca",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "gece-olunca",
+      "language": "tr",
+      "releaseStatus": "unknown",
+      "lyrics": {
+        "status": "published",
+        "file": "content/lyrics/w-0030.txt"
+      },
+      "story": {
+        "status": "published",
+        "file": "content/stories/w-0030.txt"
+      }
+    },
+    {
+      "id": "w-0031",
+      "title": "Günleri Saya Saya",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "gunleri-saya-saya",
+      "language": "tr",
+      "releaseStatus": "unknown",
+      "lyrics": {
+        "status": "published",
+        "file": "content/lyrics/w-0031.txt"
+      },
+      "story": {
+        "status": "published",
+        "file": "content/stories/w-0031.txt"
+      }
+    },
+    {
+      "id": "w-0032",
+      "title": "Haberleşiriz",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "haberlesiriz",
+      "language": "tr",
+      "releaseStatus": "unknown",
+      "lyrics": {
+        "status": "published",
+        "file": "content/lyrics/w-0032.txt"
+      },
+      "story": {
+        "status": "published",
+        "file": "content/stories/w-0032.txt"
+      }
+    },
+    {
+      "id": "w-0033",
+      "title": "Hafta",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "hafta",
+      "language": "tr",
+      "releaseStatus": "unknown",
+      "lyrics": {
+        "status": "published",
+        "file": "content/lyrics/w-0033.txt"
+      },
+      "story": {
+        "status": "published",
+        "file": "content/stories/w-0033.txt"
+      }
+    },
+    {
+      "id": "w-0034",
+      "title": "Hasret Bitecek",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "hasret-bitecek",
+      "language": "tr",
+      "releaseStatus": "unknown",
+      "lyrics": {
+        "status": "published",
+        "file": "content/lyrics/w-0034.txt"
+      },
+      "story": {
+        "status": "published",
+        "file": "content/stories/w-0034.txt"
+      }
+    },
+    {
+      "id": "w-0035",
+      "title": "Haydi Dene",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "haydi-dene",
+      "language": "tr",
+      "releaseStatus": "unknown",
+      "lyrics": {
+        "status": "published",
+        "file": "content/lyrics/w-0035.txt"
+      },
+      "story": {
+        "status": "published",
+        "file": "content/stories/w-0035.txt"
+      }
+    },
+    {
+      "id": "w-0036",
+      "title": "Haziran",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "haziran",
+      "language": "tr",
+      "releaseStatus": "unknown",
+      "lyrics": {
+        "status": "published",
+        "file": "content/lyrics/w-0036.txt"
+      },
+      "story": {
+        "status": "published",
+        "file": "content/stories/w-0036.txt"
+      }
+    },
+    {
+      "id": "w-0037",
+      "title": "Ich meld' mich...",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "ich-meld-mich",
+      "language": "de",
+      "releaseStatus": "unknown",
+      "lyrics": {
+        "status": "published",
+        "file": "content/lyrics/w-0037.txt"
+      },
+      "story": {
+        "status": "published",
+        "file": "content/stories/w-0037.txt"
+      }
+    },
+    {
+      "id": "w-0038",
+      "title": "İkizler",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "ikizler",
+      "language": "tr",
+      "releaseStatus": "unknown",
+      "lyrics": {
+        "status": "published",
+        "file": "content/lyrics/w-0038.txt"
+      },
+      "story": {
+        "status": "published",
+        "file": "content/stories/w-0038.txt"
+      }
+    },
+    {
+      "id": "w-0039",
+      "title": "Kabuğumu Bıraktım",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "kabugumu-biraktim",
+      "language": "tr",
+      "releaseStatus": "unknown",
+      "lyrics": {
+        "status": "published",
+        "file": "content/lyrics/w-0039.txt"
+      },
+      "story": {
+        "status": "published",
+        "file": "content/stories/w-0039.txt"
+      }
+    },
+    {
+      "id": "w-0040",
+      "title": "Kahve Falı",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "kahve-fali",
+      "language": "tr",
+      "releaseStatus": "unknown",
+      "lyrics": {
+        "status": "published",
+        "file": "content/lyrics/w-0040.txt"
+      },
+      "story": {
+        "status": "published",
+        "file": "content/stories/w-0040.txt"
+      }
+    },
+    {
+      "id": "w-0041",
+      "title": "Kahve Molası",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "kahve-molasi",
+      "language": "tr",
+      "releaseStatus": "unknown",
+      "lyrics": {
+        "status": "published",
+        "file": "content/lyrics/w-0041.txt"
+      },
+      "story": {
+        "status": "published",
+        "file": "content/stories/w-0041.txt"
+      }
+    },
+    {
+      "id": "w-0042",
+      "title": "Kendimi Arıyorum",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "kendimi-ariyorum",
+      "language": "tr",
+      "releaseStatus": "unknown",
+      "lyrics": {
+        "status": "published",
+        "file": "content/lyrics/w-0042.txt"
+      },
+      "story": {
+        "status": "published",
+        "file": "content/stories/w-0042.txt"
+      }
+    },
+    {
+      "id": "w-0043",
+      "title": "Kiminle",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "kiminle",
+      "language": "tr",
+      "releaseStatus": "unknown",
+      "lyrics": {
+        "status": "published",
+        "file": "content/lyrics/w-0043.txt"
+      },
+      "story": {
+        "status": "published",
+        "file": "content/stories/w-0043.txt"
+      }
+    },
+    {
+      "id": "w-0044",
+      "title": "Koç",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "koc",
+      "language": "tr",
+      "releaseStatus": "unknown",
+      "lyrics": {
+        "status": "published",
+        "file": "content/lyrics/w-0044.txt"
+      },
+      "story": {
+        "status": "published",
+        "file": "content/stories/w-0044.txt"
+      }
+    },
+    {
+      "id": "w-0045",
+      "title": "Kova",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "kova",
+      "language": "tr",
+      "releaseStatus": "unknown",
+      "lyrics": {
+        "status": "published",
+        "file": "content/lyrics/w-0045.txt"
+      },
+      "story": {
+        "status": "published",
+        "file": "content/stories/w-0045.txt"
+      }
+    },
+    {
+      "id": "w-0046",
+      "title": "Mutlu Yıllar",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "mutlu-yillar",
+      "language": "tr",
+      "releaseStatus": "unknown",
+      "lyrics": {
+        "status": "published",
+        "file": "content/lyrics/w-0046.txt"
+      },
+      "story": {
+        "status": "published",
+        "file": "content/stories/w-0046.txt"
+      }
+    },
+    {
+      "id": "w-0047",
+      "title": "Nerdesin",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "nerdesin",
+      "language": "tr",
+      "releaseStatus": "unknown",
+      "lyrics": {
+        "status": "published",
+        "file": "content/lyrics/w-0047.txt"
+      },
+      "story": {
+        "status": "published",
+        "file": "content/stories/w-0047.txt"
+      }
+    },
+    {
+      "id": "w-0048",
+      "title": "Neredeyim Ben",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "neredeyim-ben",
+      "language": "tr",
+      "releaseStatus": "unknown",
+      "lyrics": {
+        "status": "published",
+        "file": "content/lyrics/w-0048.txt"
+      },
+      "story": {
+        "status": "published",
+        "file": "content/stories/w-0048.txt"
+      }
+    },
+    {
+      "id": "w-0049",
+      "title": "Oğlak",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "oglak",
+      "language": "tr",
+      "releaseStatus": "unknown",
+      "lyrics": {
+        "status": "published",
+        "file": "content/lyrics/w-0049.txt"
+      },
+      "story": {
+        "status": "published",
+        "file": "content/stories/w-0049.txt"
+      }
+    },
+    {
+      "id": "w-0050",
+      "title": "Sebebi Sensin",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "sebebi-sensin",
+      "language": "tr",
+      "releaseStatus": "unknown",
+      "lyrics": {
+        "status": "published",
+        "file": "content/lyrics/w-0050.txt"
+      },
+      "story": {
+        "status": "published",
+        "file": "content/stories/w-0050.txt"
+      }
+    },
+    {
+      "id": "w-0051",
+      "title": "Seninle",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "seninle",
+      "language": "tr",
+      "releaseStatus": "unknown",
+      "lyrics": {
+        "status": "published",
+        "file": "content/lyrics/w-0051.txt"
+      },
+      "story": {
+        "status": "published",
+        "file": "content/stories/w-0051.txt"
+      }
+    },
+    {
+      "id": "w-0052",
+      "title": "Sonsuza Kadar",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "sonsuza-kadar",
+      "language": "tr",
+      "releaseStatus": "unknown",
+      "lyrics": {
+        "status": "published",
+        "file": "content/lyrics/w-0052.txt"
+      },
+      "story": {
+        "status": "published",
+        "file": "content/stories/w-0052.txt"
+      }
+    },
+    {
+      "id": "w-0053",
+      "title": "Söz Verdim",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "soz-verdim",
+      "language": "tr",
+      "releaseStatus": "unknown",
+      "lyrics": {
+        "status": "published",
+        "file": "content/lyrics/w-0053.txt"
+      },
+      "story": {
+        "status": "published",
+        "file": "content/stories/w-0053.txt"
+      }
+    },
+    {
+      "id": "w-0054",
+      "title": "Tebessümler Yüzümde",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "tebessumler-yuzumde",
+      "language": "tr",
+      "releaseStatus": "unknown",
+      "lyrics": {
+        "status": "published",
+        "file": "content/lyrics/w-0054.txt"
+      },
+      "story": {
+        "status": "published",
+        "file": "content/stories/w-0054.txt"
+      }
+    },
+    {
+      "id": "w-0055",
+      "title": "Terazi",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "terazi",
+      "language": "tr",
+      "releaseStatus": "unknown",
+      "lyrics": {
+        "status": "published",
+        "file": "content/lyrics/w-0055.txt"
+      },
+      "story": {
+        "status": "published",
+        "file": "content/stories/w-0055.txt"
+      }
+    },
+    {
+      "id": "w-0056",
+      "title": "Turizmci",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "turizmci",
+      "language": "tr",
+      "releaseStatus": "unknown",
+      "lyrics": {
+        "status": "published",
+        "file": "content/lyrics/w-0056.txt"
+      },
+      "story": {
+        "status": "published",
+        "file": "content/stories/w-0056.txt"
+      }
+    },
+    {
+      "id": "w-0057",
+      "title": "Türbülans",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "turbulans",
+      "language": "tr",
+      "releaseStatus": "unknown",
+      "lyrics": {
+        "status": "published",
+        "file": "content/lyrics/w-0057.txt"
+      },
+      "story": {
+        "status": "published",
+        "file": "content/stories/w-0057.txt"
+      }
+    },
+    {
+      "id": "w-0058",
+      "title": "Wegen Dir",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "wegen-dir",
+      "language": "de",
+      "releaseStatus": "unknown",
+      "lyrics": {
+        "status": "published",
+        "file": "content/lyrics/w-0058.txt"
+      },
+      "story": {
+        "status": "published",
+        "file": "content/stories/w-0058.txt"
+      }
+    },
+    {
+      "id": "w-0059",
+      "title": "Yay",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "yay",
+      "language": "tr",
+      "releaseStatus": "unknown",
+      "lyrics": {
+        "status": "published",
+        "file": "content/lyrics/w-0059.txt"
+      },
+      "story": {
+        "status": "published",
+        "file": "content/stories/w-0059.txt"
+      }
+    },
+    {
+      "id": "w-0060",
+      "title": "Yengeç",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "yengec",
+      "language": "tr",
+      "releaseStatus": "unknown",
+      "lyrics": {
+        "status": "published",
+        "file": "content/lyrics/w-0060.txt"
+      },
+      "story": {
+        "status": "published",
+        "file": "content/stories/w-0060.txt"
+      }
+    },
+    {
+      "id": "w-0061",
+      "title": "Yenik Yüreğim",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "yenik-yuregim",
+      "language": "tr",
+      "releaseStatus": "unknown",
+      "lyrics": {
+        "status": "published",
+        "file": "content/lyrics/w-0061.txt"
+      },
+      "story": {
+        "status": "published",
+        "file": "content/stories/w-0061.txt"
+      }
+    },
+    {
+      "id": "w-0062",
+      "title": "Yine Üşüyorum",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "yine-usuyorum",
+      "language": "tr",
+      "releaseStatus": "unknown",
+      "lyrics": {
+        "status": "published",
+        "file": "content/lyrics/w-0062.txt"
+      },
+      "story": {
+        "status": "published",
+        "file": "content/stories/w-0062.txt"
+      }
+    },
+    {
+      "id": "w-0063",
+      "title": "Yoksun Ama...",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "yoksun-ama",
+      "language": "tr",
+      "releaseStatus": "unknown",
+      "lyrics": {
+        "status": "published",
+        "file": "content/lyrics/w-0063.txt"
+      },
+      "story": {
+        "status": "published",
+        "file": "content/stories/w-0063.txt"
+      }
+    },
+    {
+      "id": "w-0064",
+      "title": "Yoksun",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "yoksun",
+      "language": "tr",
+      "releaseStatus": "unknown",
+      "lyrics": {
+        "status": "published",
+        "file": "content/lyrics/w-0064.txt"
+      },
+      "story": {
+        "status": "published",
+        "file": "content/stories/w-0064.txt"
+      }
+    },
+    {
+      "id": "w-0065",
+      "title": "Biliyorum (Rock Ballad Version)",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "biliyorum-rock-ballad-version",
+      "language": "tr",
+      "releaseStatus": "unknown",
+      "lyrics": {
+        "status": "published",
+        "file": "content/lyrics/w-0014.txt"
+      },
+      "story": {
+        "status": "published",
+        "file": "content/stories/w-0014.txt"
+      }
+    },
+    {
+      "id": "w-0066",
+      "title": "Böyle Bir Şey",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "boyle-bir-sey",
+      "language": "tr",
+      "releaseStatus": "unknown",
+      "lyrics": {
+        "status": "published",
+        "file": "content/lyrics/w-0020.txt"
+      },
+      "story": {
+        "status": "published",
+        "file": "content/stories/w-0020.txt"
+      }
+    },
+    {
+      "id": "w-0067",
+      "title": "Turizmci (Pop Versiyon)",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "turizmci-pop-versiyon",
+      "language": "tr",
+      "releaseStatus": "unknown",
+      "lyrics": {
+        "status": "published",
+        "file": "content/lyrics/w-0056.txt"
+      },
+      "story": {
+        "status": "published",
+        "file": "content/stories/w-0056.txt"
+      }
+    },
+    {
+      "id": "w-0068",
+      "title": "Yenik Yüreğim (Thrash Metal Version)",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "yenik-yuregim-thrash-metal-version",
+      "language": "tr",
+      "releaseStatus": "unknown",
+      "lyrics": {
+        "status": "published",
+        "file": "content/lyrics/w-0061.txt"
+      },
+      "story": {
+        "status": "published",
+        "file": "content/stories/w-0061.txt"
+      }
+    }
+  ],
+  "recordings": [
+    {
+      "id": "r-0001",
+      "workId": "w-0001",
+      "title": "Ağlama",
+      "versionLabel": null,
+      "genres": [],
+      "isOriginal": null,
+      "coverId": "c-0001",
+      "releaseDate": null,
+      "links": {
+        "spotify": null,
+        "youtube": null,
+        "youtubeMusic": null,
+        "appleMusic": null,
+        "other": []
+      }
+    },
+    {
+      "id": "r-0002",
+      "workId": "w-0002",
+      "title": "Akrep",
+      "versionLabel": null,
+      "genres": [],
+      "isOriginal": null,
+      "coverId": "c-0002",
+      "releaseDate": null,
+      "links": {
+        "spotify": null,
+        "youtube": null,
+        "youtubeMusic": null,
+        "appleMusic": null,
+        "other": []
+      }
+    },
+    {
+      "id": "r-0003",
+      "workId": "w-0003",
+      "title": "Angaralı Hasret",
+      "versionLabel": null,
+      "genres": [],
+      "isOriginal": null,
+      "coverId": "c-0003",
+      "releaseDate": null,
+      "links": {
+        "spotify": null,
+        "youtube": null,
+        "youtubeMusic": null,
+        "appleMusic": null,
+        "other": []
+      }
+    },
+    {
+      "id": "r-0004",
+      "workId": "w-0004",
+      "title": "Anneler Günü",
+      "versionLabel": null,
+      "genres": [],
+      "isOriginal": null,
+      "coverId": "c-0004",
+      "releaseDate": null,
+      "links": {
+        "spotify": null,
+        "youtube": null,
+        "youtubeMusic": null,
+        "appleMusic": null,
+        "other": []
+      }
+    },
+    {
+      "id": "r-0005",
+      "workId": "w-0005",
+      "title": "Aslan",
+      "versionLabel": null,
+      "genres": [],
+      "isOriginal": null,
+      "coverId": "c-0005",
+      "releaseDate": null,
+      "links": {
+        "spotify": null,
+        "youtube": null,
+        "youtubeMusic": null,
+        "appleMusic": null,
+        "other": []
+      }
+    },
+    {
+      "id": "r-0006",
+      "workId": "w-0006",
+      "title": "Aşkım",
+      "versionLabel": null,
+      "genres": [],
+      "isOriginal": null,
+      "coverId": "c-0006",
+      "releaseDate": null,
+      "links": {
+        "spotify": null,
+        "youtube": null,
+        "youtubeMusic": null,
+        "appleMusic": null,
+        "other": []
+      }
+    },
+    {
+      "id": "r-0007",
+      "workId": "w-0007",
+      "title": "Babalar Günü",
+      "versionLabel": null,
+      "genres": [],
+      "isOriginal": null,
+      "coverId": "c-0007",
+      "releaseDate": null,
+      "links": {
+        "spotify": null,
+        "youtube": null,
+        "youtubeMusic": null,
+        "appleMusic": null,
+        "other": []
+      }
+    },
+    {
+      "id": "r-0008",
+      "workId": "w-0008",
+      "title": "Balık",
+      "versionLabel": null,
+      "genres": [],
+      "isOriginal": null,
+      "coverId": "c-0008",
+      "releaseDate": null,
+      "links": {
+        "spotify": null,
+        "youtube": null,
+        "youtubeMusic": null,
+        "appleMusic": null,
+        "other": []
+      }
+    },
+    {
+      "id": "r-0009",
+      "workId": "w-0009",
+      "title": "Başak",
+      "versionLabel": null,
+      "genres": [],
+      "isOriginal": null,
+      "coverId": "c-0009",
+      "releaseDate": null,
+      "links": {
+        "spotify": null,
+        "youtube": null,
+        "youtubeMusic": null,
+        "appleMusic": null,
+        "other": []
+      }
+    },
+    {
+      "id": "r-0010",
+      "workId": "w-0010",
+      "title": "Ben Boğa'yım",
+      "versionLabel": null,
+      "genres": [],
+      "isOriginal": null,
+      "coverId": "c-0010",
+      "releaseDate": null,
+      "links": {
+        "spotify": null,
+        "youtube": null,
+        "youtubeMusic": null,
+        "appleMusic": null,
+        "other": []
+      }
+    },
+    {
+      "id": "r-0011",
+      "workId": "w-0011",
+      "title": "Beni Sal",
+      "versionLabel": null,
+      "genres": [],
+      "isOriginal": null,
+      "coverId": "c-0011",
+      "releaseDate": null,
+      "links": {
+        "spotify": null,
+        "youtube": null,
+        "youtubeMusic": null,
+        "appleMusic": null,
+        "other": []
+      }
+    },
+    {
+      "id": "r-0012",
+      "workId": "w-0012",
+      "title": "Beni Yâr Seçtin",
+      "versionLabel": null,
+      "genres": [],
+      "isOriginal": null,
+      "coverId": "c-0012",
+      "releaseDate": null,
+      "links": {
+        "spotify": null,
+        "youtube": null,
+        "youtubeMusic": null,
+        "appleMusic": null,
+        "other": []
+      }
+    },
+    {
+      "id": "r-0013",
+      "workId": "w-0013",
+      "title": "Benimle Yaşlanacaktın",
+      "versionLabel": null,
+      "genres": [],
+      "isOriginal": null,
+      "coverId": "c-0013",
+      "releaseDate": null,
+      "links": {
+        "spotify": null,
+        "youtube": null,
+        "youtubeMusic": null,
+        "appleMusic": null,
+        "other": []
+      }
+    },
+    {
+      "id": "r-0014",
+      "workId": "w-0065",
+      "title": "Biliyorum (Rock Ballad Version)",
+      "versionLabel": "Rock Ballad Version",
+      "genres": [
+        "rock-ballad"
+      ],
+      "isOriginal": false,
+      "coverId": "c-0014",
+      "releaseDate": null,
+      "links": {
+        "spotify": null,
+        "youtube": null,
+        "youtubeMusic": null,
+        "appleMusic": null,
+        "other": []
+      }
+    },
+    {
+      "id": "r-0015",
+      "workId": "w-0014",
+      "title": "Biliyorum",
+      "versionLabel": null,
+      "genres": [
+        "pop"
+      ],
+      "isOriginal": true,
+      "coverId": "c-0015",
+      "releaseDate": null,
+      "links": {
+        "spotify": null,
+        "youtube": null,
+        "youtubeMusic": null,
+        "appleMusic": null,
+        "other": []
+      }
+    },
+    {
+      "id": "r-0016",
+      "workId": "w-0015",
+      "title": "Bir Güzel Sevdim",
+      "versionLabel": null,
+      "genres": [],
+      "isOriginal": null,
+      "coverId": "c-0016",
+      "releaseDate": null,
+      "links": {
+        "spotify": null,
+        "youtube": null,
+        "youtubeMusic": null,
+        "appleMusic": null,
+        "other": []
+      }
+    },
+    {
+      "id": "r-0017",
+      "workId": "w-0016",
+      "title": "Bir Kedim Var",
+      "versionLabel": null,
+      "genres": [],
+      "isOriginal": null,
+      "coverId": "c-0017",
+      "releaseDate": null,
+      "links": {
+        "spotify": null,
+        "youtube": null,
+        "youtubeMusic": null,
+        "appleMusic": null,
+        "other": []
+      }
+    },
+    {
+      "id": "r-0018",
+      "workId": "w-0017",
+      "title": "Biten Sadece Zaman",
+      "versionLabel": null,
+      "genres": [],
+      "isOriginal": null,
+      "coverId": "c-0018",
+      "releaseDate": null,
+      "links": {
+        "spotify": null,
+        "youtube": null,
+        "youtubeMusic": null,
+        "appleMusic": null,
+        "other": []
+      }
+    },
+    {
+      "id": "r-0019",
+      "workId": "w-0018",
+      "title": "Boğa",
+      "versionLabel": null,
+      "genres": [],
+      "isOriginal": null,
+      "coverId": "c-0019",
+      "releaseDate": null,
+      "links": {
+        "spotify": null,
+        "youtube": null,
+        "youtubeMusic": null,
+        "appleMusic": null,
+        "other": []
+      }
+    },
+    {
+      "id": "r-0020",
+      "workId": "w-0019",
+      "title": "Boşver Geç",
+      "versionLabel": null,
+      "genres": [],
+      "isOriginal": null,
+      "coverId": "c-0020",
+      "releaseDate": null,
+      "links": {
+        "spotify": null,
+        "youtube": null,
+        "youtubeMusic": null,
+        "appleMusic": null,
+        "other": []
+      }
+    },
+    {
+      "id": "r-0021",
+      "workId": "w-0066",
+      "title": "Böyle Bir Şey",
+      "versionLabel": null,
+      "genres": [],
+      "isOriginal": null,
+      "coverId": "c-0021",
+      "releaseDate": null,
+      "links": {
+        "spotify": null,
+        "youtube": null,
+        "youtubeMusic": null,
+        "appleMusic": null,
+        "other": []
+      }
+    },
+    {
+      "id": "r-0022",
+      "workId": "w-0021",
+      "title": "Bugün Benim Doğum Günüm",
+      "versionLabel": null,
+      "genres": [],
+      "isOriginal": null,
+      "coverId": "c-0022",
+      "releaseDate": null,
+      "links": {
+        "spotify": null,
+        "youtube": null,
+        "youtubeMusic": null,
+        "appleMusic": null,
+        "other": []
+      }
+    },
+    {
+      "id": "r-0023",
+      "workId": "w-0022",
+      "title": "Çarpıldım Sana",
+      "versionLabel": null,
+      "genres": [],
+      "isOriginal": null,
+      "coverId": "c-0023",
+      "releaseDate": null,
+      "links": {
+        "spotify": null,
+        "youtube": null,
+        "youtubeMusic": null,
+        "appleMusic": null,
+        "other": []
+      }
+    },
+    {
+      "id": "r-0024",
+      "workId": "w-0023",
+      "title": "Çat Çat Çat",
+      "versionLabel": null,
+      "genres": [],
+      "isOriginal": null,
+      "coverId": "c-0024",
+      "releaseDate": null,
+      "links": {
+        "spotify": null,
+        "youtube": null,
+        "youtubeMusic": null,
+        "appleMusic": null,
+        "other": []
+      }
+    },
+    {
+      "id": "r-0025",
+      "workId": "w-0024",
+      "title": "Çekip Gittin",
+      "versionLabel": null,
+      "genres": [],
+      "isOriginal": null,
+      "coverId": "c-0025",
+      "releaseDate": null,
+      "links": {
+        "spotify": null,
+        "youtube": null,
+        "youtubeMusic": null,
+        "appleMusic": null,
+        "other": []
+      }
+    },
+    {
+      "id": "r-0026",
+      "workId": "w-0025",
+      "title": "Çok Sevince İnsanı",
+      "versionLabel": null,
+      "genres": [],
+      "isOriginal": null,
+      "coverId": "c-0026",
+      "releaseDate": null,
+      "links": {
+        "spotify": "https://open.spotify.com/intl-tr/album/2m94UOFfNo6rgepMcIPe4y",
+        "youtube": null,
+        "youtubeMusic": "https://music.youtube.com/watch?v=N_2B6ZBbbMU",
+        "appleMusic": "https://music.apple.com/us/song/%C3%A7ok-sevince-i-nsan%C4%B1/6812929297",
+        "other": []
+      }
+    },
+    {
+      "id": "r-0027",
+      "workId": "w-0026",
+      "title": "Du bist der Grund",
+      "versionLabel": null,
+      "genres": [],
+      "isOriginal": null,
+      "coverId": "c-0027",
+      "releaseDate": null,
+      "links": {
+        "spotify": null,
+        "youtube": null,
+        "youtubeMusic": null,
+        "appleMusic": null,
+        "other": []
+      }
+    },
+    {
+      "id": "r-0028",
+      "workId": "w-0027",
+      "title": "Eksilmeyen",
+      "versionLabel": null,
+      "genres": [],
+      "isOriginal": null,
+      "coverId": "c-0028",
+      "releaseDate": null,
+      "links": {
+        "spotify": null,
+        "youtube": null,
+        "youtubeMusic": null,
+        "appleMusic": null,
+        "other": []
+      }
+    },
+    {
+      "id": "r-0029",
+      "workId": "w-0028",
+      "title": "Elimi Sıktın",
+      "versionLabel": null,
+      "genres": [],
+      "isOriginal": null,
+      "coverId": "c-0029",
+      "releaseDate": null,
+      "links": {
+        "spotify": null,
+        "youtube": null,
+        "youtubeMusic": null,
+        "appleMusic": null,
+        "other": []
+      }
+    },
+    {
+      "id": "r-0030",
+      "workId": "w-0029",
+      "title": "Fishka",
+      "versionLabel": null,
+      "genres": [],
+      "isOriginal": null,
+      "coverId": "c-0030",
+      "releaseDate": null,
+      "links": {
+        "spotify": null,
+        "youtube": null,
+        "youtubeMusic": null,
+        "appleMusic": null,
+        "other": []
+      }
+    },
+    {
+      "id": "r-0031",
+      "workId": "w-0030",
+      "title": "Gece Olunca",
+      "versionLabel": null,
+      "genres": [],
+      "isOriginal": null,
+      "coverId": "c-0031",
+      "releaseDate": null,
+      "links": {
+        "spotify": null,
+        "youtube": null,
+        "youtubeMusic": null,
+        "appleMusic": null,
+        "other": []
+      }
+    },
+    {
+      "id": "r-0032",
+      "workId": "w-0031",
+      "title": "Günleri Saya Saya",
+      "versionLabel": null,
+      "genres": [],
+      "isOriginal": null,
+      "coverId": "c-0032",
+      "releaseDate": null,
+      "links": {
+        "spotify": null,
+        "youtube": null,
+        "youtubeMusic": null,
+        "appleMusic": null,
+        "other": []
+      }
+    },
+    {
+      "id": "r-0033",
+      "workId": "w-0032",
+      "title": "Haberleşiriz",
+      "versionLabel": null,
+      "genres": [],
+      "isOriginal": null,
+      "coverId": "c-0033",
+      "releaseDate": null,
+      "links": {
+        "spotify": null,
+        "youtube": null,
+        "youtubeMusic": null,
+        "appleMusic": null,
+        "other": []
+      }
+    },
+    {
+      "id": "r-0034",
+      "workId": "w-0033",
+      "title": "Hafta",
+      "versionLabel": null,
+      "genres": [],
+      "isOriginal": null,
+      "coverId": "c-0034",
+      "releaseDate": null,
+      "links": {
+        "spotify": null,
+        "youtube": null,
+        "youtubeMusic": null,
+        "appleMusic": null,
+        "other": []
+      }
+    },
+    {
+      "id": "r-0035",
+      "workId": "w-0034",
+      "title": "Hasret Bitecek",
+      "versionLabel": null,
+      "genres": [],
+      "isOriginal": null,
+      "coverId": "c-0035",
+      "releaseDate": null,
+      "links": {
+        "spotify": null,
+        "youtube": null,
+        "youtubeMusic": null,
+        "appleMusic": null,
+        "other": []
+      }
+    },
+    {
+      "id": "r-0036",
+      "workId": "w-0035",
+      "title": "Haydi Dene",
+      "versionLabel": null,
+      "genres": [],
+      "isOriginal": null,
+      "coverId": "c-0036",
+      "releaseDate": null,
+      "links": {
+        "spotify": null,
+        "youtube": null,
+        "youtubeMusic": null,
+        "appleMusic": null,
+        "other": []
+      }
+    },
+    {
+      "id": "r-0037",
+      "workId": "w-0036",
+      "title": "Haziran",
+      "versionLabel": null,
+      "genres": [],
+      "isOriginal": null,
+      "coverId": "c-0037",
+      "releaseDate": null,
+      "links": {
+        "spotify": null,
+        "youtube": null,
+        "youtubeMusic": null,
+        "appleMusic": null,
+        "other": []
+      }
+    },
+    {
+      "id": "r-0038",
+      "workId": "w-0037",
+      "title": "Ich meld' mich...",
+      "versionLabel": null,
+      "genres": [],
+      "isOriginal": null,
+      "coverId": "c-0038",
+      "releaseDate": null,
+      "links": {
+        "spotify": null,
+        "youtube": null,
+        "youtubeMusic": null,
+        "appleMusic": null,
+        "other": []
+      }
+    },
+    {
+      "id": "r-0039",
+      "workId": "w-0038",
+      "title": "İkizler",
+      "versionLabel": null,
+      "genres": [],
+      "isOriginal": null,
+      "coverId": "c-0039",
+      "releaseDate": null,
+      "links": {
+        "spotify": null,
+        "youtube": null,
+        "youtubeMusic": null,
+        "appleMusic": null,
+        "other": []
+      }
+    },
+    {
+      "id": "r-0040",
+      "workId": "w-0039",
+      "title": "Kabuğumu Bıraktım",
+      "versionLabel": null,
+      "genres": [],
+      "isOriginal": null,
+      "coverId": "c-0040",
+      "releaseDate": null,
+      "links": {
+        "spotify": null,
+        "youtube": null,
+        "youtubeMusic": null,
+        "appleMusic": null,
+        "other": []
+      }
+    },
+    {
+      "id": "r-0041",
+      "workId": "w-0040",
+      "title": "Kahve Falı",
+      "versionLabel": null,
+      "genres": [],
+      "isOriginal": null,
+      "coverId": "c-0041",
+      "releaseDate": null,
+      "links": {
+        "spotify": null,
+        "youtube": null,
+        "youtubeMusic": null,
+        "appleMusic": null,
+        "other": []
+      }
+    },
+    {
+      "id": "r-0042",
+      "workId": "w-0041",
+      "title": "Kahve Molası",
+      "versionLabel": null,
+      "genres": [],
+      "isOriginal": null,
+      "coverId": "c-0042",
+      "releaseDate": null,
+      "links": {
+        "spotify": null,
+        "youtube": null,
+        "youtubeMusic": null,
+        "appleMusic": null,
+        "other": []
+      }
+    },
+    {
+      "id": "r-0043",
+      "workId": "w-0042",
+      "title": "Kendimi Arıyorum",
+      "versionLabel": null,
+      "genres": [],
+      "isOriginal": null,
+      "coverId": "c-0043",
+      "releaseDate": null,
+      "links": {
+        "spotify": null,
+        "youtube": null,
+        "youtubeMusic": null,
+        "appleMusic": null,
+        "other": []
+      }
+    },
+    {
+      "id": "r-0044",
+      "workId": "w-0043",
+      "title": "Kiminle",
+      "versionLabel": null,
+      "genres": [],
+      "isOriginal": null,
+      "coverId": "c-0044",
+      "releaseDate": null,
+      "links": {
+        "spotify": null,
+        "youtube": null,
+        "youtubeMusic": null,
+        "appleMusic": null,
+        "other": []
+      }
+    },
+    {
+      "id": "r-0045",
+      "workId": "w-0044",
+      "title": "Koç",
+      "versionLabel": null,
+      "genres": [],
+      "isOriginal": null,
+      "coverId": "c-0045",
+      "releaseDate": null,
+      "links": {
+        "spotify": null,
+        "youtube": null,
+        "youtubeMusic": null,
+        "appleMusic": null,
+        "other": []
+      }
+    },
+    {
+      "id": "r-0046",
+      "workId": "w-0045",
+      "title": "Kova",
+      "versionLabel": null,
+      "genres": [],
+      "isOriginal": null,
+      "coverId": "c-0046",
+      "releaseDate": null,
+      "links": {
+        "spotify": null,
+        "youtube": null,
+        "youtubeMusic": null,
+        "appleMusic": null,
+        "other": []
+      }
+    },
+    {
+      "id": "r-0047",
+      "workId": "w-0046",
+      "title": "Mutlu Yıllar",
+      "versionLabel": null,
+      "genres": [],
+      "isOriginal": null,
+      "coverId": "c-0047",
+      "releaseDate": null,
+      "links": {
+        "spotify": null,
+        "youtube": null,
+        "youtubeMusic": null,
+        "appleMusic": null,
+        "other": []
+      }
+    },
+    {
+      "id": "r-0048",
+      "workId": "w-0047",
+      "title": "Nerdesin",
+      "versionLabel": null,
+      "genres": [],
+      "isOriginal": null,
+      "coverId": "c-0048",
+      "releaseDate": null,
+      "links": {
+        "spotify": null,
+        "youtube": null,
+        "youtubeMusic": null,
+        "appleMusic": null,
+        "other": []
+      }
+    },
+    {
+      "id": "r-0049",
+      "workId": "w-0048",
+      "title": "Neredeyim Ben",
+      "versionLabel": null,
+      "genres": [],
+      "isOriginal": null,
+      "coverId": "c-0049",
+      "releaseDate": null,
+      "links": {
+        "spotify": null,
+        "youtube": null,
+        "youtubeMusic": null,
+        "appleMusic": null,
+        "other": []
+      }
+    },
+    {
+      "id": "r-0050",
+      "workId": "w-0049",
+      "title": "Oğlak",
+      "versionLabel": null,
+      "genres": [],
+      "isOriginal": null,
+      "coverId": "c-0050",
+      "releaseDate": null,
+      "links": {
+        "spotify": null,
+        "youtube": null,
+        "youtubeMusic": null,
+        "appleMusic": null,
+        "other": []
+      }
+    },
+    {
+      "id": "r-0051",
+      "workId": "w-0020",
+      "title": "Öyle Bir Şey",
+      "versionLabel": null,
+      "genres": [],
+      "isOriginal": null,
+      "coverId": "c-0051",
+      "releaseDate": null,
+      "links": {
+        "spotify": null,
+        "youtube": null,
+        "youtubeMusic": null,
+        "appleMusic": null,
+        "other": []
+      }
+    },
+    {
+      "id": "r-0052",
+      "workId": "w-0050",
+      "title": "Sebebi Sensin",
+      "versionLabel": null,
+      "genres": [],
+      "isOriginal": null,
+      "coverId": "c-0052",
+      "releaseDate": null,
+      "links": {
+        "spotify": null,
+        "youtube": null,
+        "youtubeMusic": null,
+        "appleMusic": null,
+        "other": []
+      }
+    },
+    {
+      "id": "r-0053",
+      "workId": "w-0051",
+      "title": "Seninle",
+      "versionLabel": null,
+      "genres": [],
+      "isOriginal": null,
+      "coverId": "c-0053",
+      "releaseDate": null,
+      "links": {
+        "spotify": null,
+        "youtube": null,
+        "youtubeMusic": null,
+        "appleMusic": null,
+        "other": []
+      }
+    },
+    {
+      "id": "r-0054",
+      "workId": "w-0052",
+      "title": "Sonsuza Kadar",
+      "versionLabel": null,
+      "genres": [],
+      "isOriginal": null,
+      "coverId": "c-0054",
+      "releaseDate": null,
+      "links": {
+        "spotify": null,
+        "youtube": null,
+        "youtubeMusic": null,
+        "appleMusic": null,
+        "other": []
+      }
+    },
+    {
+      "id": "r-0055",
+      "workId": "w-0053",
+      "title": "Söz Verdim",
+      "versionLabel": null,
+      "genres": [],
+      "isOriginal": null,
+      "coverId": "c-0055",
+      "releaseDate": null,
+      "links": {
+        "spotify": null,
+        "youtube": null,
+        "youtubeMusic": null,
+        "appleMusic": null,
+        "other": []
+      }
+    },
+    {
+      "id": "r-0056",
+      "workId": "w-0054",
+      "title": "Tebessümler Yüzümde",
+      "versionLabel": null,
+      "genres": [],
+      "isOriginal": null,
+      "coverId": "c-0056",
+      "releaseDate": null,
+      "links": {
+        "spotify": null,
+        "youtube": null,
+        "youtubeMusic": null,
+        "appleMusic": null,
+        "other": []
+      }
+    },
+    {
+      "id": "r-0057",
+      "workId": "w-0055",
+      "title": "Terazi",
+      "versionLabel": null,
+      "genres": [],
+      "isOriginal": null,
+      "coverId": "c-0057",
+      "releaseDate": null,
+      "links": {
+        "spotify": null,
+        "youtube": null,
+        "youtubeMusic": null,
+        "appleMusic": null,
+        "other": []
+      }
+    },
+    {
+      "id": "r-0058",
+      "workId": "w-0067",
+      "title": "Turizmci (Pop Versiyon)",
+      "versionLabel": "Pop Versiyon",
+      "genres": [
+        "pop"
+      ],
+      "isOriginal": false,
+      "coverId": "c-0058",
+      "releaseDate": null,
+      "links": {
+        "spotify": null,
+        "youtube": null,
+        "youtubeMusic": null,
+        "appleMusic": null,
+        "other": []
+      }
+    },
+    {
+      "id": "r-0059",
+      "workId": "w-0056",
+      "title": "Turizmci",
+      "versionLabel": null,
+      "genres": [
+        "pop"
+      ],
+      "isOriginal": true,
+      "coverId": "c-0059",
+      "releaseDate": null,
+      "links": {
+        "spotify": null,
+        "youtube": null,
+        "youtubeMusic": null,
+        "appleMusic": null,
+        "other": []
+      }
+    },
+    {
+      "id": "r-0060",
+      "workId": "w-0057",
+      "title": "Türbülans",
+      "versionLabel": null,
+      "genres": [],
+      "isOriginal": null,
+      "coverId": "c-0060",
+      "releaseDate": null,
+      "links": {
+        "spotify": null,
+        "youtube": null,
+        "youtubeMusic": null,
+        "appleMusic": null,
+        "other": []
+      }
+    },
+    {
+      "id": "r-0061",
+      "workId": "w-0058",
+      "title": "Wegen Dir",
+      "versionLabel": null,
+      "genres": [],
+      "isOriginal": null,
+      "coverId": "c-0061",
+      "releaseDate": null,
+      "links": {
+        "spotify": null,
+        "youtube": null,
+        "youtubeMusic": null,
+        "appleMusic": null,
+        "other": []
+      }
+    },
+    {
+      "id": "r-0062",
+      "workId": "w-0059",
+      "title": "Yay",
+      "versionLabel": null,
+      "genres": [],
+      "isOriginal": null,
+      "coverId": "c-0062",
+      "releaseDate": null,
+      "links": {
+        "spotify": null,
+        "youtube": null,
+        "youtubeMusic": null,
+        "appleMusic": null,
+        "other": []
+      }
+    },
+    {
+      "id": "r-0063",
+      "workId": "w-0060",
+      "title": "Yengeç",
+      "versionLabel": null,
+      "genres": [],
+      "isOriginal": null,
+      "coverId": "c-0063",
+      "releaseDate": null,
+      "links": {
+        "spotify": null,
+        "youtube": null,
+        "youtubeMusic": null,
+        "appleMusic": null,
+        "other": []
+      }
+    },
+    {
+      "id": "r-0064",
+      "workId": "w-0061",
+      "title": "Yenik Yüreğim (Pop Version)",
+      "versionLabel": "Pop Version",
+      "genres": [
+        "pop"
+      ],
+      "isOriginal": true,
+      "coverId": "c-0064",
+      "releaseDate": null,
+      "links": {
+        "spotify": null,
+        "youtube": null,
+        "youtubeMusic": null,
+        "appleMusic": null,
+        "other": []
+      }
+    },
+    {
+      "id": "r-0065",
+      "workId": "w-0068",
+      "title": "Yenik Yüreğim (Thrash Metal Version)",
+      "versionLabel": "Thrash Metal Version",
+      "genres": [
+        "thrash-metal"
+      ],
+      "isOriginal": false,
+      "coverId": "c-0065",
+      "releaseDate": null,
+      "links": {
+        "spotify": null,
+        "youtube": null,
+        "youtubeMusic": null,
+        "appleMusic": null,
+        "other": []
+      }
+    },
+    {
+      "id": "r-0066",
+      "workId": "w-0062",
+      "title": "Yine Üşüyorum",
+      "versionLabel": null,
+      "genres": [],
+      "isOriginal": null,
+      "coverId": "c-0066",
+      "releaseDate": null,
+      "links": {
+        "spotify": null,
+        "youtube": null,
+        "youtubeMusic": null,
+        "appleMusic": null,
+        "other": []
+      }
+    },
+    {
+      "id": "r-0067",
+      "workId": "w-0063",
+      "title": "Yoksun Ama...",
+      "versionLabel": null,
+      "genres": [],
+      "isOriginal": null,
+      "coverId": "c-0067",
+      "releaseDate": null,
+      "links": {
+        "spotify": null,
+        "youtube": null,
+        "youtubeMusic": null,
+        "appleMusic": null,
+        "other": []
+      }
+    },
+    {
+      "id": "r-0068",
+      "workId": "w-0064",
+      "title": "Yoksun",
+      "versionLabel": null,
+      "genres": [],
+      "isOriginal": null,
+      "coverId": "c-0068",
+      "releaseDate": null,
+      "links": {
+        "spotify": null,
+        "youtube": null,
+        "youtubeMusic": null,
+        "appleMusic": null,
+        "other": []
+      }
+    }
+  ],
+  "covers": [
+    {
+      "id": "c-0001",
+      "sourceFileName": "Ağlama.jpg",
+      "format": "jpeg",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 1196136,
+      "sha256": "0719e8584fa01e3dfa2ab95f954f8fa1e92f821afa17c93641f9824cf3039095",
+      "webImages": [
+        {
+          "path": "images/c-0001-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 26510,
+          "sha256": "5e3951c472ae6460778c5fb0b4152bd42aba80d74cc64343261ac6c17afbccdf"
+        },
+        {
+          "path": "images/c-0001-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 74746,
+          "sha256": "0d7e57b06f0884325151caa7b9c19e93a863073eefbe4df3372a0b53807128ae"
+        },
+        {
+          "path": "images/c-0001-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 128608,
+          "sha256": "9ab837cdc32c3e27207482d42578c4db6e567f44a88f2e2dbf7b05a490f14020"
+        }
+      ]
+    },
+    {
+      "id": "c-0002",
+      "sourceFileName": "Akrep 23 Ekim21 Kasım.jpg",
+      "format": "jpeg",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 1236917,
+      "sha256": "7e7b18b63706a128efee9c89790b8d4d91ad346ac0fb932d88ebd86ef9f069b6",
+      "webImages": [
+        {
+          "path": "images/c-0002-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 26806,
+          "sha256": "ad290f02d194a7d32458d6638291df6eb7639720be541134270218c29a882952"
+        },
+        {
+          "path": "images/c-0002-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 80776,
+          "sha256": "161af8bf4abb49b6482282d558e3fd3df25cec14d84177563fdf972da90acce7"
+        },
+        {
+          "path": "images/c-0002-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 140640,
+          "sha256": "7b5aadc3bab2678aca6033f38c8167067c418107d752c026baf3bf1c11f05509"
+        }
+      ]
+    },
+    {
+      "id": "c-0003",
+      "sourceFileName": "Angaralı Hasret.jpg",
+      "format": "jpeg",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 1850402,
+      "sha256": "b18c6bab92ab2283781eb8e6210862c97c75c9ab307fdad0f594da9d524a1e7e",
+      "webImages": [
+        {
+          "path": "images/c-0003-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 40088,
+          "sha256": "35f09ba7372ffbff01e1db326a1caf5798571f38251f7ae9ff12fc2d1244813e"
+        },
+        {
+          "path": "images/c-0003-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 114324,
+          "sha256": "2f6611bff50fc4746aea326b79f7cfbef1bccd9ea595da800e1a94c978554c8d"
+        },
+        {
+          "path": "images/c-0003-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 190166,
+          "sha256": "1b4a694b43e1a673290921b767de36cd68b07dafd9ef398f68f6f2251c5e4e4a"
+        }
+      ]
+    },
+    {
+      "id": "c-0004",
+      "sourceFileName": "Anneler Günü.jpg",
+      "format": "jpeg",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 1341265,
+      "sha256": "da99d6969d972c3aea669cd2ef031b8cb9ba99e69820a98da9ba3b03e39e0920",
+      "webImages": [
+        {
+          "path": "images/c-0004-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 18864,
+          "sha256": "c57a0c18bf5595ede76cb1f528aee261ecfa51ea57a9cc34be6914d655ea1950"
+        },
+        {
+          "path": "images/c-0004-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 53456,
+          "sha256": "fa6e0869f75da0572f1215f43fa0861f216eb3717e5c4dc52642d8c8dfdd25a1"
+        },
+        {
+          "path": "images/c-0004-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 92886,
+          "sha256": "f8cde7b66de41e25ede892e984ad76607f38560ae260971cef11f53b5c6f6a4f"
+        }
+      ]
+    },
+    {
+      "id": "c-0005",
+      "sourceFileName": "Aslan 23 Temmuz22 Ağustos.jpg",
+      "format": "jpeg",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 1632966,
+      "sha256": "231552577eed0dd2dd20c685cdc01e510f61968a9b2fd514553ed662cb68cfe0",
+      "webImages": [
+        {
+          "path": "images/c-0005-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 39990,
+          "sha256": "03c12b65eae294d7a7a19fa0c9a3bb333c19882125a001322b6750a07f9b667e"
+        },
+        {
+          "path": "images/c-0005-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 128302,
+          "sha256": "d1df383f68108fedf0cb5c98bccd4f9f4819e75fdc34a6e94d9e551f06ded04e"
+        },
+        {
+          "path": "images/c-0005-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 228222,
+          "sha256": "80dcf622569cd40b7c00d959c320df87ea0021ae590a65001a497e5b3596dae8"
+        }
+      ]
+    },
+    {
+      "id": "c-0006",
+      "sourceFileName": "Aşkım.jpg",
+      "format": "jpeg",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 1144305,
+      "sha256": "8d3a159f2d18254c91acc9b00b2000024597d6feb455fce91679e2b1f3090a84",
+      "webImages": [
+        {
+          "path": "images/c-0006-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 31014,
+          "sha256": "67baf5c02c46032fa00cbd834585baeccb782e33f7b878cb136b962f320b5130"
+        },
+        {
+          "path": "images/c-0006-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 78880,
+          "sha256": "b1dae581e61cffa189d12e550eaac6f4cc511777ec4983089df22fb9aeeb1f8a"
+        },
+        {
+          "path": "images/c-0006-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 129564,
+          "sha256": "ddc52dc2bcced88fb85806378d4b21fa1532d557f3d9826485c945ae8cbf69ca"
+        }
+      ]
+    },
+    {
+      "id": "c-0007",
+      "sourceFileName": "Babalar Günü.jpg",
+      "format": "jpeg",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 1960201,
+      "sha256": "d338b0eb36b9f21241cffb0534e5a517131f75ff1909f5dae141d6d9d377d855",
+      "webImages": [
+        {
+          "path": "images/c-0007-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 32456,
+          "sha256": "316bf0a3cbe3caab43eb58d1c5f0b92baea2ce2b41576fab2d5ccca342a882cd"
+        },
+        {
+          "path": "images/c-0007-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 90094,
+          "sha256": "95e214e7fa31b947f922bddcfd30490e4d244861abdb9aab6350b662f4e3db61"
+        },
+        {
+          "path": "images/c-0007-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 152696,
+          "sha256": "d0db85f1009730964e3f3340543f42c4a5dcf45f2c5e4a0cb5920dd2f11d74fc"
+        }
+      ]
+    },
+    {
+      "id": "c-0008",
+      "sourceFileName": "Balık 19 Şubat20 Mart.jpg",
+      "format": "jpeg",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 1574081,
+      "sha256": "412d4bd475fdb66834d6b9cfe030549e69edc4af6e691dabd25a42a6445b2591",
+      "webImages": [
+        {
+          "path": "images/c-0008-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 37858,
+          "sha256": "01f4d8d76141d8e57f44841256bc8d78548046374417ce5f355b98be77d4391a"
+        },
+        {
+          "path": "images/c-0008-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 119440,
+          "sha256": "80f38ef2e7b807f3c14dcf1e3540db19991f9d976370c9c66de17fb3fc717496"
+        },
+        {
+          "path": "images/c-0008-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 209010,
+          "sha256": "cdc0948da8b41ccd846d48dab63fe18ffc27aa5fc5469037f892ff872f78e1c9"
+        }
+      ]
+    },
+    {
+      "id": "c-0009",
+      "sourceFileName": "Başak 23 Ağustos22 Eylül.jpg",
+      "format": "jpeg",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 1637303,
+      "sha256": "f36f21f7c1cbc53e70f6fd4ce048f8a97fe9b456cc2daffdedcace59f332b759",
+      "webImages": [
+        {
+          "path": "images/c-0009-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 41470,
+          "sha256": "7c4e2f854ee8cc54f16b7be57b58cd9f98d585d4bc0f292e88910c2419e3b24c"
+        },
+        {
+          "path": "images/c-0009-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 131248,
+          "sha256": "db057b6a4664cb8360badc75c7dfbf77446b9bf76fc0ac8a9c5d352850aaa3fa"
+        },
+        {
+          "path": "images/c-0009-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 228358,
+          "sha256": "64d40ff1dc3bb467b0d1c0a289d268226db9af6466aba82a7b8e6369d49fc41b"
+        }
+      ]
+    },
+    {
+      "id": "c-0010",
+      "sourceFileName": "Ben Boğa'yım.jpg",
+      "format": "jpeg",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 2002707,
+      "sha256": "e567234cab2e9faed81219a4e847df3a556789f6f8d0e753dac7bfa49bf00fe0",
+      "webImages": [
+        {
+          "path": "images/c-0010-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 33144,
+          "sha256": "e7f6866f26b962e3bf8811dd0b696820e1d341bb7a0ba16cf069e3e181b244ec"
+        },
+        {
+          "path": "images/c-0010-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 98810,
+          "sha256": "99d7099e836b5f9c30d952f8d0e02e6714c3891741a2cd27763e20ee4c034328"
+        },
+        {
+          "path": "images/c-0010-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 169848,
+          "sha256": "5a58a952abab8f14e587b4862af51b2b9fa581d5436823fc123367f970f0bfc9"
+        }
+      ]
+    },
+    {
+      "id": "c-0011",
+      "sourceFileName": "Beni Sal.jpeg",
+      "format": "jpeg",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 1170369,
+      "sha256": "5aa241f89ac679402380116a97ba80a57cd7997a7b1450b7e3ed7bb38a2106ab",
+      "webImages": [
+        {
+          "path": "images/c-0011-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 14498,
+          "sha256": "caeddcaf7f14aa8458b3a548c7e4df10c4d033412a6f0f4dc30face79217e99c"
+        },
+        {
+          "path": "images/c-0011-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 34958,
+          "sha256": "1c1a9ba8fbada46be6555fe1777cef7193975386fe0db3ace171756f368a92ea"
+        },
+        {
+          "path": "images/c-0011-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 57744,
+          "sha256": "f75e4144a6397df626318bcef0b6ef8234364a9e5e2c53b287c85a45876e893f"
+        }
+      ]
+    },
+    {
+      "id": "c-0012",
+      "sourceFileName": "Beni Yâr Seçtin.jpg",
+      "format": "jpeg",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 1202664,
+      "sha256": "73c17663e69635875e7a67992b27381cde2712c21a5896cd6face8739bc4651e",
+      "webImages": [
+        {
+          "path": "images/c-0012-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 18862,
+          "sha256": "bbed120e732df5c8f790937265707e67e688b1e8b4ec9657a9512e1b7c5de2aa"
+        },
+        {
+          "path": "images/c-0012-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 46244,
+          "sha256": "3630b693bc61c57859068df25727846974b3027303e482d7d6b2cc07e95046dd"
+        },
+        {
+          "path": "images/c-0012-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 77096,
+          "sha256": "353788822f15f38bcda73d56db5aedcd758cad9f1b13acbd624dd2a13979c1d6"
+        }
+      ]
+    },
+    {
+      "id": "c-0013",
+      "sourceFileName": "Benimle yaşlanacaktın.jpg",
+      "format": "jpeg",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 1144786,
+      "sha256": "bb68d184bc46d8a73f4f87a99c6e94386f914d86d7c16e0e92157ab2b1fe92bd",
+      "webImages": [
+        {
+          "path": "images/c-0013-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 13616,
+          "sha256": "b29298c6593d14672bc3e43641ecca22ae245a04622251c462854ca77820bd1a"
+        },
+        {
+          "path": "images/c-0013-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 38132,
+          "sha256": "66b40bf52672db92cede0b01b3fbaa8cb4f2dead7e7ef8ac2a2350aa558482e4"
+        },
+        {
+          "path": "images/c-0013-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 67014,
+          "sha256": "f18ae75e74d35d97ca2595325377ce386018bda4a8ff67da25bc9ffa3363b6bf"
+        }
+      ]
+    },
+    {
+      "id": "c-0014",
+      "sourceFileName": "Biliyorum (Rock Ballad Version).jpg",
+      "format": "jpeg",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 1542316,
+      "sha256": "1a0b7d82aa5f7b27af86cf60dbccf17805de6e0a3557c8f5d0fb3c0086264a80",
+      "webImages": [
+        {
+          "path": "images/c-0014-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 23828,
+          "sha256": "5d6c3d646327e9eaabc2a16363eae7fc25721bdabc7dd9807d975f9eef8ae06d"
+        },
+        {
+          "path": "images/c-0014-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 73602,
+          "sha256": "45afbf4c9dd42af0ccaf589c951528881b456d9d437d213fd0af4035f9c2b380"
+        },
+        {
+          "path": "images/c-0014-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 128948,
+          "sha256": "d718fa41c512343bb3875ef804f8c1986941ef4f9ece4cf630c50ebf765b1ade"
+        }
+      ]
+    },
+    {
+      "id": "c-0015",
+      "sourceFileName": "Biliyorum.jpg",
+      "format": "jpeg",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 1525994,
+      "sha256": "a0c32e548a5d15a935110f99d6fb4a6888117673e36f7bfe2ca0cc54b51d2826",
+      "webImages": [
+        {
+          "path": "images/c-0015-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 18918,
+          "sha256": "7516b7744d0853391bd5025f68f285a1c70e5c463c5f50d9a233be55821fdadc"
+        },
+        {
+          "path": "images/c-0015-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 61538,
+          "sha256": "552ee3015cf2c42fc5ff87f6047cef9340907d3988cf32c7d2e1a909266fef9c"
+        },
+        {
+          "path": "images/c-0015-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 113412,
+          "sha256": "6874b097a1dbcb9d320f053119424ec3ecdafcd13740a3ea72b37a9fc7e75b50"
+        }
+      ]
+    },
+    {
+      "id": "c-0016",
+      "sourceFileName": "Bir Güzel Sevdim.jpg",
+      "format": "jpeg",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 1690164,
+      "sha256": "f73eaf8acbdc69c510edcbf2ba3305ceb358efead1b3224742faf0f06881ca33",
+      "webImages": [
+        {
+          "path": "images/c-0016-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 24618,
+          "sha256": "bda4393171b52e326736858f4b56e10556677f6558ee0600e9612b09621c8357"
+        },
+        {
+          "path": "images/c-0016-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 73110,
+          "sha256": "cdca6a7cdee287429eb9dfcb761a152e0d989a08b8c6957d2f099db71c405651"
+        },
+        {
+          "path": "images/c-0016-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 130104,
+          "sha256": "79747a42c9f1ac7a5e3b871ab581ecd9a254815d99a15ba1d82ba7e703102b7a"
+        }
+      ]
+    },
+    {
+      "id": "c-0017",
+      "sourceFileName": "Bir Kedim Var.jpg",
+      "format": "jpeg",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 1886259,
+      "sha256": "63fee54c7f324801b21688d8b86f11d9609ac8c3880825bb44df08188ef66097",
+      "webImages": [
+        {
+          "path": "images/c-0017-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 29068,
+          "sha256": "e5a043b536c07038346b36552833b57e51f68f85e883afb35d5714900fa549c0"
+        },
+        {
+          "path": "images/c-0017-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 94934,
+          "sha256": "f7bd19240d7eace88a1ff64fe35524438e795c28c7fab8e10de451bedd6f8d5c"
+        },
+        {
+          "path": "images/c-0017-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 170966,
+          "sha256": "810f4f2768fc8e5a6aa505dc14e6c65798c9bbcc59c7ca11074160dd6ba427e6"
+        }
+      ]
+    },
+    {
+      "id": "c-0018",
+      "sourceFileName": "Biten Sadece Zaman.jpg",
+      "format": "jpeg",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 1301449,
+      "sha256": "7ca1897fd0603e5c81f7cb1cc45bc8769b626970462e8b68b21423a5da60ff64",
+      "webImages": [
+        {
+          "path": "images/c-0018-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 33646,
+          "sha256": "41fc01a86a9e4c6df8599bfa7bd9ee3033b5e9ea7678a78f7a20ff35a2557940"
+        },
+        {
+          "path": "images/c-0018-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 93408,
+          "sha256": "6106ecac3211c4895a1ae42d3e73e746c2f540dce33efe1fc0c3942eac1b95fa"
+        },
+        {
+          "path": "images/c-0018-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 156242,
+          "sha256": "46bd06d5d7967be5ce544401afadc2120b6676b45fe57f3660d8a8e8bd5ebbd9"
+        }
+      ]
+    },
+    {
+      "id": "c-0019",
+      "sourceFileName": "Boğa 20 Nisan20 Mayıs.jpg",
+      "format": "jpeg",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 1631871,
+      "sha256": "e315318ffa98bf1776c670bd75a6e1fbb0139d362c1eaea3e0541b92c4be96e7",
+      "webImages": [
+        {
+          "path": "images/c-0019-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 41998,
+          "sha256": "7bc95c6e6b4e05105aef46c87a2cbbaf53e190d256992b8b34e9fef7686d4b3d"
+        },
+        {
+          "path": "images/c-0019-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 131810,
+          "sha256": "0b2976113e5a41213ed6bcd57d5d3742b7ee63c0925c1d38b38fc1f6468ebc3b"
+        },
+        {
+          "path": "images/c-0019-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 228996,
+          "sha256": "66dee565ba42420484232612e141a7b2493adfced3c33985a5c52b7ea69b863c"
+        }
+      ]
+    },
+    {
+      "id": "c-0020",
+      "sourceFileName": "Boşver Geç.jpg",
+      "format": "jpeg",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 648170,
+      "sha256": "bc9549087314e8a461906d61c049633d51b8cf0b3e018aa71a3a4202c453237f",
+      "webImages": [
+        {
+          "path": "images/c-0020-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 21908,
+          "sha256": "1d6bbd8b7184bb409501d9f6618fa3cccbf6508782f7895cfb3efbf9aa318ca5"
+        },
+        {
+          "path": "images/c-0020-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 54756,
+          "sha256": "ed9b506f866d3e0ee00dda79ba8c9bd6fd63efa82fed89f3feb80644cabb8808"
+        },
+        {
+          "path": "images/c-0020-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 91108,
+          "sha256": "e7b478bc80db57c9260b95d44f1bec202cc18d3bd50c00baa4c95274d64129d8"
+        }
+      ]
+    },
+    {
+      "id": "c-0021",
+      "sourceFileName": "Böyle Bir Şey.jpg",
+      "format": "jpeg",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 1467800,
+      "sha256": "1dfb9120a0de6a52de592220996093c99061f50c2fc413c6f359202bb24788fa",
+      "webImages": [
+        {
+          "path": "images/c-0021-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 37010,
+          "sha256": "09d2bd573a10e927b65ef5189a54d5a132b2f913291744e11f899a2e39ae5d65"
+        },
+        {
+          "path": "images/c-0021-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 111864,
+          "sha256": "f5441cff8651c9b08474781de0d52b087a658035c4ae0c3308abb6ad32dd3de3"
+        },
+        {
+          "path": "images/c-0021-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 192656,
+          "sha256": "7b7734d406e4aa2af9164622ae75e14966336beb4ca5b84568921a8fc2e8beaa"
+        }
+      ]
+    },
+    {
+      "id": "c-0022",
+      "sourceFileName": "Bugün Benim Doğum Günüm.jpg",
+      "format": "jpeg",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 1891056,
+      "sha256": "36229745d36215715bee4874f04d063280722d3a42a00f5f125ea522ddcd42a4",
+      "webImages": [
+        {
+          "path": "images/c-0022-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 43498,
+          "sha256": "a37c9d71797403ee276c69b2906cc143069790bd481c5ff3c87c5043d761891f"
+        },
+        {
+          "path": "images/c-0022-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 108502,
+          "sha256": "0ae6ca91d02c95f1448ce984a5aac99ba3c4ddd0a3feaa527f56611aafb9adfa"
+        },
+        {
+          "path": "images/c-0022-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 175506,
+          "sha256": "9428db746f017575de9e6923db61a7c493bb05cc1462941fdfa8b9b580bc9677"
+        }
+      ]
+    },
+    {
+      "id": "c-0023",
+      "sourceFileName": "Çarpıldım sana.jpeg",
+      "format": "jpeg",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 1558057,
+      "sha256": "fbee9407188b6d9caacb25be709829ee8a29743ee031dbf7d55b86a3d81882e3",
+      "webImages": [
+        {
+          "path": "images/c-0023-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 36440,
+          "sha256": "887d4055e38947622740e7fddd5da5be71a2cd65da5b9a86a0c4be59e999edbf"
+        },
+        {
+          "path": "images/c-0023-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 88516,
+          "sha256": "c2866cdc88a2579c72f7ee12160714578c22759c424f64f5e2668a2418b437f1"
+        },
+        {
+          "path": "images/c-0023-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 140920,
+          "sha256": "fbf2e6fe0cdcea9959785463c664c6aaba8633a2c15990f4d56fa4a6760d062c"
+        }
+      ]
+    },
+    {
+      "id": "c-0024",
+      "sourceFileName": "Çat Çat Çat.jpg",
+      "format": "jpeg",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 1709117,
+      "sha256": "31a1e4cd58cb065307ddf631986869f8f240d7bb0735dc18eb1d034877ba4ece",
+      "webImages": [
+        {
+          "path": "images/c-0024-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 37324,
+          "sha256": "f38c22c3b4169e1fd2153f7db532e6d74e44c652197841f3f0191b0783a3ec79"
+        },
+        {
+          "path": "images/c-0024-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 85678,
+          "sha256": "e92666488fa65055daa32a5c9dc7d12242189f04857af58df7167a4ae2e0cd3d"
+        },
+        {
+          "path": "images/c-0024-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 133250,
+          "sha256": "6d87ce11d284e4b82e66a2a0c6afcb210db0c7b4462f1ec727d1e686122f6374"
+        }
+      ]
+    },
+    {
+      "id": "c-0025",
+      "sourceFileName": "Çekip Gittin.jpg",
+      "format": "jpeg",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 1431569,
+      "sha256": "6095eafad9811888630e513ea4626d0190d5232f93bce62ea8919170505235af",
+      "webImages": [
+        {
+          "path": "images/c-0025-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 24694,
+          "sha256": "d8807eac2cc211430f78a30612a88a57166d54b561e147fe96140d2ab8a406fb"
+        },
+        {
+          "path": "images/c-0025-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 67354,
+          "sha256": "51a2e1ed28277eb3b2e38a4f7981c5612d09bcfbd11f61a1f89353c7866f5810"
+        },
+        {
+          "path": "images/c-0025-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 113250,
+          "sha256": "7e5ccb4c0c528595a8f4f52565a7e5dae58ad270b7fa0c9c6599268034e21b3d"
+        }
+      ]
+    },
+    {
+      "id": "c-0026",
+      "sourceFileName": "Çok Sevince İnsanı.jpg",
+      "format": "jpeg",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 1359418,
+      "sha256": "4f10aa8606fde0f1837bbcf14bb5daa05a2652eaaec6f148ea126367302cf066",
+      "webImages": [
+        {
+          "path": "images/c-0026-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 19786,
+          "sha256": "c19a4547169671cbe4f0fe8d78bc2a6dc4e390002e6be669ddcf4587734796f2"
+        },
+        {
+          "path": "images/c-0026-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 54064,
+          "sha256": "475f90cf6c42623f62e28d0597948ca0aef7ba5c95e5d7ac9d120914240322c1"
+        },
+        {
+          "path": "images/c-0026-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 92472,
+          "sha256": "9939b241d8ddfc4e7ee779fef1063d4d53f079a726d4052fe82307f223201765"
+        }
+      ]
+    },
+    {
+      "id": "c-0027",
+      "sourceFileName": "Du bist der Grund.jpg",
+      "format": "jpeg",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 1427893,
+      "sha256": "020d6a9d0dd142e2fe3c22897671227766f01f69b4e5dbac328e1172756c17d7",
+      "webImages": [
+        {
+          "path": "images/c-0027-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 26340,
+          "sha256": "51310848342233d6ef9ee5b8452f0423f6564998c95f81f0e31ff0a7596fa422"
+        },
+        {
+          "path": "images/c-0027-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 75720,
+          "sha256": "6aa2f8098e239923ad20b5b171cdca4c0ab93080162460d80a3280588c90e2d6"
+        },
+        {
+          "path": "images/c-0027-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 124438,
+          "sha256": "2ed749a974772fb832d2d93ea570872307fbac4da3d89e2e6bef0218c140d327"
+        }
+      ]
+    },
+    {
+      "id": "c-0028",
+      "sourceFileName": "Eksilmeyen.jpg",
+      "format": "jpeg",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 1273866,
+      "sha256": "af48949287a7f5c6ebf3dfeaa487ed5f1d4794edbc4808bb78e4a62e7faf5811",
+      "webImages": [
+        {
+          "path": "images/c-0028-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 15138,
+          "sha256": "22e40c6a9ac039221e950a57ca0ee650fa555ab8750bd413150bf8665c813cc9"
+        },
+        {
+          "path": "images/c-0028-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 45820,
+          "sha256": "3c7394d4354c23c27982edbb1606ea85a03057fd29864b987229b0730dd0d606"
+        },
+        {
+          "path": "images/c-0028-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 80456,
+          "sha256": "f1d33824a785dfc91e7b46b843e9006701e536198ec7ccf941a7b1b0852059fc"
+        }
+      ]
+    },
+    {
+      "id": "c-0029",
+      "sourceFileName": "Elimi sıktın.jpg",
+      "format": "jpeg",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 1392273,
+      "sha256": "274a914e63b173a52be0a8deada11f5e1034e6daded818996babe41204b00114",
+      "webImages": [
+        {
+          "path": "images/c-0029-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 11388,
+          "sha256": "18886b25127b04852fe7706fb0bc577d15a5f28b38dae922e882cf7a9de755ef"
+        },
+        {
+          "path": "images/c-0029-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 27500,
+          "sha256": "2772856b03b0a24c9a76a896ca4d3125dc33237017c8e7e5aca9b50a5b82251a"
+        },
+        {
+          "path": "images/c-0029-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 46272,
+          "sha256": "a6dd7b216b7d64b226c9a3658fa5029bbab4b3de4a7bbcad4ef49e1b6115a7c0"
+        }
+      ]
+    },
+    {
+      "id": "c-0030",
+      "sourceFileName": "Fishka.jpg",
+      "format": "jpeg",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 2476151,
+      "sha256": "7c99ab04f441498b9ec36e2968dc81f8649c9dc52f054ea860630d5b2f4c7fe4",
+      "webImages": [
+        {
+          "path": "images/c-0030-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 47982,
+          "sha256": "2220bb493ea99e7d992472a89f186efa0d5332479afa732da75680bbb24ccdd7"
+        },
+        {
+          "path": "images/c-0030-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 143870,
+          "sha256": "658edd52dec1853eabd78200c89e5fd9a90e324c899937b5d31a1cfde64b39ff"
+        },
+        {
+          "path": "images/c-0030-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 246018,
+          "sha256": "ebf7a91cc76b59976482357223447fd7441a665b8fc72823e1e8480784665807"
+        }
+      ]
+    },
+    {
+      "id": "c-0031",
+      "sourceFileName": "Gece Olunca.jpg",
+      "format": "jpeg",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 921536,
+      "sha256": "524818356ba76a70dfa80c13d299ce62ea1521ca0f8e6a3dca5f9ae1be32c63b",
+      "webImages": [
+        {
+          "path": "images/c-0031-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 10266,
+          "sha256": "7537800ecf4a6f57219bcdb6181e4321510b3d34820a592c3fd8010bf85a0b40"
+        },
+        {
+          "path": "images/c-0031-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 29142,
+          "sha256": "9c5def1977ea4cfb99bbc13d589640dd234a7406ba533860b46e9da5cc0a0c10"
+        },
+        {
+          "path": "images/c-0031-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 54060,
+          "sha256": "30040812e660ed5c9ea9c07c538943d3fb17854566759747218ca0731f1a6d67"
+        }
+      ]
+    },
+    {
+      "id": "c-0032",
+      "sourceFileName": "Günleri saya saya.png",
+      "format": "png",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 3150729,
+      "sha256": "475b83dcd3f24e5d15c82611f3c8a2cb3615f4a2bd1d2969a02849a882dbef4a",
+      "webImages": [
+        {
+          "path": "images/c-0032-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 19050,
+          "sha256": "ba0b5e02b7f7d69117177d5a041b447f24d548636c61688582a2b1bea5423cb2"
+        },
+        {
+          "path": "images/c-0032-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 42822,
+          "sha256": "59a91019e7f4b3e20b4be5ff803ba7ac47f185bcb46a3e01e067b7e05c4c03e1"
+        },
+        {
+          "path": "images/c-0032-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 67388,
+          "sha256": "f8f0e14ab361299dff2328848bb060a81ac45ed6dce41ccd85c74f6c1a508945"
+        }
+      ]
+    },
+    {
+      "id": "c-0033",
+      "sourceFileName": "Haberleşiriz.jpg",
+      "format": "jpeg",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 1592126,
+      "sha256": "bc066fea3e82c3c8e9da6c577890d2cd3f0f4f5b59c9ff6fec085dbfe06f5ad3",
+      "webImages": [
+        {
+          "path": "images/c-0033-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 30178,
+          "sha256": "9a9ea3107d28d95fb582464c1717368c6c19c16b4064ac5a201e77d36060fec4"
+        },
+        {
+          "path": "images/c-0033-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 86896,
+          "sha256": "286bcbcdf3724ab5d9142b89580b9c5580c2244242bd2ca48f00f3270859d484"
+        },
+        {
+          "path": "images/c-0033-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 144228,
+          "sha256": "f8921b1b4a26d9799d95db1dfeda0d0a0ae7ea93b3f27b1c45906f1ead6fd944"
+        }
+      ]
+    },
+    {
+      "id": "c-0034",
+      "sourceFileName": "Hafta.jpg",
+      "format": "jpeg",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 690675,
+      "sha256": "93a32fbbaf39296ba1cf9b9af049a4053b1c025f94dda6838e95068d09932ea9",
+      "webImages": [
+        {
+          "path": "images/c-0034-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 19142,
+          "sha256": "05d8d574eca0cdd76d787fcc84a0f48ae8020eb0c685a77d7b4d6c9747c78265"
+        },
+        {
+          "path": "images/c-0034-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 55320,
+          "sha256": "a003d130f3e95e828a6e874d8cfceab942e4b287590a95dab5573852a599afa8"
+        },
+        {
+          "path": "images/c-0034-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 97048,
+          "sha256": "c78b5b999671577dae2423d2b0d2878b8dfb7ec3ad4069a0a717cdf28a93b7c0"
+        }
+      ]
+    },
+    {
+      "id": "c-0035",
+      "sourceFileName": "Hasret Bitecek.jpg",
+      "format": "jpeg",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 1282326,
+      "sha256": "d3d09ab95574dd2597a429cd9a96d8efece2ca7cd01e4a9db01393d9b03bcbd8",
+      "webImages": [
+        {
+          "path": "images/c-0035-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 17002,
+          "sha256": "bdd1eca704de73c315fc0dcd8f65452827904de8f4e9a0e82b6906afb41084af"
+        },
+        {
+          "path": "images/c-0035-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 47002,
+          "sha256": "fc2c81a486a0a081580caf4e0bd2274e5cc302bb94e06d9c3a7449e335002c0d"
+        },
+        {
+          "path": "images/c-0035-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 81562,
+          "sha256": "14d6aad8eadcddbed03cc462f3f1c5626822eaa9ca5b5d894e8ef16fef89cd86"
+        }
+      ]
+    },
+    {
+      "id": "c-0036",
+      "sourceFileName": "Haydi Dene.jpg",
+      "format": "jpeg",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 1485497,
+      "sha256": "0b0769627353e753f1ae9889a1dae41a2c7a1b7432a7a5942b7db68b2b67cb93",
+      "webImages": [
+        {
+          "path": "images/c-0036-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 27434,
+          "sha256": "989d0b26b52b890493a9e391664b4bb48900a277e0acea8a9732174c5d79efa5"
+        },
+        {
+          "path": "images/c-0036-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 69780,
+          "sha256": "f8224d11a9ad432ef18afa9527370597418e89feb16f694fdbdb208de40967ec"
+        },
+        {
+          "path": "images/c-0036-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 112102,
+          "sha256": "0a868a4643f72d6a67d596d7b120e4598bb915a1e5dc4f76cf72a7f22b9eabda"
+        }
+      ]
+    },
+    {
+      "id": "c-0037",
+      "sourceFileName": "Haziran.jpg",
+      "format": "jpeg",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 2004533,
+      "sha256": "1323eb69693f76cb2bae8cd0f992bf803130a18e27c7806e1c9c72239ea8b0bc",
+      "webImages": [
+        {
+          "path": "images/c-0037-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 40642,
+          "sha256": "cc28fbd473b61e4f3bccfd6f5877f341f528b9aacfc5229170a35bee41b00e61"
+        },
+        {
+          "path": "images/c-0037-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 113672,
+          "sha256": "9319d4fbf7a5c5987580699c55a385ca394971ac1184ff2ada5f000a2265c1c7"
+        },
+        {
+          "path": "images/c-0037-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 186074,
+          "sha256": "b13a2bd9d1f38d556206b73f890b65f3f71440e9491ee28674002f86acf34b61"
+        }
+      ]
+    },
+    {
+      "id": "c-0038",
+      "sourceFileName": "Ich meld' mich....jpg",
+      "format": "jpeg",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 1504076,
+      "sha256": "8a9cd9e4a5b855c2dfde81a463cf4faa8ac3288fcdc6b0c98e0f28ecd8ddc460",
+      "webImages": [
+        {
+          "path": "images/c-0038-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 25046,
+          "sha256": "6f0e8cfc10fa11784bf9de31baa7319fa37f5649d7a0495730d6f664c31a5487"
+        },
+        {
+          "path": "images/c-0038-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 70356,
+          "sha256": "dda2786edbd2ba69b5e3943635001cc12964cf5e6b805971057696766acb16fa"
+        },
+        {
+          "path": "images/c-0038-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 115698,
+          "sha256": "75243ca8e9a45ee0b8389b1693505ffaec6ff9551e4ae9f88636322ae37c1458"
+        }
+      ]
+    },
+    {
+      "id": "c-0039",
+      "sourceFileName": "İkizler 21 Mayıs21 Haziran.jpg",
+      "format": "jpeg",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 1603322,
+      "sha256": "63c354491d7ad3288f64e21de5eab63f2c4591cfc4d9d77d333829141c7f1269",
+      "webImages": [
+        {
+          "path": "images/c-0039-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 40230,
+          "sha256": "3d2370bd4865af3aa472d24ab285c2e1be23d006edd3d4c2c0072a0e6ee8aba0"
+        },
+        {
+          "path": "images/c-0039-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 127026,
+          "sha256": "e7c624a5f9bcdbb2fc5645d721a8fb43bb0578a7177c36bdb3f48729d30b6c59"
+        },
+        {
+          "path": "images/c-0039-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 218470,
+          "sha256": "740d33eccdf3d1f3d985452bfda005378454fe9233d12dee93fa4104722018ad"
+        }
+      ]
+    },
+    {
+      "id": "c-0040",
+      "sourceFileName": "Kabuğumu Bıraktım.jpg",
+      "format": "jpeg",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 788131,
+      "sha256": "8e1d6754e2fe51b04d9c569c7c3ad6e0dfe361bd111dbd0b990494349eff3704",
+      "webImages": [
+        {
+          "path": "images/c-0040-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 27054,
+          "sha256": "94bef08bfb3ccc4369ddf8cf5538a7a735b58629089ba4d832ff30d17abfeb4c"
+        },
+        {
+          "path": "images/c-0040-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 75416,
+          "sha256": "4bc9faf24bd2adf990c422f6f5ae7a89e3b317cd467f088866ce23fbaa75ad49"
+        },
+        {
+          "path": "images/c-0040-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 125210,
+          "sha256": "221e009765b1ae62473d0d37d640eec7bd83fbe6b574a279b1d1c8fa37ed467b"
+        }
+      ]
+    },
+    {
+      "id": "c-0041",
+      "sourceFileName": "Kahve Falı.jpg",
+      "format": "jpeg",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 1800855,
+      "sha256": "8ac77482346432f4f03111d1890d36266dd710e05beca513904ecafa671823ce",
+      "webImages": [
+        {
+          "path": "images/c-0041-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 32548,
+          "sha256": "27feac340c4bfd1aecd6ab5eb473454663f69e23e9fc8723b9d3c184eb3e7c63"
+        },
+        {
+          "path": "images/c-0041-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 94348,
+          "sha256": "487e5e30e3d7e8d0b853bbbd8442c9138c403d3549328c5ccc6c3b826702e190"
+        },
+        {
+          "path": "images/c-0041-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 158034,
+          "sha256": "c4faf256043c01c38b3c77773fd05b82e45ad485c44d9a6a7eb9cd766f4e7b27"
+        }
+      ]
+    },
+    {
+      "id": "c-0042",
+      "sourceFileName": "Kahve Molası.jpg",
+      "format": "jpeg",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 1345167,
+      "sha256": "a4fd089d8d2b033cd0a5932ac0b8f5cabdeaea1ea1b8f4ff29d10e7864ac3adf",
+      "webImages": [
+        {
+          "path": "images/c-0042-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 25670,
+          "sha256": "ed84707005adc2f0bedc25955e4bb11c7450b115fabc3953a0bc97649bf966b6"
+        },
+        {
+          "path": "images/c-0042-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 66326,
+          "sha256": "5eab88709d242b35d4197c3357871500669360f829b7909e80b1548acca8aa8b"
+        },
+        {
+          "path": "images/c-0042-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 109986,
+          "sha256": "e060bc8de6912c0e51f51a47f9a3544e89c0ecf113472490b8a5dea691a2b2c2"
+        }
+      ]
+    },
+    {
+      "id": "c-0043",
+      "sourceFileName": "Kendimi arıyorum.jpg",
+      "format": "jpeg",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 911757,
+      "sha256": "aa5211852495ffbb29cd140c74e12cdae0731f2b7cfc79d05547a6975284ad12",
+      "webImages": [
+        {
+          "path": "images/c-0043-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 10088,
+          "sha256": "1d4ca163e4a1ecea986223b04b29c23a46a84e7f062071743c1f34b07240cba8"
+        },
+        {
+          "path": "images/c-0043-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 26680,
+          "sha256": "4a5997521575ed5ca24f215f6f383be11172d710364891a9f02f2cd01128405e"
+        },
+        {
+          "path": "images/c-0043-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 46630,
+          "sha256": "8b8c18e40b0220896dba34ec7e6b9719c2d773dca9587f527a5f98dcded0b297"
+        }
+      ]
+    },
+    {
+      "id": "c-0044",
+      "sourceFileName": "Kiminle.jpg",
+      "format": "jpeg",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 1498355,
+      "sha256": "cfcd16c09fb451599920f0e1239ccf4f4beac362830f2c1ffa14591d084035b4",
+      "webImages": [
+        {
+          "path": "images/c-0044-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 19822,
+          "sha256": "4c39bc74903a8ff2c1b315cc434ce661ff316f1cfd44c6c390bf5dba6ab6917b"
+        },
+        {
+          "path": "images/c-0044-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 53568,
+          "sha256": "a3c1a8929b6510eb2030a8957074746fbdfe30989f75e77fd816c9e9c063dfcf"
+        },
+        {
+          "path": "images/c-0044-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 87524,
+          "sha256": "4f0a617978011448de5e888ec81dd86d35dcb7cc25eca25bce87a71e853522b2"
+        }
+      ]
+    },
+    {
+      "id": "c-0045",
+      "sourceFileName": "Koç 4.jpg",
+      "format": "jpeg",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 1658247,
+      "sha256": "f1cc286d71f0dddc2f5daebe6c396c62c6077b3bf4d1666aaf8f94eac369e292",
+      "webImages": [
+        {
+          "path": "images/c-0045-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 41298,
+          "sha256": "faeee7d5e8c5e4890402ed9a5d085012c940393b85434e8d3096786eaaef097d"
+        },
+        {
+          "path": "images/c-0045-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 135644,
+          "sha256": "1ca6ff25ec1763a668371b79d007c6b0cff35df0d66345bc2c42b395aa8e42f3"
+        },
+        {
+          "path": "images/c-0045-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 233144,
+          "sha256": "fcc1c1166653aceabc804b1f1acb38342a7514a71e5f17196158002ce9c4a720"
+        }
+      ]
+    },
+    {
+      "id": "c-0046",
+      "sourceFileName": "Kova 20 Ocak18 Şubat.jpg",
+      "format": "jpeg",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 1613819,
+      "sha256": "d9998a45e0e7bcae8d0d1762de0b4888871739d47048e5755eb6039ea3549834",
+      "webImages": [
+        {
+          "path": "images/c-0046-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 38172,
+          "sha256": "42f2f977ec6b04e84ac13842e105cd9b0e4c2bea0371a3e72f43ec1f65e898e0"
+        },
+        {
+          "path": "images/c-0046-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 122794,
+          "sha256": "7e3fb1af08cb0ed6c2def6d1e1cb46493845d73571ee6b417ae2b5445175b367"
+        },
+        {
+          "path": "images/c-0046-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 216110,
+          "sha256": "5522df3457aed3c684271599bc52183441cbb008aa843f5b5ea497fb7a1d01a4"
+        }
+      ]
+    },
+    {
+      "id": "c-0047",
+      "sourceFileName": "Mutlu Yıllar.jpg",
+      "format": "jpeg",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 2557175,
+      "sha256": "abf5eb5538c2d12a384e19a3fbba5af576887e36b9d14f7877e7de6f105326f5",
+      "webImages": [
+        {
+          "path": "images/c-0047-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 60694,
+          "sha256": "213bfbb825c7d465b906ca2ca2f143e3f24912c6deabd79c29f41da770063210"
+        },
+        {
+          "path": "images/c-0047-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 159784,
+          "sha256": "13630ba55ce22a26c96f909356be1f3915a984e07f32c173c623c79859f5b32d"
+        },
+        {
+          "path": "images/c-0047-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 262678,
+          "sha256": "c0f30ea667dc8d2efcaac202a4116abb0266c98f46fe4f8f5f94716e6ecda2e1"
+        }
+      ]
+    },
+    {
+      "id": "c-0048",
+      "sourceFileName": "Nerdesin .jpg",
+      "format": "jpeg",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 1361565,
+      "sha256": "c97b1180ed3d02d7f77ebbd35bda729a1bb589ecb72e5c60cbb618a320ad703a",
+      "webImages": [
+        {
+          "path": "images/c-0048-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 15870,
+          "sha256": "ef1023733f2eb930b52bbbc6fc981a2c490ba5cd10b1607b3d80e39de0568f7a"
+        },
+        {
+          "path": "images/c-0048-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 39126,
+          "sha256": "fbf612dc5c812f246d497c885a7747ec196e5c9229d9173c867bb2b3fab35962"
+        },
+        {
+          "path": "images/c-0048-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 64746,
+          "sha256": "ea473dc69b023459d721fe3abae7dfc8665f7441d4925ee7240269e732299c8b"
+        }
+      ]
+    },
+    {
+      "id": "c-0049",
+      "sourceFileName": "Neredeyim ben.jpg",
+      "format": "jpeg",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 1780133,
+      "sha256": "313bf1f7f47d05efd643128cb61926317dbffcb84625d2eafd5d4dde02dc7fb1",
+      "webImages": [
+        {
+          "path": "images/c-0049-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 36434,
+          "sha256": "50204f5d529f7f90d618f790cc3f9ace72808d64f467a9bb6ad3be8f6ed84c7b"
+        },
+        {
+          "path": "images/c-0049-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 101744,
+          "sha256": "1c7484f95b506748ef4f2b521914ca974fb9e98870b273c8213a3fff133778d4"
+        },
+        {
+          "path": "images/c-0049-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 167444,
+          "sha256": "7663aecd9f4c024b1cafa7ad3c7916e1f48dab75ad1c5e0c157c0aa895a19704"
+        }
+      ]
+    },
+    {
+      "id": "c-0050",
+      "sourceFileName": "Oğlak 22 Aralık19 Ocak.jpg",
+      "format": "jpeg",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 1600036,
+      "sha256": "fbd41a197ffb30502b533726d3a44f723de8ca2cc96cfd774f916a049152ec6a",
+      "webImages": [
+        {
+          "path": "images/c-0050-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 37646,
+          "sha256": "5c10da5f38661edda36854e5d5baa1b071d6d5363db1d14489836fe024e57a38"
+        },
+        {
+          "path": "images/c-0050-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 120836,
+          "sha256": "4b2d400eef28992a600cb32616cb67a0fa8ff5dfca6d334f3e6cf0c259b40d43"
+        },
+        {
+          "path": "images/c-0050-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 213462,
+          "sha256": "5fd35e9c19d6f299271cc23331b935a67955fe66c681442654d697ba589093f5"
+        }
+      ]
+    },
+    {
+      "id": "c-0051",
+      "sourceFileName": "Öyle Bir Şey.jpg",
+      "format": "jpeg",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 1012850,
+      "sha256": "1572406fdf78c344c8618b48215497fedf8da59435211fbfb02adadd534ac243",
+      "webImages": [
+        {
+          "path": "images/c-0051-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 23152,
+          "sha256": "0b1cd4a112835056272b383dfbb01172e3aee433dca10f82a84b2aad92470378"
+        },
+        {
+          "path": "images/c-0051-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 60470,
+          "sha256": "de046c1d942553aaaea6dfb8a06609f4c07d8e6f6fbeaa10042191807b7084a7"
+        },
+        {
+          "path": "images/c-0051-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 100180,
+          "sha256": "a07553e489b482ffb82f929f1d1d4c6e9598f882ecb862fa6c90604cbfa99e5b"
+        }
+      ]
+    },
+    {
+      "id": "c-0052",
+      "sourceFileName": "Sebebi sensin.jpg",
+      "format": "jpeg",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 1675001,
+      "sha256": "1479859596ebb08dec9dc75efc08e1d8b6ed7ccd7c5bed5ed7f1956d0c21921e",
+      "webImages": [
+        {
+          "path": "images/c-0052-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 20044,
+          "sha256": "688b3308f87d9c5739697f84aed4229cc100781bdfbc99f957e1df73556fe961"
+        },
+        {
+          "path": "images/c-0052-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 53070,
+          "sha256": "705e6656e05159a55d11f44d210996c2342743213a8a04808908c49a3a27a69c"
+        },
+        {
+          "path": "images/c-0052-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 88116,
+          "sha256": "02fc988a6bca9d47604bfe5fadff60589c77f5391f0769ee2c5abe76a7a8bd83"
+        }
+      ]
+    },
+    {
+      "id": "c-0053",
+      "sourceFileName": "Seninle.jpg",
+      "format": "jpeg",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 1582114,
+      "sha256": "2a0abfa8ddcfcd627a1eed077d44787bf73fc8bfc8bf34613b11839cfc6f0ef7",
+      "webImages": [
+        {
+          "path": "images/c-0053-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 28490,
+          "sha256": "7d12a5abad017e9f8050dc129afef46c1c338099038bf9334c405de75ea639d9"
+        },
+        {
+          "path": "images/c-0053-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 73636,
+          "sha256": "25fb9c9970514bd6decf6c7ce435d47a98aac118fa1df852d1faaa8817798a17"
+        },
+        {
+          "path": "images/c-0053-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 122294,
+          "sha256": "2ed3b42a504e60368b205a8d4f9ad152ac2b3147d74ed90f1af5e7f1e1957297"
+        }
+      ]
+    },
+    {
+      "id": "c-0054",
+      "sourceFileName": "Sonsuza kadar.jpg",
+      "format": "jpeg",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 2291451,
+      "sha256": "2bb974601efca7956defeec876a02e35ef8262f6113c5fca193f30ca26b13522",
+      "webImages": [
+        {
+          "path": "images/c-0054-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 31562,
+          "sha256": "1cafbb4df5f15519cdb03c97f6a2b6f86cf15bce5cd027f05c314daf4d5aa153"
+        },
+        {
+          "path": "images/c-0054-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 104570,
+          "sha256": "e7deb81c4af35f5413fe01085ee84aad889a5ba709912ac886584a2d5d419515"
+        },
+        {
+          "path": "images/c-0054-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 195316,
+          "sha256": "1b325f1790942181cb5fae44f47a387f16bdd17ab3bacc36dd1a43f4ee3a6286"
+        }
+      ]
+    },
+    {
+      "id": "c-0055",
+      "sourceFileName": "Söz Verdim.jpg",
+      "format": "jpeg",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 1325896,
+      "sha256": "c35b4f496c17927764f71f3eaa9c59df8a0c01c7bee49d326344e5fc14ecb6c4",
+      "webImages": [
+        {
+          "path": "images/c-0055-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 18144,
+          "sha256": "7ecdcbf60696d53ab7e53efd7caa4260e18ad92d04f662b0c06373fac2f3b94b"
+        },
+        {
+          "path": "images/c-0055-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 50918,
+          "sha256": "41c377f043ee257dcba9ed81ff7c8dc8f08a99a6a72cad268b0cb4b470e149ad"
+        },
+        {
+          "path": "images/c-0055-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 88140,
+          "sha256": "40cddecb86014aa0237e54aab318c94ad7331fa097f5ab8a67e836a3208114b3"
+        }
+      ]
+    },
+    {
+      "id": "c-0056",
+      "sourceFileName": "Tebessümler yüzümde.jpeg",
+      "format": "jpeg",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 1600989,
+      "sha256": "a43507f7f185b42a97fd09273afd3f139acd15a3968005ff6d98c4fa5076c3b9",
+      "webImages": [
+        {
+          "path": "images/c-0056-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 35376,
+          "sha256": "53cba8c31f31fc7f6960b17a289b4bac46e94a457ea6c69310ff4406a56266d3"
+        },
+        {
+          "path": "images/c-0056-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 94546,
+          "sha256": "b85418fc6cfe0624ebea90cf6f68e0caa4ce8af75d82056d250061da07c1902a"
+        },
+        {
+          "path": "images/c-0056-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 150020,
+          "sha256": "422a53f25eab405ffd78547a44d44ec1d02e06bd4c3c3457f1bc5e3aec0f7f2d"
+        }
+      ]
+    },
+    {
+      "id": "c-0057",
+      "sourceFileName": "Terazi 23 Eylül22 Ekim.jpg",
+      "format": "jpeg",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 1443182,
+      "sha256": "62463505d17b7264cd2d3d329016846faf7a2c47f96015abbfeff1f0bc431ccc",
+      "webImages": [
+        {
+          "path": "images/c-0057-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 35104,
+          "sha256": "06651453624f93045f9e55fb5159f624c59b49b3caacf2461d8a56c0d8dc8f02"
+        },
+        {
+          "path": "images/c-0057-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 105506,
+          "sha256": "5bcf4ede2535532b910dfb742953785dc757e3fbb68d1e68ced6a9d10b2501b4"
+        },
+        {
+          "path": "images/c-0057-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 181326,
+          "sha256": "6a1cf08cd35c9d80ede46f98986b0202a82ab57fb6296868021e4e7dcce2413b"
+        }
+      ]
+    },
+    {
+      "id": "c-0058",
+      "sourceFileName": "Turizmci ( Pop Versiyon ).jpg",
+      "format": "jpeg",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 1253702,
+      "sha256": "6fb5b959583754cadb1c736e1ae4afd065efd3a6096bc03878b56a1b8fdb2a4c",
+      "webImages": [
+        {
+          "path": "images/c-0058-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 26956,
+          "sha256": "8cca1ea9a989e174cf001555317f4514dae2e7817ba52896282d4bb6d18d62d6"
+        },
+        {
+          "path": "images/c-0058-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 69666,
+          "sha256": "229fc072646100057ec1c50d45c51cce88b7337303c821ee2c7bfc2c65481e0c"
+        },
+        {
+          "path": "images/c-0058-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 110262,
+          "sha256": "fd09a8b9581f04af58df556464847c7b3940acd5564e45c9d577565e20bfa976"
+        }
+      ]
+    },
+    {
+      "id": "c-0059",
+      "sourceFileName": "Turizmci.jpg",
+      "format": "jpeg",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 2001176,
+      "sha256": "516fdbb2b10344aa2cfc03d20f6723aef8f63cd907e4a2d8bd92c1620ce6b72c",
+      "webImages": [
+        {
+          "path": "images/c-0059-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 41212,
+          "sha256": "f227a8d1265bd0dd164c0a76d0c52a36808c306439664d1eac8845a4ba493fb1"
+        },
+        {
+          "path": "images/c-0059-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 110142,
+          "sha256": "65fc985fd7132d5ecd7214fd45dd7445b5ee9b4a9513dc2e4d368d3788ff6189"
+        },
+        {
+          "path": "images/c-0059-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 183842,
+          "sha256": "5411ff83a64b8f534d14c2541355170f4db8b2f199b9597f8f1028bb0028bfb8"
+        }
+      ]
+    },
+    {
+      "id": "c-0060",
+      "sourceFileName": "Türbülans.jpg",
+      "format": "jpeg",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 1686324,
+      "sha256": "14be6e7256d0a466454f3e0a22ad199f55ba83c2067cef17cf951e3c0c9d86ed",
+      "webImages": [
+        {
+          "path": "images/c-0060-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 26628,
+          "sha256": "9c2c094405c506de8c95025243bc4cfc051e79dd4c5a125d76d941721e3e457b"
+        },
+        {
+          "path": "images/c-0060-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 81362,
+          "sha256": "11f5a9c3367d8da8eaac8761d37e578be80fdc51169f31afe1d1c87a63af698a"
+        },
+        {
+          "path": "images/c-0060-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 141238,
+          "sha256": "d9b545ce76c40c02a8ff77656bd989bf3acfc798ec9593fa37a02cfb389ef816"
+        }
+      ]
+    },
+    {
+      "id": "c-0061",
+      "sourceFileName": "Wegen Dir.jpg",
+      "format": "jpeg",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 2225566,
+      "sha256": "4baf1099ddbf894fce5c1bcaef1b6576e6c15c10937e6f0490c9a0e615e2e534",
+      "webImages": [
+        {
+          "path": "images/c-0061-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 22510,
+          "sha256": "144260a325374146198d07d5913c75367668b377d2b3ab090297e514053e841c"
+        },
+        {
+          "path": "images/c-0061-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 57646,
+          "sha256": "6141a8b332a6bf95c055d88a860ef5b7ac2462cd454614efe60c6c7690b6b940"
+        },
+        {
+          "path": "images/c-0061-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 94516,
+          "sha256": "fd38a0965c46afa69124deafe743fc68e6e2b000cb0d199818c9b0d3d35f5e50"
+        }
+      ]
+    },
+    {
+      "id": "c-0062",
+      "sourceFileName": "Yay 22 Kasım21 Aralık.jpg",
+      "format": "jpeg",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 1536148,
+      "sha256": "fb024ecb157dae1dc8294b03bc1eb5444e36514686287294c8c8fc80909fe529",
+      "webImages": [
+        {
+          "path": "images/c-0062-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 36260,
+          "sha256": "aa981b2a7c5ba29e85ef7de7efb2a3002c5bd4c4367130d1fcadf32d570bd983"
+        },
+        {
+          "path": "images/c-0062-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 114078,
+          "sha256": "840c8a5684b64c0e9be272ae0c239426b2da6cd0f2866507c3a184ea8bfc8ce8"
+        },
+        {
+          "path": "images/c-0062-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 197342,
+          "sha256": "4b20831b4883ac63f5134ff204da150fc94a44448a0a03a4e47328884aae6463"
+        }
+      ]
+    },
+    {
+      "id": "c-0063",
+      "sourceFileName": "Yengeç 22 Haziran22 Temmuz.jpg",
+      "format": "jpeg",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 1686171,
+      "sha256": "93f66f0f3b283f747a31463600282356ced89c3c9cfebcfac0bd170507c3bb33",
+      "webImages": [
+        {
+          "path": "images/c-0063-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 44830,
+          "sha256": "2d247923be4c2f430974ea4e4f76cd1b4ddb4bf04a184fd4fb6820ba4a26c028"
+        },
+        {
+          "path": "images/c-0063-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 141776,
+          "sha256": "f57fac2b2ca3f1662d02e88732cc703216eabd89c1a04cae331ebed546a941e5"
+        },
+        {
+          "path": "images/c-0063-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 240546,
+          "sha256": "7339f2702a3f8bf2d0dd18b168ee51ef57b88c940dc5dc4c9a95f0d9337f0e89"
+        }
+      ]
+    },
+    {
+      "id": "c-0064",
+      "sourceFileName": "Yenik Yüreğim ( Pop Version ).jpg",
+      "format": "jpeg",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 1193114,
+      "sha256": "7ebb2131aa1f5b843d75f5a7ae3600b902b71888a257b179416dbe8f8cbcf77e",
+      "webImages": [
+        {
+          "path": "images/c-0064-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 19416,
+          "sha256": "d8898dd8a71467902706a129c1d72d4486d7d76c21244287f8b41413af31d2e2"
+        },
+        {
+          "path": "images/c-0064-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 51226,
+          "sha256": "a4f32c313f9227e5bd1f967c14fb634bb2406ee1cf3386abb2be1ede08ef7b9b"
+        },
+        {
+          "path": "images/c-0064-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 84572,
+          "sha256": "642e3a6f6e72314221a3c099eae8bdd1dee869e533d51e721677a58c5d522b95"
+        }
+      ]
+    },
+    {
+      "id": "c-0065",
+      "sourceFileName": "Yenik Yüreğim ( Thrash Metal Version ).jpg",
+      "format": "jpeg",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 898793,
+      "sha256": "692569c7bab84a0f61dfc40e7250885bb52cecca804416895656d79a4143328c",
+      "webImages": [
+        {
+          "path": "images/c-0065-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 25030,
+          "sha256": "60d5e77cb6577de1235d3781b94d6b13d087b47450f2a32e1e22ea7cf7957887"
+        },
+        {
+          "path": "images/c-0065-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 86538,
+          "sha256": "7b9754516a9ebd9ba6d4914d2ce62f8f8540f39bc0652ef9c02a3af9e30c795c"
+        },
+        {
+          "path": "images/c-0065-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 153172,
+          "sha256": "0fd361a48445af5746d604cb827a059a4e77445ebd5b86692362cc9756e30c6e"
+        }
+      ]
+    },
+    {
+      "id": "c-0066",
+      "sourceFileName": "Yine üşüyorum.jpg",
+      "format": "jpeg",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 1413300,
+      "sha256": "643257fb74465a5954f55c5490fa8a40c162d541e1d1889721d1228ab4b710c1",
+      "webImages": [
+        {
+          "path": "images/c-0066-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 26500,
+          "sha256": "3c69a9c50b49fec7885e1f3109830762523ede58a511767737ef8caf8618d6a9"
+        },
+        {
+          "path": "images/c-0066-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 75934,
+          "sha256": "929eafba4ae514fd0455f976489e2ff18ac2026a41fad3e1e5697fde55965df2"
+        },
+        {
+          "path": "images/c-0066-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 125298,
+          "sha256": "b42f102023cbc8bd162fc26fb38242c2e44b10b6063059544c481c7f49b380ec"
+        }
+      ]
+    },
+    {
+      "id": "c-0067",
+      "sourceFileName": "Yoksun ama....jpg",
+      "format": "jpeg",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 1313098,
+      "sha256": "ab063e36cf37554b16ca03d896bcda88d343be5dcc6d07c7ce8ff892c30bbb72",
+      "webImages": [
+        {
+          "path": "images/c-0067-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 20180,
+          "sha256": "e506f65eab1f1b16a103eb576016b9c07229bd28689c71453af750857bf6af8f"
+        },
+        {
+          "path": "images/c-0067-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 46338,
+          "sha256": "7ff89b328713041a29a5d5b80ca30c7c6edf5eca1ba01d3ea01e3291263701c5"
+        },
+        {
+          "path": "images/c-0067-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 75334,
+          "sha256": "f12b0a966e5428a5cad7e1c43c41c76252b8eb269afb3bd2c21b1b92afc4d5e6"
+        }
+      ]
+    },
+    {
+      "id": "c-0068",
+      "sourceFileName": "Yoksun.jpg",
+      "format": "jpeg",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 926200,
+      "sha256": "aba200f9ad51ba4f7d3f0c02f5435d12532b01f1d668fbac2c893b74abfda90a",
+      "webImages": [
+        {
+          "path": "images/c-0068-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 10140,
+          "sha256": "c0279ea71c82496c492c515e52952f42e892417f699563697e547304f03f43ec"
+        },
+        {
+          "path": "images/c-0068-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 29644,
+          "sha256": "c4ea98bb89b6cd4cb2f91bb27028adc70f39bb400529ab2066b938ff64afe2d4"
+        },
+        {
+          "path": "images/c-0068-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 54952,
+          "sha256": "2327858cf4de6fdc27fe92dfe66c5203f658015bd4b1597177fa36ea38dc8c5a"
+        }
+      ]
+    }
+  ],
+  "collections": [
+    {
+      "id": "col-0001",
+      "slug": "burc-serisi",
+      "title": "12 Burç",
+      "description": "On iki burcun her biri için birer şarkı.",
+      "order": 1,
+      "members": [
+        {
+          "workId": "w-0044",
+          "dateRange": {
+            "start": "03-21",
+            "end": "04-20",
+            "label": "21 Mart – 20 Nisan",
+            "sources": [
+              "cover"
+            ],
+            "status": "conflict"
+          }
+        },
+        {
+          "workId": "w-0018",
+          "dateRange": {
+            "start": "04-20",
+            "end": "05-20",
+            "label": "20 Nisan – 20 Mayıs",
+            "sources": [
+              "cover",
+              "filename"
+            ],
+            "status": "conflict"
+          }
+        },
+        {
+          "workId": "w-0038",
+          "dateRange": {
+            "start": "05-21",
+            "end": "06-21",
+            "label": "21 Mayıs – 21 Haziran",
+            "sources": [
+              "cover",
+              "filename"
+            ],
+            "status": "cover-verified"
+          }
+        },
+        {
+          "workId": "w-0060",
+          "dateRange": {
+            "start": "06-22",
+            "end": "07-22",
+            "label": "22 Haziran – 22 Temmuz",
+            "sources": [
+              "cover",
+              "filename"
+            ],
+            "status": "cover-verified"
+          }
+        },
+        {
+          "workId": "w-0005",
+          "dateRange": {
+            "start": "07-23",
+            "end": "08-22",
+            "label": "23 Temmuz – 22 Ağustos",
+            "sources": [
+              "cover",
+              "filename"
+            ],
+            "status": "cover-verified"
+          }
+        },
+        {
+          "workId": "w-0009",
+          "dateRange": {
+            "start": "08-23",
+            "end": "09-22",
+            "label": "23 Ağustos – 22 Eylül",
+            "sources": [
+              "cover",
+              "filename"
+            ],
+            "status": "cover-verified"
+          }
+        },
+        {
+          "workId": "w-0055",
+          "dateRange": {
+            "start": "09-23",
+            "end": "10-22",
+            "label": "23 Eylül – 22 Ekim",
+            "sources": [
+              "cover",
+              "filename"
+            ],
+            "status": "cover-verified"
+          }
+        },
+        {
+          "workId": "w-0002",
+          "dateRange": {
+            "start": "10-23",
+            "end": "11-21",
+            "label": "23 Ekim – 21 Kasım",
+            "sources": [
+              "cover",
+              "filename"
+            ],
+            "status": "cover-verified"
+          }
+        },
+        {
+          "workId": "w-0059",
+          "dateRange": {
+            "start": "11-22",
+            "end": "12-21",
+            "label": "22 Kasım – 21 Aralık",
+            "sources": [
+              "cover",
+              "filename"
+            ],
+            "status": "cover-verified"
+          }
+        },
+        {
+          "workId": "w-0049",
+          "dateRange": {
+            "start": "12-22",
+            "end": "01-19",
+            "label": "22 Aralık – 19 Ocak",
+            "sources": [
+              "cover",
+              "filename"
+            ],
+            "status": "cover-verified"
+          }
+        },
+        {
+          "workId": "w-0045",
+          "dateRange": {
+            "start": "01-20",
+            "end": "02-18",
+            "label": "20 Ocak – 18 Şubat",
+            "sources": [
+              "cover",
+              "filename"
+            ],
+            "status": "cover-verified"
+          }
+        },
+        {
+          "workId": "w-0008",
+          "dateRange": {
+            "start": "02-19",
+            "end": "03-20",
+            "label": "19 Şubat – 20 Mart",
+            "sources": [
+              "cover",
+              "filename"
+            ],
+            "status": "cover-verified"
+          }
+        }
+      ]
+    },
+    {
+      "id": "col-0002",
+      "slug": "almanca-sarkilar",
+      "title": "Almanca Şarkılar",
+      "description": "Almanca seslendirilen eserler.",
+      "order": 2,
+      "members": [
+        {
+          "workId": "w-0026"
+        },
+        {
+          "workId": "w-0058"
+        },
+        {
+          "workId": "w-0037"
+        }
+      ]
+    },
+    {
+      "id": "col-0003",
+      "slug": "ozel-gun-sarkilari",
+      "title": "Özel Gün Şarkıları",
+      "description": "Anneler Günü, Babalar Günü ve doğum günü gibi özel günler için şarkılar.",
+      "order": 3,
+      "members": [
+        {
+          "workId": "w-0004"
+        },
+        {
+          "workId": "w-0007"
+        },
+        {
+          "workId": "w-0021"
+        },
+        {
+          "workId": "w-0046"
+        }
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "id": "rel-0001",
+      "source": "w-0026",
+      "target": "w-0050",
+      "type": "adaptation",
+      "status": "verified"
+    },
+    {
+      "id": "rel-0002",
+      "source": "w-0037",
+      "target": "w-0032",
+      "type": "adaptation",
+      "status": "verified"
+    },
+    {
+      "id": "rel-0003",
+      "source": "w-0058",
+      "target": "w-0050",
+      "type": "adaptation",
+      "status": "verified"
+    }
+  ],
+  "openIssues": [
+    {
+      "id": "oi-0001",
+      "topic": "Öyle/Böyle Bir Şey: kanonik başlık ve ilk/orijinal kayıt",
+      "refs": [
+        "w-0020",
+        "r-0051",
+        "r-0021"
+      ],
+      "description": "Aynı bestenin iki versiyonu. Eserin kanonik başlığı, slug'ı ve ilk/orijinal kaydı henüz belirlenmedi (title/slug/isOriginal null). Böyle Bir Şey kapağında 'Rock'n Roll' yazısı var; tür kullanıcı onayı olmadan atanmadı."
+    },
+    {
+      "id": "oi-0002",
+      "topic": "Turizmci: iki Pop kaydı arasındaki farkın adı",
+      "refs": [
+        "w-0056",
+        "r-0059",
+        "r-0058"
+      ],
+      "description": "İki kayıt da Pop. Alternatif kayıt dosya adındaki 'Pop Versiyon' etiketiyle ayrıldı; müzikal farkın adı bilinmiyor."
+    },
+    {
+      "id": "oi-0003",
+      "topic": "Burç tarih aralıkları",
+      "refs": [
+        "col-0001",
+        "w-0044",
+        "w-0018"
+      ],
+      "description": "Tarihler kapak yazılarından alındı ve 11 burçta dosya adıyla eşleşiyor; kullanıcı tarafından ayrıca onaylanmadı. Koç dosya adı kesik ('Koç 4.jpg'); aralık yalnızca kapaktan okundu. Koç bitişi (20 Nisan) ile Boğa başlangıcı (20 Nisan) çakışıyor."
+    },
+    {
+      "id": "oi-0004",
+      "topic": "Biliyorum kapağı",
+      "refs": [
+        "c-0015"
+      ],
+      "description": "Kapakta sanatçı adı 'Ünal Buyüksungur' olarak görünüyor (ü eksik olabilir). Görsel dikey; kareye siyah bantlarla tamamlanmış."
+    },
+    {
+      "id": "oi-0005",
+      "topic": "Wegen Dir kapağı",
+      "refs": [
+        "c-0061"
+      ],
+      "description": "Kapakta sanatçı adı yok."
+    },
+    {
+      "id": "oi-0006",
+      "topic": "Kapaklardaki olası filigran işaretleri",
+      "refs": [
+        "c-0059",
+        "c-0010",
+        "c-0027"
+      ],
+      "description": "Bu kapakların sağ alt köşesinde küçük yıldız biçimli bir işaret görüldü. Diğer kapaklar bu açıdan sistematik olarak kontrol edilmedi."
+    },
+    {
+      "id": "oi-0007",
+      "topic": "Yayın tarihleri ve yayın durumu",
+      "refs": [],
+      "description": "Hiçbir kaydın gerçek yayın tarihi bilinmiyor (releaseDate null, releaseStatus unknown). Dosya değiştirilme tarihleri yayın tarihi olarak kullanılmadı."
+    },
+    {
+      "id": "oi-0008",
+      "topic": "Platform bağlantıları",
+      "refs": [],
+      "description": "Spotify, YouTube, YouTube Music, Apple Music ve diğer platform bağlantıları bilinmiyor; tüm alanlar boş."
+    },
+    {
+      "id": "oi-0010",
+      "topic": "Tek kayıtlı eserlerde tür ve orijinallik",
+      "refs": [],
+      "description": "Tek kaydı olan eserlerin müzik türü doğrulanmadığı için genres boş, isOriginal null bırakıldı."
+    },
+    {
+      "id": "oi-0011",
+      "topic": "Dil uyarlamalarının yönü",
+      "refs": [
+        "rel-0001",
+        "rel-0002",
+        "rel-0003"
+      ],
+      "description": "Uyarlama ilişkileri yönsüz kaydedildi; hangi dildeki eserin önce yapıldığı bilgisi verilmedi."
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+# Kişisel editör ayarları
+.vscode/
+
+# Python önbelleği (araçlar bytecode yazmaz; yine de güvence)
+__pycache__/
+*.py[cod]
+
+# Ortam ve işletim sistemi dosyaları
+.env
+.env.*
+.DS_Store
+Thumbs.db
+
+# V2: kullanılmayan yerel dosyalar (silinmedi, yalnızca Git dışında)
+/v2/music/optimization-test/
+/v2/images/unal-digital-world-hero-eski.png

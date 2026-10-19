@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Müzik Dünyam | Ünal Büyüksungur</title>
+    <meta name="description" content="Ünal Büyüksungur'un şarkıları, koleksiyonları ve notaların ardındaki hikâyeler.">
+
+    <link rel="stylesheet" href="catalog.css">
+
+    <script>
+        document.documentElement.classList.add("js");
+    </script>
+    <script src="catalog.js" defer></script>
+</head>
+
+<body>
+    <a class="skip-link" href="#katalog">Kataloğa geç</a>
+
+    <header class="site-header" id="site-header">
+        <a class="monogram" href="../" aria-label="Ünal Büyüksungur — ana sayfa">ÜB</a>
+
+        <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav">
+            <span class="nav-toggle-icon" aria-hidden="true"></span>
+            <span class="nav-toggle-label">Menü</span>
+        </button>
+
+        <nav class="site-nav" id="site-nav" aria-label="Ana menü">
+            <ul class="nav-list">
+                <li><a href="./" aria-current="page">Müzik</a></li>
+                <li><a href="../#projeler">Dijital Projeler</a></li>
+                <li><a href="../#yazilar">Yazılar</a></li>
+                <li><a href="../#galeri">Galeri</a></li>
+                <li><a href="../#hakkimda">Hakkımda</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main id="icerik">
+        <section class="intro" aria-labelledby="intro-baslik">
+            <div class="intro-inner">
+                <nav class="crumbs reveal" aria-label="Konum">
+                    <a href="../">Digital World</a>
+                    <span aria-hidden="true">/</span>
+                    <span aria-current="page">Müzik</span>
+                </nav>
+
+                <p class="brand reveal">
+                    <span class="brand-name">ÜNAL BÜYÜKSUNGUR</span>
+                </p>
+
+                <h1 class="reveal" id="intro-baslik">
+                    Müzik Dünyam
+                    <span class="accent">Bir Ömür. Birçok Hikâye.</span>
+                </h1>
+
+                <p class="intro-lead reveal">
+                    Her şarkı bir duygu, her melodi başka bir hikâye.
+                    Sözcüklerle başlayan yolculuk, notalarla devam ediyor.
+                </p>
+
+                <dl class="intro-stats reveal" id="intro-stats" hidden>
+                    <div><dt>Eser</dt><dd data-stat="works"></dd></div>
+                    <div><dt>Kayıt</dt><dd data-stat="recordings"></dd></div>
+                    <div><dt>Koleksiyon</dt><dd data-stat="collections"></dd></div>
+                </dl>
+            </div>
+        </section>
+
+        <section class="collections" aria-labelledby="koleksiyon-baslik">
+            <div class="section-head">
+                <p class="eyebrow">MÜZİK / KOLEKSİYONLAR</p>
+                <h2 class="section-title" id="koleksiyon-baslik">Koleksiyonlar</h2>
+            </div>
+            <ul class="collection-grid" id="collection-grid" aria-busy="true"></ul>
+        </section>
+
+        <section class="catalog" id="katalog" aria-labelledby="katalog-baslik">
+            <div class="section-head">
+                <p class="eyebrow">MÜZİK / KATALOG</p>
+                <h2 class="section-title" id="katalog-baslik" tabindex="-1">Tüm Eserler</h2>
+            </div>
+
+            <form class="toolbar" id="toolbar" role="search" aria-label="Katalogda ara ve filtrele" hidden>
+                <div class="search">
+                    <label class="search-label" for="search-input">Eser ara</label>
+                    <div class="search-field">
+                        <svg class="search-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
+                        <input class="search-input" id="search-input" type="search" name="q" autocomplete="off" spellcheck="false" placeholder="Örneğin: Boğa, Biliyorum">
+                    </div>
+                </div>
+
+                <fieldset class="filter-group">
+                    <legend>Koleksiyon</legend>
+                    <div class="chips" id="collection-filter"></div>
+                </fieldset>
+
+                <fieldset class="filter-group">
+                    <legend>Dil</legend>
+                    <div class="chips" id="language-filter"></div>
+                </fieldset>
+
+                <div class="toolbar-foot">
+                    <p class="result-count" id="result-count" role="status" aria-live="polite"></p>
+                    <button class="text-button" id="clear-filters" type="button" disabled>Filtreleri temizle</button>
+                </div>
+            </form>
+
+            <div class="state" id="catalog-state" role="status">
+                <p>Katalog yükleniyor…</p>
+            </div>
+
+            <ul class="work-grid" id="work-grid" aria-labelledby="katalog-baslik"></ul>
+
+            <div class="state state--empty" id="empty-state" hidden>
+                <p class="state-title">Bu aramayla eşleşen eser bulunamadı.</p>
+                <p>Farklı bir kelime deneyebilir ya da filtreleri temizleyebilirsiniz.</p>
+                <button class="button button-secondary" type="button" data-action="clear">Filtreleri temizle</button>
+            </div>
+        </section>
+    </main>
+
+    <dialog class="panel" id="work-panel" aria-labelledby="panel-title">
+        <div class="panel-inner">
+            <button class="panel-close" type="button" data-action="close-panel" autofocus>
+                <span class="visually-hidden">Paneli kapat</span>
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg>
+            </button>
+            <div class="panel-content" id="panel-content"></div>
+        </div>
+    </dialog>
+
+    <footer class="site-footer">
+        © Ünal Büyüksungur · Digital World
+    </footer>
+</body>
+
+</html>

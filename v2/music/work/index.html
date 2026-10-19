@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- Aşağıdaki varsayılanlar, eser yüklenince work.js tarafından katalog verisiyle güncellenir. -->
+    <title>Eser | Müzik Dünyam | Ünal Büyüksungur</title>
+    <meta name="description" content="Ünal Büyüksungur'un müzik kataloğundan bir eser.">
+    <!-- canonical, og:url ve og:image yalnızca geçerli bir eser yüklenince eklenir. -->
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Ünal Büyüksungur · Digital World">
+    <meta property="og:locale" content="tr_TR">
+    <meta property="og:title" content="Müzik Dünyam | Ünal Büyüksungur">
+    <meta property="og:description" content="Ünal Büyüksungur'un müzik kataloğundan bir eser.">
+
+    <link rel="stylesheet" href="../catalog.css">
+    <link rel="stylesheet" href="work.css">
+
+    <script>
+        document.documentElement.classList.add("js");
+    </script>
+    <script src="work.js" defer></script>
+</head>
+
+<body>
+    <a class="skip-link" href="#eser">İçeriğe geç</a>
+
+    <header class="site-header" id="site-header">
+        <a class="monogram" href="../../" aria-label="Ünal Büyüksungur — ana sayfa">ÜB</a>
+
+        <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav">
+            <span class="nav-toggle-icon" aria-hidden="true"></span>
+            <span class="nav-toggle-label">Menü</span>
+        </button>
+
+        <nav class="site-nav" id="site-nav" aria-label="Ana menü">
+            <ul class="nav-list">
+                <li><a href="../" aria-current="true">Müzik</a></li>
+                <li><a href="../../#projeler">Dijital Projeler</a></li>
+                <li><a href="../../#yazilar">Yazılar</a></li>
+                <li><a href="../../#galeri">Galeri</a></li>
+                <li><a href="../../#hakkimda">Hakkımda</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main id="eser" tabindex="-1">
+        <div class="work-state" id="work-state" role="status">
+            <p>Eser yükleniyor…</p>
+        </div>
+
+        <article class="work" id="work" aria-labelledby="work-title" hidden>
+            <section class="work-hero">
+                <div class="work-hero-inner">
+                    <nav class="crumbs reveal" aria-label="Konum">
+                        <a href="../../">Digital World</a>
+                        <span aria-hidden="true">/</span>
+                        <a href="../" id="crumb-catalog">Müzik</a>
+                        <span aria-hidden="true">/</span>
+                        <span aria-current="page" id="crumb-title"></span>
+                    </nav>
+
+                    <figure class="work-figure reveal">
+                        <div class="work-frame" id="work-frame"></div>
+                        <figcaption class="work-caption" id="work-caption"></figcaption>
+                    </figure>
+
+                    <div class="work-info">
+                        <p class="eyebrow reveal">MÜZİK / ESER</p>
+                        <h1 class="work-title reveal" id="work-title"></h1>
+                        <p class="work-note" id="work-title-note" hidden></p>
+
+                        <dl class="work-facts reveal" id="work-facts"></dl>
+
+                        <div class="work-versions reveal" id="work-versions"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="work-section" aria-labelledby="lyrics-title">
+                <div class="work-section-inner">
+                    <div class="work-section-head">
+                        <p class="eyebrow">SÖZLER</p>
+                        <h2 class="section-title" id="lyrics-title">Şarkı Sözleri</h2>
+                    </div>
+                    <div class="work-section-body" id="work-lyrics"></div>
+                </div>
+            </section>
+
+            <section class="work-section" aria-labelledby="story-title">
+                <div class="work-section-inner">
+                    <div class="work-section-head">
+                        <p class="eyebrow">HİKÂYE</p>
+                        <h2 class="section-title" id="story-title">Notaların Ardındaki Hikâye</h2>
+                    </div>
+                    <div class="work-section-body" id="work-story"></div>
+                </div>
+            </section>
+
+            <section class="work-section" aria-labelledby="listen-title">
+                <div class="work-section-inner">
+                    <div class="work-section-head">
+                        <p class="eyebrow">DİNLE</p>
+                        <h2 class="section-title" id="listen-title">Dinle</h2>
+                    </div>
+                    <div class="work-section-body" id="work-listen"></div>
+                </div>
+            </section>
+
+            <section class="work-section" id="work-related-section" aria-labelledby="related-title" hidden>
+                <div class="work-section-inner">
+                    <div class="work-section-head">
+                        <p class="eyebrow">BAĞLANTILI</p>
+                        <h2 class="section-title" id="related-title">İlişkili Eserler</h2>
+                    </div>
+                    <div class="work-section-body">
+                        <ul class="related-works" id="work-related"></ul>
+                    </div>
+                </div>
+            </section>
+
+            <section class="work-cta" aria-label="Kataloğa dönüş">
+                <p class="eyebrow">MÜZİK / KATALOG</p>
+                <div class="work-cta-actions">
+                    <a class="button button-primary" href="../#katalog" id="cta-catalog">Tüm Eserleri Keşfet</a>
+                    <a class="text-link" href="../" id="cta-back" hidden>Önceki görünüme dön</a>
+                </div>
+            </section>
+        </article>
+    </main>
+
+    <footer class="site-footer">
+        © Ünal Büyüksungur · Digital World
+    </footer>
+</body>
+
+</html>

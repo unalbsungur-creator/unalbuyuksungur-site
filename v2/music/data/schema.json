@@ -1,0 +1,198 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "schema.json",
+  "title": "Ünal Büyüksungur Müzik Kataloğu",
+  "description": "catalog.json yapısı. validate_catalog.py bu dosyadaki $ref, type, enum, pattern, minimum, required, properties, additionalProperties ve items anahtar kelimelerini uygular.",
+  "type": "object",
+  "required": ["catalogVersion", "updatedAt", "artist", "source", "works", "recordings", "covers", "collections", "relations", "openIssues"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "catalogVersion": { "type": "integer", "minimum": 1 },
+    "updatedAt": { "$ref": "#/$defs/date" },
+    "artist": { "type": "string" },
+    "source": {
+      "type": "object",
+      "required": ["coversDir", "lyricsDir", "storiesDir"],
+      "additionalProperties": false,
+      "properties": {
+        "coversDir": { "type": "string" },
+        "lyricsDir": { "type": "string" },
+        "storiesDir": { "type": "string" }
+      }
+    },
+    "works": { "type": "array", "items": { "$ref": "#/$defs/work" } },
+    "recordings": { "type": "array", "items": { "$ref": "#/$defs/recording" } },
+    "covers": { "type": "array", "items": { "$ref": "#/$defs/coverAsset" } },
+    "collections": { "type": "array", "items": { "$ref": "#/$defs/collection" } },
+    "relations": { "type": "array", "items": { "$ref": "#/$defs/relatedWork" } },
+    "openIssues": { "type": "array", "items": { "$ref": "#/$defs/openIssue" } }
+  },
+  "$defs": {
+    "date": { "type": "string", "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$" },
+    "slug": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" },
+    "workId": { "type": "string", "pattern": "^w-\\d{4}$" },
+    "url": { "type": ["string", "null"], "pattern": "^https://" },
+    "textAsset": {
+      "description": "Şarkı sözü veya hikâye. missing ve draft iken file null olmalıdır; published iken file, v2/music/ köküne göre content/lyrics/<kimlik>.txt veya content/stories/<kimlik>.txt yoludur (bkz. README).",
+      "type": "object",
+      "required": ["status", "file"],
+      "additionalProperties": false,
+      "properties": {
+        "status": { "enum": ["missing", "draft", "published"] },
+        "file": { "type": ["string", "null"], "pattern": "^content/(lyrics|stories)/[wr]-\\d{4}\\.txt$" }
+      }
+    },
+    "work": {
+      "type": "object",
+      "required": ["id", "title", "titleStatus", "workingTitle", "slug", "language", "releaseStatus", "lyrics", "story"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/workId" },
+        "title": { "type": ["string", "null"] },
+        "titleStatus": { "enum": ["confirmed", "unconfirmed"] },
+        "workingTitle": { "type": ["string", "null"] },
+        "slug": { "type": ["string", "null"], "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" },
+        "language": { "enum": ["tr", "de"] },
+        "releaseStatus": { "enum": ["unknown", "unreleased", "released"] },
+        "lyrics": { "$ref": "#/$defs/textAsset" },
+        "story": { "$ref": "#/$defs/textAsset" }
+      }
+    },
+    "recording": {
+      "type": "object",
+      "required": ["id", "workId", "title", "versionLabel", "genres", "isOriginal", "coverId", "releaseDate", "links"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^r-\\d{4}$" },
+        "workId": { "$ref": "#/$defs/workId" },
+        "title": { "type": "string" },
+        "versionLabel": { "type": ["string", "null"] },
+        "genres": { "type": "array", "items": { "enum": ["pop", "rock-ballad", "thrash-metal"] } },
+        "isOriginal": { "type": ["boolean", "null"] },
+        "coverId": { "type": "string", "pattern": "^c-\\d{4}$" },
+        "releaseDate": { "type": ["string", "null"], "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$" },
+        "lyrics": {
+          "description": "İsteğe bağlı istisna: yalnızca bu kaydın sözleri eserinkinden farklıysa eklenir. Yoksa eserin (Work) sözleri kullanılır.",
+          "$ref": "#/$defs/textAsset"
+        },
+        "links": {
+          "type": "object",
+          "required": ["spotify", "youtube", "youtubeMusic", "appleMusic", "other"],
+          "additionalProperties": false,
+          "properties": {
+            "spotify": { "$ref": "#/$defs/url" },
+            "youtube": { "$ref": "#/$defs/url" },
+            "youtubeMusic": { "$ref": "#/$defs/url" },
+            "appleMusic": { "$ref": "#/$defs/url" },
+            "other": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["platform", "url"],
+                "additionalProperties": false,
+                "properties": {
+                  "platform": { "type": "string" },
+                  "url": { "type": "string", "pattern": "^https://" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "coverAsset": {
+      "type": "object",
+      "required": ["id", "sourceFileName", "format", "width", "height", "bytes", "sha256", "webImages"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^c-\\d{4}$" },
+        "sourceFileName": { "type": "string" },
+        "format": { "enum": ["jpeg", "png"] },
+        "width": { "type": "integer", "minimum": 1 },
+        "height": { "type": "integer", "minimum": 1 },
+        "bytes": { "type": "integer", "minimum": 1 },
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "webImages": {
+          "description": "Kaynaktan üretilen web görselleri (400, 800, 1200 px). path, v2/music/ klasörüne göredir.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["path", "format", "width", "height", "bytes", "sha256"],
+            "additionalProperties": false,
+            "properties": {
+              "path": { "type": "string", "pattern": "^images/c-\\d{4}-\\d+\\.webp$" },
+              "format": { "enum": ["webp"] },
+              "width": { "type": "integer", "minimum": 1 },
+              "height": { "type": "integer", "minimum": 1 },
+              "bytes": { "type": "integer", "minimum": 1 },
+              "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+            }
+          }
+        }
+      }
+    },
+    "dateRange": {
+      "description": "Burç tarih aralığı (ay-gün). Eser başlığının parçası değildir.",
+      "type": "object",
+      "required": ["start", "end", "label", "sources", "status"],
+      "additionalProperties": false,
+      "properties": {
+        "start": { "type": "string", "pattern": "^(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$" },
+        "end": { "type": "string", "pattern": "^(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$" },
+        "label": { "type": "string" },
+        "sources": { "type": "array", "items": { "enum": ["cover", "filename"] } },
+        "status": { "enum": ["cover-verified", "conflict", "unverified"] }
+      }
+    },
+    "collection": {
+      "type": "object",
+      "required": ["id", "slug", "title", "description", "order", "members"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^col-\\d{4}$" },
+        "slug": { "$ref": "#/$defs/slug" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "order": { "type": "integer", "minimum": 1 },
+        "members": {
+          "description": "Dizi sırası koleksiyon içi gösterim sırasıdır.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["workId"],
+            "additionalProperties": false,
+            "properties": {
+              "workId": { "$ref": "#/$defs/workId" },
+              "dateRange": { "$ref": "#/$defs/dateRange" }
+            }
+          }
+        }
+      }
+    },
+    "relatedWork": {
+      "description": "'adaptation' yönsüzdür: source/target sırası anlam taşımaz, ilişki iki yönden sorgulanır.",
+      "type": "object",
+      "required": ["id", "source", "target", "type", "status"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^rel-\\d{4}$" },
+        "source": { "$ref": "#/$defs/workId" },
+        "target": { "$ref": "#/$defs/workId" },
+        "type": { "enum": ["adaptation"] },
+        "status": { "enum": ["verified", "unverified"] }
+      }
+    },
+    "openIssue": {
+      "type": "object",
+      "required": ["id", "topic", "refs", "description"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^oi-\\d{4}$" },
+        "topic": { "type": "string" },
+        "refs": { "type": "array", "items": { "type": "string" } },
+        "description": { "type": "string" }
+      }
+    }
+  }
+}
