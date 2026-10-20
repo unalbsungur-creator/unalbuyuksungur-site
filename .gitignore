@@ -14,3 +14,9 @@ Thumbs.db
 # V2: kullanılmayan yerel dosyalar (silinmedi, yalnızca Git dışında)
 /v2/music/optimization-test/
 /v2/images/unal-digital-world-hero-eski.png
+
+# V2 yayın paketi (v2/music/tools/build_publication.py üretir; kaynak değil, commit edilmez)
+/_site/
+/_site-manifest.json
+/_site.staging-*/
+/_site.previous-*/
