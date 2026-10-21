@@ -188,6 +188,14 @@
     overflow-wrap: anywhere;
 }
 
+/* Büyük harfe çevrilmez: tr dilinde "Version" → "VERSİON" olur. */
+.work-version {
+    margin: 14px 0 0;
+    font-size: 15px;
+    letter-spacing: 0.08em;
+    color: var(--gold);
+}
+
 .work-note {
     margin: 16px 0 0;
     padding-left: 14px;
@@ -299,13 +307,6 @@
     transition: border-color 0.3s ease, background-color 0.3s ease;
 }
 
-.version-card--static {
-    grid-template-columns: minmax(0, 1fr);
-    min-height: 0;
-    padding: 16px 18px;
-    cursor: default;
-}
-
 .version-card img {
     width: 64px;
     height: 64px;
@@ -357,7 +358,7 @@
 }
 
 @media (hover: hover) {
-    .version-card:not(.version-card--static):hover {
+    .version-card:hover {
         border-color: rgba(201, 166, 107, 0.6);
     }
 }
@@ -654,11 +655,6 @@
         grid-template-columns: 56px minmax(0, 1fr) 20px;
         gap: 12px;
         padding: 10px 12px 10px 10px;
-    }
-
-    /* Tek kayıtlı kartta kapak ve seçim işareti yoktur; yukarıdaki üç sütun ona uygulanmaz. */
-    .version-card--static {
-        grid-template-columns: minmax(0, 1fr);
     }
 
     .version-card img {

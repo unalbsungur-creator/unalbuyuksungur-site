@@ -315,20 +315,47 @@
         dom.facts.replaceChildren.apply(dom.facts, facts);
     }
 
+    // Tek kayıtlı eserde kaydın katalogdaki sürüm adı (versionLabel) başlığın altında gösterilir. Eser başlığı
+    // sürüm adıyla bitiyorsa ("Biliyorum (Rock Ballad Version)") büyük başlıkta tekrar edilmez. Çoklu kayıtta
+    // sürüm adları versiyon seçicide görünür.
+    function versionLabel(work) {
+        if (work.recordings.length !== 1) return null;
+        var label = work.recordings[0].versionLabel;
+        if (typeof label !== "string" || !label.trim()) return null;
+        label = label.trim();
+        var suffix = " (" + label + ")";
+        var title = work.title.slice(-suffix.length) === suffix ? work.title.slice(0, -suffix.length) : work.title;
+        return { label: label, title: title };
+    }
+
+    // Breadcrumb CSS ile büyük harfe çevrilir; dönüşüm lang özniteliğinin dil kuralına göre yapılır (sayfa tr:
+    // i → İ). Eser adı eserin dilinde işaretlenir ("Wegen Dir" → WEGEN DIR). Başlığın sonundaki İngilizce sürüm
+    // adı ("… Version") ayrıca en işaretlenir; Türkçe sürüm adı ("Pop Versiyon") eserin dilinde kalır.
+    var ENGLISH_VERSION = /\bVersion\b/;
+    // Katalog dili tr olup Türkçe yazıma uymayan özel adlar; yalnızca breadcrumb dönüşümünü etkiler, katalogdaki
+    // language değişmez. "Fishka" (izci kampı parolası) Türkçe kuralla FİSHKA olurdu.
+    var CRUMB_LANGS = { "w-0029": "en" };
+
+    function renderCrumbTitle(work, version) {
+        var lang = CRUMB_LANGS[work.id] || work.data.language;
+        dom.crumbTitle.setAttribute("lang", lang);
+        if (!version || version.title === work.title) {
+            dom.crumbTitle.textContent = work.title;
+            return;
+        }
+        dom.crumbTitle.replaceChildren(
+            version.title + " (",
+            el("span", { lang: ENGLISH_VERSION.test(version.label) ? "en" : lang, text: version.label }),
+            ")"
+        );
+    }
+
+    // Versiyon seçici yalnızca birden fazla kaydı olan eserde gösterilir; tek kayıt başlığı tekrar edeceği için alan gizlenir.
     function renderVersions(work, selectedId) {
         var multiple = work.recordings.length > 1;
         var children = [];
-        if (!multiple) {
-            var only = work.recordings[0];
-            var tags = genreTags(only);
-            children.push(el("h2", { className: "versions-title", text: "Kayıt" }));
-            children.push(el("div", { className: "version-card version-card--static" }, [
-                el("span", { className: "version-text" }, [
-                    el("span", { className: "version-name", text: only.title }),
-                    tags.length ? el("span", { className: "version-tags" }, tags) : null
-                ])
-            ]));
-        } else {
+        dom.versions.hidden = !multiple;
+        if (multiple) {
             var options = work.recordings.map(function (recording) {
                 var tags = genreTags(recording);
                 var origin = originTag(recording);
@@ -615,8 +642,13 @@
         var hasReturnState = Boolean(returnState.toString());
 
         applySeo(work);
-        dom.title.textContent = work.title;
-        dom.crumbTitle.textContent = work.title;
+        var version = versionLabel(work);
+        dom.title.textContent = version ? version.title : work.title;
+        if (version) {
+            dom.version.textContent = version.label;
+            dom.version.hidden = false;
+        }
+        renderCrumbTitle(work, version);
         dom.crumbCatalog.setAttribute("href", catalogHref(returnState));
         if (!work.titleConfirmed) {
             dom.titleNote.textContent = "Bu eserin kesin başlığı henüz belirlenmedi; şimdilik iki kaydın adıyla birlikte gösteriliyor.";
@@ -699,6 +731,7 @@
             caption: document.getElementById("work-caption"),
             title: document.getElementById("work-title"),
             titleNote: document.getElementById("work-title-note"),
+            version: document.getElementById("work-version"),
             crumbTitle: document.getElementById("crumb-title"),
             crumbCatalog: document.getElementById("crumb-catalog"),
             facts: document.getElementById("work-facts"),
