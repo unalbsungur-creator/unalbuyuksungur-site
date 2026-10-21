@@ -45,8 +45,61 @@ SPLITS = [
 ]
 SLUGS = {"w-0020": "oyle-bir-sey", "w-0065": "biliyorum-rock-ballad-version", "w-0066": "boyle-bir-sey",
          "w-0067": "turizmci-pop-versiyon", "w-0068": "yenik-yuregim-thrash-metal-version"}
-# Görev 36 kullanıcı kararı: ilk video klip (Çok Sevince İnsanı, w-0025 / r-0026). Katalogdaki tek video budur.
-VIDEO_DECISIONS = {"r-0026": [{"provider": "youtube", "videoId": "7c21yJVIsJc", "videoType": "official-music-video"}]}
+# Kayıt videoları: kayıt -> YouTube video kimliği (official-music-video). Kaynak yalnızca kanalın "Video Klip" oynatma
+# listesi (49 video; yorumdaki # liste sırasıdır). Görev 36: r-0026 (ilk video). Görev 40: kalan 48 video, Görev 39
+# envanteri ve kullanıcı kararlarıyla (ör. #7 -> Sonsuza Kadar, #29 -> Rock Ballad, #43 -> Pop). Katalogda bunlar dışında
+# video olamaz; videosu olmayan 19 kayıtta alan yoktur.
+VIDEO_DECISIONS = {
+    "r-0003": "HNKMM9pfTJ8",  # #14 Angaralı Hasret
+    "r-0004": "tVrZGaPSRTw",  # #49 Anneler Günü
+    "r-0007": "TtxuK4xdhUU",  # #36 Babalar Günü
+    "r-0010": "0BMN6o_hJUw",  # #48 Ben Boğa'yım
+    "r-0011": "z5csFSoSli8",  # #6 Beni Sal
+    "r-0012": "OYm6z7ehzKE",  # #41 Beni Yâr Seçtin
+    "r-0013": "_ljZcwuJvWU",  # #4 Benimle Yaşlanacaktın
+    "r-0014": "t_-m6kXBRzk",  # #29 Biliyorum (Rock Ballad Version)
+    "r-0016": "MKnTF1jkwwY",  # #23 Bir Güzel Sevdim
+    "r-0017": "-3WL0gfweKo",  # #9 Bir Kedim Var
+    "r-0020": "O00SvlTK7UM",  # #25 Boşver Geç
+    "r-0022": "1_uIKEFU5J8",  # #8 Bugün Benim Doğum Günüm
+    "r-0023": "U4Y7UcDhEmY",  # #34 Çarpıldım Sana
+    "r-0024": "PGvPgywoiWU",  # #32 Çat Çat Çat
+    "r-0025": "KuogkPvK2PM",  # #42 Çekip Gittin
+    "r-0026": "7c21yJVIsJc",  # #46 Çok Sevince İnsanı (Görev 36)
+    "r-0027": "q1zwOKY3Ymk",  # #18 Du bist der Grund
+    "r-0028": "ZUu-K_Qmli8",  # #10 Eksilmeyen
+    "r-0029": "E5uvkGpOqTo",  # #3 Elimi Sıktın
+    "r-0030": "kiMxnPIWF1Q",  # #26 Fishka
+    "r-0031": "_huavYSid-8",  # #15 Gece Olunca
+    "r-0032": "1_HWDHh0stg",  # #1 Günleri Saya Saya
+    "r-0033": "fAmjDqgBOPU",  # #11 Haberleşiriz
+    "r-0034": "wE9b3MR37IE",  # #17 Hafta
+    "r-0035": "pklgS71VhRc",  # #44 Hasret Bitecek
+    "r-0036": "m1RDa0-8338",  # #27 Haydi Dene
+    "r-0037": "0tni7CybqP8",  # #39 Haziran
+    "r-0038": "zTtH67AFB5U",  # #21 Ich meld' mich...
+    "r-0040": "NDLHL_8sCZk",  # #31 Kabuğumu Bıraktım
+    "r-0041": "wIMBBZnc7J0",  # #47 Kahve Falı
+    "r-0043": "LUjBENG76ZA",  # #16 Kendimi Arıyorum
+    "r-0044": "3Mcc6SnIrs4",  # #33 Kiminle
+    "r-0047": "xZ5bDIskUVA",  # #20 Mutlu Yıllar
+    "r-0048": "AqUwsEjYzaA",  # #24 Nerdesin
+    "r-0049": "UmwBKxmgsFs",  # #35 Neredeyim Ben
+    "r-0052": "G5RS_E5hmjE",  # #2 Sebebi Sensin
+    "r-0053": "1kW3WenFU5o",  # #30 Seninle
+    "r-0054": "1KhGHDbMMGQ",  # #7 Sonsuza Kadar (kullanıcı kararı; listedeki başlık "Galatasaray Marşı")
+    "r-0055": "c2HxZlyjlmA",  # #40 Söz Verdim
+    "r-0056": "aHjCAyxfZeI",  # #28 Tebessümler Yüzümde
+    "r-0058": "F-mRzZU-2fI",  # #13 Turizmci (Pop Versiyon)
+    "r-0059": "VaKBbcUp5RQ",  # #12 Turizmci (özgün kayıt)
+    "r-0060": "H6MG3MK7oEc",  # #22 Türbülans
+    "r-0061": "GvXRUO-vPsA",  # #19 Wegen Dir
+    "r-0064": "L7TthTFzoWM",  # #43 Yenik Yüreğim (Pop Version)
+    "r-0065": "n8tlmkgthQU",  # #45 Yenik Yüreğim (Thrash Metal Version)
+    "r-0066": "oDxRo89ih-0",  # #37 Yine Üşüyorum
+    "r-0067": "s84iajTL2aQ",  # #5 Yoksun Ama...
+    "r-0068": "lJTRetMuCzk",  # #38 Yoksun
+}
 VIDEO_DECISIONS_UPDATED_AT = "2026-10-21"
 # Görev 25 kullanıcı onaylı site hikâyesi düzeltmesi (Ağlama, w-0001; Word belgesi değişmedi).
 AGLAMA_CORRECTION = ("content/stories/w-0001.txt",
@@ -233,11 +286,12 @@ def expected_split_catalog(before):
 
 
 def apply_later_decisions(data):
-    """Görev 25'ten sonra onaylanan katalog kararlarını ekler (Görev 36: kayıt videoları)."""
+    """Görev 25'ten sonra onaylanan katalog kararlarını ekler (Görev 36 ve 40: kayıt videoları)."""
     data = json.loads(json.dumps(data))
     for recording in data["recordings"]:
         if recording["id"] in VIDEO_DECISIONS:
-            recording["videos"] = json.loads(json.dumps(VIDEO_DECISIONS[recording["id"]]))
+            recording["videos"] = [{"provider": "youtube", "videoId": VIDEO_DECISIONS[recording["id"]],
+                                    "videoType": "official-music-video"}]
     data["updatedAt"] = VIDEO_DECISIONS_UPDATED_AT
     return data
 
@@ -355,6 +409,19 @@ def repo_checks(report, catalog):
     problems = [] if ids == EXPECTED_OPEN_ISSUES else [f"açık konular: {ids}"]
     report.check("Açık konular: 10; oi-0009 kapalı, oi-0001 ve oi-0008 açık", problems)
 
+    # Kayıt videoları onaylı kararlarla birebir: yanlış/eksik/fazla/yinelenen video ya da yanlış kayıt (versiyon) FAIL.
+    problems = []
+    for rid, recording in sorted(recordings.items()):
+        expected = ([{"provider": "youtube", "videoId": VIDEO_DECISIONS[rid], "videoType": "official-music-video"}]
+                    if rid in VIDEO_DECISIONS else None)
+        if recording.get("videos") != expected:
+            problems.append(f"{rid}: videos = {recording.get('videos')!r}, beklenen {expected!r}")
+    problems += [f"{rid}: onaylı kayıt katalogda yok" for rid in VIDEO_DECISIONS if rid not in recordings]
+    if len(set(VIDEO_DECISIONS.values())) != len(VIDEO_DECISIONS):
+        problems.append("onaylı kararlarda yinelenen video kimliği")
+    report.check(f"Kayıt videoları onaylı {len(VIDEO_DECISIONS)} kararla birebir; videosuz "
+                 f"{len(recordings) - len(VIDEO_DECISIONS)} kayıtta alan yok", problems)
+
 
 def archive_checks(report, catalog, archive):
     import import_song_archive as isa  # noqa: E402
@@ -439,7 +506,7 @@ def archive_checks(report, catalog, archive):
         problems.append("Görev 25 yedek kataloğu beklenen sürüm değil")
     expected = apply_later_decisions(expected_split_catalog(json.loads(before_path.read_text(encoding="utf-8"))))
     problems += [key for key in sorted(set(expected) | set(catalog)) if expected.get(key) != catalog.get(key)]
-    report.check("Katalog = Görev 25 öncesi yedek + ayırma kararı + Görev 36 video kararı (başka hiçbir fark yok)",
+    report.check("Katalog = Görev 25 öncesi yedek + ayırma kararı + onaylı 49 video kararı (başka hiçbir fark yok)",
                  problems)
 
     backup = {}

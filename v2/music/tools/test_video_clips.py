@@ -2,9 +2,10 @@
 """Kayıt videoları (video klip) için regresyon testi (unittest, yalnızca okur).
 
 Görev 36: video, belirli bir müzik kaydını temsil ettiği için Recording düzeyinde, isteğe bağlı `videos`
-dizisinde tutulur. Adres saklanmaz; yalnızca doğrulanmış videoId'den türetilir. İlk ve tek video:
-Çok Sevince İnsanı (w-0025 / r-0026). Tarayıcıdaki davranış (tıklamadan önce iframe yok) ayrıca
-Chromium ile sınanır; burada katalog, doğrulayıcı ve kaynak kod kuralları denetlenir.
+dizisinde tutulur. Adres saklanmaz; yalnızca doğrulanmış videoId'den türetilir. İlk video: Çok Sevince İnsanı
+(w-0025 / r-0026). Görev 40'ta 48 video daha eklendi; 49 videonun playlist eşleştirmesi test_playlist_videos.py
+dosyasında sınanır. Tarayıcıdaki davranış (tıklamadan önce iframe yok) ayrıca Chromium ile sınanır; burada
+katalog, doğrulayıcı ve kaynak kod kuralları denetlenir.
 
 Kullanım:
     python v2/music/tools/test_video_clips.py
@@ -62,16 +63,19 @@ class CatalogVideoTests(unittest.TestCase):
         self.assertEqual(recording["videos"], [FIRST_VIDEO])
         self.assertNotIn("videos", work, "video eser (Work) düzeyinde değil, kayıt düzeyinde tutulur")
 
-    def test_only_one_recording_has_videos(self):
-        self.assertEqual([r["id"] for r in RECORDINGS.values() if "videos" in r], ["r-0026"])
+    def test_each_recording_has_at_most_one_video(self):
+        for recording in RECORDINGS.values():
+            self.assertLessEqual(len(recording.get("videos", [])), 1, recording["id"])
 
     def test_video_does_not_touch_listen_links_or_content(self):
-        recording = RECORDINGS["r-0026"]
-        self.assertIsNone(recording["links"]["youtube"], "video adresi dinleme bağlantılarına kopyalanmaz")
-        work = WORKS["w-0025"]
-        for asset in (work["lyrics"], work["story"]):
-            data = (MUSIC_ROOT / asset["file"]).read_bytes()
-            self.assertEqual(hashlib.sha256(data).hexdigest(), CONTENT_SHA256[asset["file"]], asset["file"])
+        for recording in RECORDINGS.values():
+            if "videos" not in recording:
+                continue
+            self.assertIsNone(recording["links"]["youtube"], f"{recording['id']}: video adresi dinleme bağlantılarına kopyalanmaz")
+            work = WORKS[recording["workId"]]
+            for asset in (work["lyrics"], work["story"]):
+                data = (MUSIC_ROOT / asset["file"]).read_bytes()
+                self.assertEqual(hashlib.sha256(data).hexdigest(), CONTENT_SHA256[asset["file"]], asset["file"])
 
     def test_catalog_matches_schema_and_validator(self):
         self.assertEqual(schema_errors(CATALOG, SCHEMA, SCHEMA), [])
