@@ -1,7 +1,7 @@
 {
   "$schema": "./schema.json",
   "catalogVersion": 1,
-  "updatedAt": "2026-10-19",
+  "updatedAt": "2026-10-21",
   "artist": "Ünal Büyüksungur",
   "source": {
     "coversDir": "UNAL_MUSIC_ARCHIVE/covers",
@@ -1611,7 +1611,14 @@
         "youtubeMusic": "https://music.youtube.com/watch?v=N_2B6ZBbbMU",
         "appleMusic": "https://music.apple.com/us/song/%C3%A7ok-sevince-i-nsan%C4%B1/6812929297",
         "other": []
-      }
+      },
+      "videos": [
+        {
+          "provider": "youtube",
+          "videoId": "7c21yJVIsJc",
+          "videoType": "official-music-video"
+        }
+      ]
     },
     {
       "id": "r-0027",

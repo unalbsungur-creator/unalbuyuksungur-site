@@ -6,8 +6,8 @@ okur, hiçbir dosya yazmaz. Python standart kütüphanesiyle çalışır; WebP
 dosyalarının tam olarak açılabildiğini ve doğru kapağa ait olduğunu denetleyen
 iki kontrol (23, 26) Pillow gerektirir, Pillow yoksa SKIP olarak raporlanır.
 
-Kontroller 27-36 söz/hikâye yayınını (content/), dinleme bağlantılarını ve kalıcı
-kimlikleri denetler; her sorun köşeli parantez içinde bir hata koduyla raporlanır
+Kontroller 27-37 söz/hikâye yayınını (content/), dinleme bağlantılarını, kalıcı
+kimlikleri ve kayıt videolarını denetler;her sorun köşeli parantez içinde bir hata koduyla raporlanır
 (ör. [CNT-PATH], [LNK-URL], [ID-BASELINE]). Kurallar: v2/music/data/README.md.
 
 Kullanım:
@@ -101,6 +101,10 @@ LINK_HOSTS = {
     "youtubeMusic": ("music.youtube.com",),
     "appleMusic": ("music.apple.com",),
 }
+# Kontrol 37: kayıt videoları (Görev 36). Adres saklanmaz, yalnızca doğrulanmış videoId'den türetilir.
+VIDEO_PROVIDERS = {"youtube": re.compile(r"[A-Za-z0-9_-]{11}")}  # fullmatch ile kullanılır
+VIDEO_TYPES = ("official-music-video",)
+VIDEO_KEYS = {"provider", "videoId", "videoType", "title"}
 # Kontrol 36: kalıcı kimlikler. "rrrr:wwww" = kayıt r-rrrr, eser w-wwww, kapak c-rrrr.
 # Yeni eser/kayıt eklenebilir; buradaki kimlikler silinemez, başka esere veya kapağa taşınamaz.
 # Görev 05'te verildi; Görev 25 kullanıcı kararıyla dört kayıt yeni eserlere taşındı:
@@ -223,6 +227,51 @@ def url_problem(url, hosts=None):
     if hosts and not any(host == h or host.endswith("." + h) for h in hosts):
         return f"{host} bu platforma ait değil ({', '.join(hosts)})"
     return None
+
+
+def video_problems(recordings):
+    """Kayıtların isteğe bağlı videos alanındaki sorunlar. Hata kodları: VID-LIST, VID-KEYS, VID-PROVIDER,
+    VID-ID, VID-TYPE, VID-TITLE, VID-DUP."""
+    problems, owners = [], {}
+    for recording in recordings.values():
+        if "videos" not in recording:
+            continue
+        videos = recording["videos"]
+        if not isinstance(videos, list) or not videos:
+            problems.append(f"[VID-LIST] {recording['id']}.videos: boş olmayan bir dizi olmalı "
+                            "(videosu olmayan kayıtta alan hiç yazılmaz)")
+            continue
+        for index, video in enumerate(videos):
+            where = f"{recording['id']}.videos[{index}]"
+            if not isinstance(video, dict):
+                problems.append(f"[VID-KEYS] {where}: nesne olmalı")
+                continue
+            missing = sorted({"provider", "videoId", "videoType"} - set(video))
+            extra = sorted(set(video) - VIDEO_KEYS)
+            if missing or extra:
+                problems.append(f"[VID-KEYS] {where}: eksik {missing}, tanımsız {extra}")
+            provider, video_id = video.get("provider"), video.get("videoId")
+            pattern = VIDEO_PROVIDERS.get(provider) if isinstance(provider, str) else None
+            if pattern is None:
+                problems.append(f"[VID-PROVIDER] {where}: {provider!r} izin verilen sağlayıcı değil "
+                                f"({', '.join(VIDEO_PROVIDERS)})")
+            elif not isinstance(video_id, str) or not pattern.fullmatch(video_id):
+                problems.append(f"[VID-ID] {where}: {video_id!r} geçerli bir {provider} video kimliği değil")
+            else:
+                owners.setdefault((provider, video_id), []).append(where)
+            if video.get("videoType") not in VIDEO_TYPES:
+                problems.append(f"[VID-TYPE] {where}: {video.get('videoType')!r} izin verilen tür değil "
+                                f"({', '.join(VIDEO_TYPES)})")
+            if "title" in video:
+                title = video["title"]
+                if not isinstance(title, str) or not title.strip() or \
+                        any(ord(ch) < 32 or 0x7F <= ord(ch) < 0xA0 for ch in title):
+                    problems.append(f"[VID-TITLE] {where}: başlık boş olmayan, kontrol karakteri içermeyen metin olmalı")
+    for (provider, video_id), places in owners.items():
+        if len(places) > 1:
+            problems.append(f"[VID-DUP] {provider} {video_id}: birden fazla yerde ({', '.join(places)}); "
+                            "bir video tek bir kayda aittir")
+    return problems
 
 
 # --- Basit JSON Schema alt kümesi ---------------------------------------------
@@ -779,6 +828,10 @@ def run(catalog, schema, archive, music_root):
     report.check(36, f"Mevcut {BASELINE_WORK_COUNT} Work ve {len(ID_BASELINE.split())} Recording kimliği "
                      "korunuyor", problems)
 
+    # 37. Kayıt videoları
+    report.check(37, "Kayıt videoları geçerli (izin verilen sağlayıcı, video kimliği ve tür; tekrar yok)",
+                 video_problems(recordings))
+
     # Bilgi amaçlı özet
     print(f"Katalog: {len(works)} Work, {len(recordings)} Recording, "
           f"{len(covers)} CoverAsset, {len(collections)} Collection, "
@@ -789,8 +842,9 @@ def run(catalog, schema, archive, music_root):
     known_links += sum(len(r["links"]["other"]) for r in recordings.values())
     known_lyrics = sum(1 for w in works.values() if w["lyrics"]["status"] != "missing")
     known_stories = sum(1 for w in works.values() if w["story"]["status"] != "missing")
+    known_videos = sum(len(r.get("videos") or []) for r in recordings.values())
     print(f"Bilinen değerler: {known_dates} yayın tarihi, {known_links} platform bağlantısı, "
-          f"{known_lyrics} söz, {known_stories} hikâye")
+          f"{known_lyrics} söz, {known_stories} hikâye, {known_videos} video")
     print()
     return report.print()
 

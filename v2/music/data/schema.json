@@ -76,6 +76,11 @@
           "description": "İsteğe bağlı istisna: yalnızca bu kaydın sözleri eserinkinden farklıysa eklenir. Yoksa eserin (Work) sözleri kullanılır.",
           "$ref": "#/$defs/textAsset"
         },
+        "videos": {
+          "description": "İsteğe bağlı: bu kayda ait videolar (ör. resmî video klip). Alan yoksa kaydın videosu yoktur; boş dizi yazılmaz. Adres saklanmaz, videoId'den türetilir (bkz. README).",
+          "type": "array",
+          "items": { "$ref": "#/$defs/video" }
+        },
         "links": {
           "type": "object",
           "required": ["spotify", "youtube", "youtubeMusic", "appleMusic", "other"],
@@ -99,6 +104,17 @@
             }
           }
         }
+      }
+    },
+    "video": {
+      "type": "object",
+      "required": ["provider", "videoId", "videoType"],
+      "additionalProperties": false,
+      "properties": {
+        "provider": { "enum": ["youtube"] },
+        "videoId": { "type": "string", "pattern": "^[A-Za-z0-9_-]{11}$" },
+        "videoType": { "enum": ["official-music-video"] },
+        "title": { "type": "string", "pattern": "\\S" }
       }
     },
     "coverAsset": {

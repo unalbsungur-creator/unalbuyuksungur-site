@@ -45,6 +45,9 @@ SPLITS = [
 ]
 SLUGS = {"w-0020": "oyle-bir-sey", "w-0065": "biliyorum-rock-ballad-version", "w-0066": "boyle-bir-sey",
          "w-0067": "turizmci-pop-versiyon", "w-0068": "yenik-yuregim-thrash-metal-version"}
+# Görev 36 kullanıcı kararı: ilk video klip (Çok Sevince İnsanı, w-0025 / r-0026). Katalogdaki tek video budur.
+VIDEO_DECISIONS = {"r-0026": [{"provider": "youtube", "videoId": "7c21yJVIsJc", "videoType": "official-music-video"}]}
+VIDEO_DECISIONS_UPDATED_AT = "2026-10-21"
 # Görev 25 kullanıcı onaylı site hikâyesi düzeltmesi (Ağlama, w-0001; Word belgesi değişmedi).
 AGLAMA_CORRECTION = ("content/stories/w-0001.txt",
                      "1998/ Flört bitince gözler kapaklarını açtığı ve damlalar gelmeye başladı",
@@ -226,6 +229,16 @@ def expected_split_catalog(before):
         recordings[move]["workId"] = new
         recordings[move].pop("lyrics", None)
     data["works"].sort(key=lambda w: w["id"])
+    return data
+
+
+def apply_later_decisions(data):
+    """Görev 25'ten sonra onaylanan katalog kararlarını ekler (Görev 36: kayıt videoları)."""
+    data = json.loads(json.dumps(data))
+    for recording in data["recordings"]:
+        if recording["id"] in VIDEO_DECISIONS:
+            recording["videos"] = json.loads(json.dumps(VIDEO_DECISIONS[recording["id"]]))
+    data["updatedAt"] = VIDEO_DECISIONS_UPDATED_AT
     return data
 
 
@@ -424,9 +437,10 @@ def archive_checks(report, catalog, archive):
     problems = []
     if sha256(before_path) != TASK25_BACKUP_CATALOG_SHA256:
         problems.append("Görev 25 yedek kataloğu beklenen sürüm değil")
-    expected = expected_split_catalog(json.loads(before_path.read_text(encoding="utf-8")))
+    expected = apply_later_decisions(expected_split_catalog(json.loads(before_path.read_text(encoding="utf-8"))))
     problems += [key for key in sorted(set(expected) | set(catalog)) if expected.get(key) != catalog.get(key)]
-    report.check("Katalog = Görev 25 öncesi yedek + ayırma kararı (başka hiçbir fark yok)", problems)
+    report.check("Katalog = Görev 25 öncesi yedek + ayırma kararı + Görev 36 video kararı (başka hiçbir fark yok)",
+                 problems)
 
     backup = {}
     for line in (archive / "backups" / "task-21" / "v2-sha256-manifest.txt").read_text(encoding="utf-8").strip().splitlines():

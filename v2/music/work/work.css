@@ -429,6 +429,120 @@
     text-transform: none;
 }
 
+/* ---------- Video klip ---------- */
+
+/* 16:9 alan; kapak yerel görseldir, YouTube oynatıcısı yalnızca oynat düğmesine basılınca yüklenir. */
+.video-player {
+    position: relative;
+    width: 100%;
+    max-width: 100%;
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
+    border: 1px solid var(--line-soft);
+    border-radius: 4px;
+    background: #05080F;
+}
+
+.video-player iframe {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+}
+
+.video-play {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    align-content: center;
+    gap: 14px;
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--text);
+    cursor: pointer;
+}
+
+/* Kare kapak 16:9 alanı doldurur; okunaklılık için koyulaştırılır. */
+.video-play img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    filter: brightness(0.45) saturate(0.9);
+    transition: filter 0.35s ease;
+}
+
+.video-play-icon {
+    position: relative;
+    width: 76px;
+    height: 76px;
+    border: 1px solid var(--gold);
+    border-radius: 50%;
+    background: rgba(11, 16, 27, 0.55);
+    transition: background-color 0.3s ease, transform 0.3s ease;
+}
+
+/* Oynat üçgeni */
+.video-play-icon::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    border-style: solid;
+    border-width: 13px 0 13px 22px;
+    border-color: transparent transparent transparent var(--gold);
+    transform: translate(-38%, -50%);
+}
+
+.video-play-label {
+    position: relative;
+    font-size: 13px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--gold-soft);
+}
+
+.video-play:focus-visible {
+    outline: 2px solid var(--gold);
+    outline-offset: -4px;
+}
+
+.video-play:hover .video-play-icon,
+.video-play:focus-visible .video-play-icon {
+    background: rgba(201, 166, 107, 0.18);
+    transform: scale(1.06);
+}
+
+.video-play:hover img,
+.video-play:focus-visible img {
+    filter: brightness(0.55) saturate(1);
+}
+
+.video-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px 20px;
+    margin-top: 18px;
+}
+
+/* "YouTube'da İzle" özgün yazımıyla görünsün (genel .button büyük harf dönüşümü uygulanmaz). */
+.video-actions .button {
+    text-transform: none;
+}
+
+.video-note {
+    margin: 0;
+    font-size: 14px;
+    color: var(--muted);
+}
+
 .related-works {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
@@ -572,10 +686,21 @@
     .work-cta-actions {
         flex-direction: column;
     }
+
+    .video-play-icon {
+        width: 60px;
+        height: 60px;
+    }
+
+    .video-play-icon::after {
+        border-width: 10px 0 10px 17px;
+    }
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .related-work:hover {
+    .related-work:hover,
+    .video-play:hover .video-play-icon,
+    .video-play:focus-visible .video-play-icon {
         transform: none !important;
     }
 }

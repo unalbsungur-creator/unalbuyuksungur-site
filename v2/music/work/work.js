@@ -27,6 +27,19 @@
         { key: "youtubeMusic", name: "YouTube Music'te Dinle" },
         { key: "youtube", name: "YouTube'da Dinle" }
     ];
+    // Kayıt videoları (bkz. data/README.md). Adres katalogda saklanmaz; doğrulanmış videoId'den türetilir.
+    // Doğrulayıcının (kontrol 37) tarayıcıdaki karşılığı: bilinmeyen sağlayıcı, tür veya kimlik gösterilmez.
+    var VIDEO_PROVIDERS = {
+        youtube: {
+            id: /^[A-Za-z0-9_-]{11}$/,
+            // youtube-nocookie.com oynatıcıyı çerezsiz başlatır; tam anonimlik sağlamaz (oynatınca YouTube'a bağlanılır).
+            embed: function (id) { return "https://www.youtube-nocookie.com/embed/" + id + "?autoplay=1&rel=0&playsinline=1"; },
+            watch: function (id) { return "https://www.youtube.com/watch?v=" + id; },
+            name: "YouTube",
+            watchLabel: "YouTube'da İzle"
+        }
+    };
+    var VIDEO_TYPES = { "official-music-video": "Video Klip" };
     var TEXTS = {
         lyrics: {
             empty: "Bu eserin şarkı sözleri henüz yayımlanmadı.",
@@ -443,6 +456,71 @@
         dom.listen.replaceChildren.apply(dom.listen, children);
     }
 
+    // Seçili kaydın ilk geçerli videosu; yoksa null. Geçersiz kayıtlar sessizce atlanır (doğrulayıcı FAIL verir).
+    function videoFor(recording) {
+        var videos = Array.isArray(recording.videos) ? recording.videos : [];
+        return videos.filter(function (video) {
+            var provider = video && Object.prototype.hasOwnProperty.call(VIDEO_PROVIDERS, video.provider) ? VIDEO_PROVIDERS[video.provider] : null;
+            return provider && typeof video.videoId === "string" && provider.id.test(video.videoId) &&
+                Object.prototype.hasOwnProperty.call(VIDEO_TYPES, video.videoType);
+        })[0] || null;
+    }
+
+    // Sayfa açılışında yalnızca yerel kapak ve oynat düğmesi çizilir; YouTube'a hiçbir istek gitmez.
+    // Oynatıcı (iframe) kullanıcı oynat düğmesine basınca oluşturulur. YouTube'da İzle bağlantısı her zaman
+    // görünür: gömme engellenirse ya da video sahibi gömmeye izin vermiyorsa video oradan izlenebilir.
+    function renderVideo(work, recording) {
+        var video = videoFor(recording);
+        if (!video) {
+            dom.videoSection.hidden = true;
+            dom.video.replaceChildren();
+            dom.video.__key = null;
+            return;
+        }
+        var key = video.provider + ":" + video.videoId;
+        dom.videoSection.hidden = false;
+        if (dom.video.__key === key) return; // aynı video zaten çizili (oynuyor olabilir)
+        dom.video.__key = key;
+
+        var provider = VIDEO_PROVIDERS[video.provider];
+        var label = video.title || recording.title;
+        var player = el("div", { className: "video-player" });
+        var play = el("button", { className: "video-play", type: "button" }, [
+            coverImage(work.covers[recording.coverId], { minWidth: 800, sizes: "(min-width: 900px) 58vw, calc(100vw - 40px)", alt: "", lazy: true }),
+            el("span", { className: "video-play-icon", "aria-hidden": "true" }),
+            el("span", { className: "video-play-label", text: "Oynat" }),
+            el("span", { className: "visually-hidden", text: ": " + label + " — " + VIDEO_TYPES[video.videoType] + " (" + provider.name + " oynatıcısı yüklenir)" })
+        ]);
+        play.addEventListener("click", function () {
+            var frame = el("iframe", {
+                src: provider.embed(encodeURIComponent(video.videoId)),
+                title: label + " — " + VIDEO_TYPES[video.videoType] + " (" + provider.name + ")",
+                loading: "lazy",
+                allow: "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share",
+                referrerpolicy: "strict-origin-when-cross-origin",
+                allowfullscreen: true
+            });
+            player.replaceChildren(frame);
+            player.classList.add("is-playing");
+            frame.focus();
+        });
+        player.appendChild(play);
+
+        dom.video.replaceChildren(
+            player,
+            el("div", { className: "video-actions" }, [
+                el("a", {
+                    className: "button button-secondary",
+                    href: provider.watch(encodeURIComponent(video.videoId)),
+                    target: "_blank",
+                    rel: "noopener noreferrer",
+                    text: provider.watchLabel
+                }, [el("span", { className: "visually-hidden", text: " (yeni sekmede açılır)" })]),
+                el("p", { className: "video-note", text: "Oynat düğmesine bastığınızda video " + provider.name + " üzerinden yüklenir." })
+            ])
+        );
+    }
+
     function renderRelated(work, returnState) {
         if (!work.related.length) {
             dom.relatedSection.hidden = true;
@@ -467,6 +545,7 @@
     function selectRecording(work, recordingId, updateUrl) {
         var recording = work.recordings.filter(function (r) { return r.id === recordingId; })[0] || work.recordings[0];
         renderCover(work, recording);
+        renderVideo(work, recording);
         renderListen(work, recording);
         var lyrics = lyricsFor(work, recording);
         if (lyrics !== dom.lyrics.__asset) {
@@ -627,6 +706,8 @@
             lyrics: document.getElementById("work-lyrics"),
             story: document.getElementById("work-story"),
             listen: document.getElementById("work-listen"),
+            video: document.getElementById("work-video"),
+            videoSection: document.getElementById("work-video-section"),
             related: document.getElementById("work-related"),
             relatedSection: document.getElementById("work-related-section"),
             ctaBack: document.getElementById("cta-back")

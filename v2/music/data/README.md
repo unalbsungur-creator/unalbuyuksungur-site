@@ -64,6 +64,7 @@ Sitede yalnızca doğrulanmış ve yayımlanmış içerik görünür. Hiçbir s�
 | Kayda özel söz (istisna) | `recording.lyrics` (isteğe bağlı) | Yalnızca bir kaydın sözleri eserinkinden **gerçekten** farklıysa eklenir. Alan yoksa eserin sözleri kullanılır. Detay sayfası, seçili versiyonun yayımlanmış istisnası varsa onu gösterir. |
 | Notaların Ardındaki Hikâye | `work.story` | Eserin yazılış hikâyesi besteye aittir. |
 | Dinleme bağlantıları | `recording.links` | Her versiyonun ayrı Spotify / YouTube adresi olur. Bir adres yalnızca bir kayda bağlanır. |
+| Video klip | `recording.videos` (isteğe bağlı) | Video belirli bir kaydın görüntüsüdür; Pop ve Rock Ballad versiyonlarının klipleri ayrıdır. |
 
 Kayda özel bir *üretim* hikâyesi (ör. Rock Ballad düzenlemesinin nasıl kaydedildiği) bugün şemada yoktur. Gerekirse
 `recording.story` adıyla, `textAsset` yapısında ve `content/stories/r-XXXX.txt` yoluyla ayrı bir içerik olarak eklenmeli;
@@ -117,6 +118,31 @@ doğrudan URL ile okunabilir. Bu yüzden:
   `youtubeMusic` → `music.youtube.com`, `appleMusic` → `music.apple.com`. Diğer platformlar `other` listesine
   `{ "platform": "Ad", "url": "https://…" }` biçiminde girer.
 - Aynı adres iki kayda bağlanamaz; Pop ve Rock Ballad versiyonları kendi adreslerini taşır.
+
+### Video klipler
+
+Video, belirli bir müzik kaydını temsil ettiği için kaydın (Recording) isteğe bağlı `videos` dizisinde tutulur:
+
+```json
+"videos": [
+  { "provider": "youtube", "videoId": "7c21yJVIsJc", "videoType": "official-music-video" }
+]
+```
+
+- Videosu olmayan kayıtta alan **hiç yazılmaz** (boş dizi yazılmaz). Eser sayfasında "Video Klip" bölümü yalnızca
+  seçili kaydın geçerli bir videosu varsa görünür.
+- Adres saklanmaz; oynatıcı (`https://www.youtube-nocookie.com/embed/<videoId>`) ve "YouTube'da İzle" bağlantısı
+  (`https://www.youtube.com/watch?v=<videoId>`) `videoId`'den türetilir. `youtu.be/<videoId>` paylaşım adresindeki
+  kimlik aynıdır.
+- İzin verilen değerler: `provider` = `youtube`; `videoId` = tam 11 karakter `A–Z a–z 0–9 _ -`; `videoType` =
+  `official-music-video`. `title` isteğe bağlıdır; yoksa kaydın başlığı kullanılır.
+- Bir video yalnızca bir kayda bağlanır. Dizi ileride bir kayda birden fazla video (ör. canlı performans) eklemeye izin
+  verir; bunun için önce `videoType` listesi şema, doğrulayıcı ve `work/work.js` içinde birlikte genişletilir.
+- Gizlilik ve performans: sayfa açılışında YouTube'a istek gitmez; kapak olarak kaydın kendi WebP kapağı gösterilir.
+  YouTube oynatıcısı yalnızca ziyaretçi "Oynat" düğmesine basınca yüklenir. `youtube-nocookie.com` çerezsiz başlatma
+  sağlar ama tam anonimlik sağlamaz.
+- Eklemek için: kimliği paylaşım adresinden alın (`https://youtu.be/7c21yJVIsJc` → `7c21yJVIsJc`), ilgili **kaydın**
+  `videos` dizisine yazın ve doğrulayıcıyı çalıştırın (37).
 
 ### Yeni içerik ekleme adımları
 
@@ -205,7 +231,7 @@ Arşiv farklı bir konumdaysa `--archive <yol>` verilir. Araç hiçbir dosya yaz
 Pillow kurulu değilse WebP'lerin tam çözümlenmesi (23) ve doğru kapağa ait olması (26) kontrolleri SKIP olur ve çıkış kodu 1 döner.
 Kullanıcının onayladığı katalog kararları (burç üyeleri, versiyon grupları, uyarlama ilişkileri) araç içinde kaynak dosya adlarıyla sabitlenmiştir; bu kararlar değişirse araç da güncellenmelidir.
 
-Kontroller 27–36 içerik yayınını denetler; her sorun bir hata koduyla raporlanır:
+Kontroller 27–37 içerik yayınını denetler; her sorun bir hata koduyla raporlanır:
 
 | Kontrol | Kod | Denetlenen |
 |---|---|---|
@@ -219,3 +245,4 @@ Kontroller 27–36 içerik yayınını denetler; her sorun bir hata koduyla rapo
 | 34 | `LNK-URL` | Bağlantılar geçerli HTTPS ve doğru platform alan adı |
 | 35 | `LNK-REC` | Her bağlantı tek bir geçerli kayda ait |
 | 36 | `ID-BASELINE` | Mevcut Work / Recording kimlikleri ve eşlemeleri korunuyor |
+| 37 | `VID-LIST`, `VID-KEYS`, `VID-PROVIDER`, `VID-ID`, `VID-TYPE`, `VID-TITLE`, `VID-DUP` | Kayıt videoları: boş olmayan dizi, bilinen alanlar, izin verilen sağlayıcı/kimlik/tür, geçerli başlık, tekrar yok |
