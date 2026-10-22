@@ -633,6 +633,16 @@
             overflow-wrap: anywhere;
         }
 
+        .social-link .link-platform,
+        .social-link .link-account {
+            overflow-wrap: normal;
+            word-break: normal;
+        }
+
+        .social-link .link-copy {
+            flex: 1 1 auto;
+        }
+
         .link-platform {
             font-size: 12px;
             letter-spacing: 1.5px;
@@ -983,6 +993,12 @@
             }
         }
 
+        @media (max-width: 1100px) {
+            .social-links {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+
         @media (max-width: 680px) {
             .card-grid {
                 grid-template-columns: 1fr;
@@ -1014,7 +1030,7 @@
             }
 
             .social-links {
-                grid-template-columns: repeat(2, minmax(0, 1fr));
+                grid-template-columns: 1fr;
             }
 
             .footer-inner {
@@ -1024,10 +1040,6 @@
         }
 
         @media (max-width: 359px) {
-            .social-links {
-                grid-template-columns: 1fr;
-            }
-
             .social-link {
                 width: 100%;
             }
@@ -1271,7 +1283,8 @@
             <div class="about-inner">
                 <span class="badge">Yakında</span>
                 <h2 class="section-title" id="hakkimda-baslik">Hakkımda</h2>
-                <p class="section-lead">Hikâyemin tamamı ve iletişim bilgileri bu bölümde yer alacak.</p>
+                <p class="section-lead">Burası, hikâyemi ve farklı alanlardaki çalışmalarımı paylaştığım kişisel dünyam.
+                </p>
                 <ul class="social-links" aria-label="Sosyal medya bağlantıları">
                     <li><a class="social-link" data-external-link="linkedin"
                             data-external-label="Ünal Büyüksungur LinkedIn profilini aç"><span class="platform-icon"
