@@ -511,7 +511,7 @@
             border-top: 1px solid rgba(201, 166, 107, 0.25);
         }
 
-        .stop + .stop {
+        .stop+.stop {
             padding-left: 28px;
             border-left: 1px solid rgba(201, 166, 107, 0.12);
         }
@@ -577,6 +577,118 @@
             margin: 0 auto;
         }
 
+        .social-links {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 16px;
+            margin: 40px 0 0;
+            padding: 0;
+            list-style: none;
+        }
+
+        .social-link,
+        .shop-link {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            min-width: 0;
+            min-height: 64px;
+            padding: 14px 18px;
+            border: 1px solid rgba(201, 166, 107, 0.2);
+            border-radius: 4px;
+            background: rgba(23, 35, 56, 0.72);
+            color: var(--text);
+            text-decoration: none;
+            transition: border-color 0.3s ease, color 0.3s ease, transform 0.3s ease;
+        }
+
+        .social-link:hover,
+        .shop-link:hover {
+            border-color: var(--gold);
+            color: var(--gold);
+            transform: translateY(-2px);
+        }
+
+        .platform-icon {
+            flex: 0 0 36px;
+            display: grid;
+            place-items: center;
+            width: 36px;
+            height: 36px;
+            border: 1px solid var(--line);
+            border-radius: 50%;
+            color: var(--gold);
+            font-size: 13px;
+            font-weight: 700;
+            letter-spacing: 0;
+        }
+
+        .link-copy {
+            min-width: 0;
+        }
+
+        .link-platform,
+        .link-account {
+            display: block;
+            overflow-wrap: anywhere;
+        }
+
+        .link-platform {
+            font-size: 12px;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+        }
+
+        .link-account {
+            margin-top: 2px;
+            font-size: 13px;
+            color: var(--muted);
+        }
+
+        .external-stop-link {
+            margin-top: 12px;
+        }
+
+        .shop {
+            scroll-margin-top: var(--header-height);
+            padding: clamp(64px, 7vw, 104px) var(--gutter);
+            border-top: 1px solid rgba(201, 166, 107, 0.12);
+            background:
+                radial-gradient(ellipse 55% 90% at 90% 50%, rgba(201, 166, 107, 0.07), transparent 70%),
+                var(--background);
+        }
+
+        .shop-inner {
+            max-width: 1320px;
+            margin: 0 auto;
+        }
+
+        .shop-card {
+            max-width: 620px;
+            margin-top: 36px;
+            padding: clamp(24px, 3vw, 40px);
+            border: 1px solid rgba(201, 166, 107, 0.2);
+            border-radius: 4px;
+            background: linear-gradient(150deg, #172338, #101927);
+        }
+
+        .shop-card h3 {
+            margin: 0 0 10px;
+            font-family: var(--font-serif);
+            font-size: clamp(26px, 3vw, 36px);
+            font-weight: 400;
+        }
+
+        .shop-card p {
+            margin: 0 0 24px;
+            color: var(--muted);
+        }
+
+        .shop-link {
+            display: inline-flex;
+            min-height: 52px;
+        }
+
         .site-footer {
             padding: 32px var(--gutter);
             border-top: 1px solid rgba(201, 166, 107, 0.12);
@@ -585,15 +697,58 @@
             color: var(--muted);
         }
 
+        .footer-inner {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 24px;
+            max-width: 1320px;
+            margin: 0 auto;
+        }
+
+        .footer-links {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin: 0;
+            padding: 0;
+            list-style: none;
+        }
+
+        .footer-link {
+            display: grid;
+            place-items: center;
+            width: 44px;
+            height: 44px;
+            border: 1px solid rgba(201, 166, 107, 0.2);
+            border-radius: 50%;
+            color: var(--muted);
+            text-decoration: none;
+            transition: border-color 0.3s ease, color 0.3s ease;
+        }
+
+        .footer-link:hover {
+            border-color: var(--gold);
+            color: var(--gold);
+        }
+
         /* ---------- Giriş animasyonu ---------- */
 
         .reveal {
             animation: reveal 0.9s ease both;
         }
 
-        .reveal:nth-child(2) { animation-delay: 0.1s; }
-        .reveal:nth-child(3) { animation-delay: 0.2s; }
-        .reveal:nth-child(4) { animation-delay: 0.3s; }
+        .reveal:nth-child(2) {
+            animation-delay: 0.1s;
+        }
+
+        .reveal:nth-child(3) {
+            animation-delay: 0.2s;
+        }
+
+        .reveal:nth-child(4) {
+            animation-delay: 0.3s;
+        }
 
         @keyframes reveal {
             from {
@@ -687,8 +842,13 @@
                 left: 0;
             }
 
-            .nav-toggle-icon::before { top: -7px; }
-            .nav-toggle-icon::after { top: 7px; }
+            .nav-toggle-icon::before {
+                top: -7px;
+            }
+
+            .nav-toggle-icon::after {
+                top: 7px;
+            }
 
             .nav-toggle[aria-expanded="true"] .nav-toggle-icon {
                 background: transparent;
@@ -848,9 +1008,28 @@
             }
 
             .stop,
-            .stop + .stop {
+            .stop+.stop {
                 padding: 24px 0 20px;
                 border-left: 0;
+            }
+
+            .social-links {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .footer-inner {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+        }
+
+        @media (max-width: 359px) {
+            .social-links {
+                grid-template-columns: 1fr;
+            }
+
+            .social-link {
+                width: 100%;
             }
         }
 
@@ -898,13 +1077,8 @@
 
     <main id="icerik">
         <section class="hero" id="ust" aria-labelledby="hero-baslik">
-            <img
-                class="hero-media"
-                src="images/unal-digital-world-hero.png"
-                width="1672"
-                height="941"
-                fetchpriority="high"
-                alt="">
+            <img class="hero-media" src="images/unal-digital-world-hero.png" width="1672" height="941"
+                fetchpriority="high" alt="">
 
             <div class="hero-content">
                 <p class="brand reveal">
@@ -940,7 +1114,12 @@
                     <a class="card" href="music/">
                         <div class="card-media card-media--muzik">
                             <span class="card-icon">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"
+                                    stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                                    <path d="M9 18V5l12-2v13" />
+                                    <circle cx="6" cy="18" r="3" />
+                                    <circle cx="18" cy="16" r="3" />
+                                </svg>
                             </span>
                         </div>
                         <div class="card-body">
@@ -949,7 +1128,11 @@
                             <p class="card-text">Bestelerim, şarkılarım ve notaların ardındaki hikâyeler.</p>
                             <div class="card-foot">
                                 <span class="card-tags">Eserler · Koleksiyonlar · Hikâyeler</span>
-                                <svg class="card-arrow" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                                <svg class="card-arrow" width="22" height="22" viewBox="0 0 24 24" fill="none"
+                                    stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
+                                    stroke-linejoin="round" aria-hidden="true" focusable="false">
+                                    <path d="M5 12h14M13 6l6 6-6 6" />
+                                </svg>
                             </div>
                         </div>
                     </a>
@@ -958,7 +1141,12 @@
                     <a class="card" href="#projeler">
                         <div class="card-media card-media--projeler">
                             <span class="card-icon">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M16 18l6-6-6-6"/><path d="M8 6l-6 6 6 6"/><path d="M14 4l-4 16"/></svg>
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"
+                                    stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                                    <path d="M16 18l6-6-6-6" />
+                                    <path d="M8 6l-6 6 6 6" />
+                                    <path d="M14 4l-4 16" />
+                                </svg>
                             </span>
                         </div>
                         <div class="card-body">
@@ -967,7 +1155,11 @@
                             <p class="card-text">Fikirlerden doğan, teknolojiyle hayata geçen dijital çözümler.</p>
                             <div class="card-foot">
                                 <span class="card-tags">Yazılım · Yapay Zekâ · Ürünler</span>
-                                <svg class="card-arrow" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                                <svg class="card-arrow" width="22" height="22" viewBox="0 0 24 24" fill="none"
+                                    stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
+                                    stroke-linejoin="round" aria-hidden="true" focusable="false">
+                                    <path d="M5 12h14M13 6l6 6-6 6" />
+                                </svg>
                             </div>
                         </div>
                     </a>
@@ -976,7 +1168,11 @@
                     <a class="card" href="#yazilar">
                         <div class="card-media card-media--yazilar">
                             <span class="card-icon">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M2 4h6a4 4 0 0 1 4 4v13a3 3 0 0 0-3-3H2z"/><path d="M22 4h-6a4 4 0 0 0-4 4v13a3 3 0 0 1 3-3h7z"/></svg>
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"
+                                    stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                                    <path d="M2 4h6a4 4 0 0 1 4 4v13a3 3 0 0 0-3-3H2z" />
+                                    <path d="M22 4h-6a4 4 0 0 0-4 4v13a3 3 0 0 1 3-3h7z" />
+                                </svg>
                             </span>
                         </div>
                         <div class="card-body">
@@ -985,7 +1181,11 @@
                             <p class="card-text">Şiirlerim, denemelerim, düşüncelerim ve hayata dair gözlemlerim.</p>
                             <div class="card-foot">
                                 <span class="card-tags">Şiir · Deneme · Düşünce</span>
-                                <svg class="card-arrow" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                                <svg class="card-arrow" width="22" height="22" viewBox="0 0 24 24" fill="none"
+                                    stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
+                                    stroke-linejoin="round" aria-hidden="true" focusable="false">
+                                    <path d="M5 12h14M13 6l6 6-6 6" />
+                                </svg>
                             </div>
                         </div>
                     </a>
@@ -994,7 +1194,12 @@
                     <a class="card" href="#galeri">
                         <div class="card-media card-media--galeri">
                             <span class="card-icon">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"
+                                    stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                                    <path
+                                        d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                                    <circle cx="12" cy="13" r="4" />
+                                </svg>
                             </span>
                         </div>
                         <div class="card-body">
@@ -1003,7 +1208,11 @@
                             <p class="card-text">Fotoğraflar, videolar ve yıllar içinde biriken anlardan izler.</p>
                             <div class="card-foot">
                                 <span class="card-tags">Fotoğraf · Video · Anılar</span>
-                                <svg class="card-arrow" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                                <svg class="card-arrow" width="22" height="22" viewBox="0 0 24 24" fill="none"
+                                    stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
+                                    stroke-linejoin="round" aria-hidden="true" focusable="false">
+                                    <path d="M5 12h14M13 6l6 6-6 6" />
+                                </svg>
                             </div>
                         </div>
                     </a>
@@ -1029,6 +1238,9 @@
                 <span class="badge">Yakında</span>
                 <h2 id="yazilar-baslik">Yazılar</h2>
                 <p>Şiir ve deneme arşivi düzenleniyor.</p>
+                <a class="stop-link external-stop-link" data-external-link="blog" data-external-label="ÜNALBLOG'u aç">
+                    <span data-external-display>ÜNALBLOG</span>'a Git
+                </a>
             </section>
 
             <section class="stop" id="galeri" aria-labelledby="galeri-baslik">
@@ -1038,19 +1250,71 @@
             </section>
         </div>
 
+        <section class="shop" id="magaza" aria-labelledby="magaza-baslik">
+            <div class="shop-inner">
+                <p class="eyebrow">DIGITAL WORLD / MAĞAZA</p>
+                <h2 class="section-title" id="magaza-baslik">Mağaza</h2>
+                <p class="section-lead">Dijital ürünlerime güvenli mağaza sayfam üzerinden ulaşabilirsiniz.</p>
+                <article class="shop-card">
+                    <span class="badge">Shopier</span>
+                    <h3 data-external-display>Shopier Mağazam</h3>
+                    <p>Türkiye'deki alıcılar için dijital ürünlerimi Shopier üzerinden keşfedin.</p>
+                    <a class="shop-link" data-external-link="shopier" data-external-label="Shopier Mağazamı aç">
+                        <span class="platform-icon" aria-hidden="true">S</span>
+                        <span>Mağazayı Ziyaret Et</span>
+                    </a>
+                </article>
+            </div>
+        </section>
+
         <section class="about" id="hakkimda" aria-labelledby="hakkimda-baslik">
             <div class="about-inner">
                 <span class="badge">Yakında</span>
                 <h2 class="section-title" id="hakkimda-baslik">Hakkımda</h2>
                 <p class="section-lead">Hikâyemin tamamı ve iletişim bilgileri bu bölümde yer alacak.</p>
+                <ul class="social-links" aria-label="Sosyal medya bağlantıları">
+                    <li><a class="social-link" data-external-link="linkedin"
+                            data-external-label="Ünal Büyüksungur LinkedIn profilini aç"><span class="platform-icon"
+                                aria-hidden="true">in</span><span class="link-copy"><span class="link-platform"
+                                    data-external-platform>LinkedIn</span><span class="link-account"
+                                    data-external-display>Ünal Büyüksungur</span></span></a></li>
+                    <li><a class="social-link" data-external-link="instagram"
+                            data-external-label="Ünal Büyüksungur Instagram profilini aç"><span class="platform-icon"
+                                aria-hidden="true">◎</span><span class="link-copy"><span class="link-platform"
+                                    data-external-platform>Instagram</span><span class="link-account"
+                                    data-external-display>@unalbuyuksungurmusic</span></span></a></li>
+                    <li><a class="social-link" data-external-link="facebook"
+                            data-external-label="Ünal Büyüksungur Facebook profilini aç"><span class="platform-icon"
+                                aria-hidden="true">f</span><span class="link-copy"><span class="link-platform"
+                                    data-external-platform>Facebook</span><span class="link-account"
+                                    data-external-display>Ünal Büyüksungur</span></span></a></li>
+                    <li><a class="social-link" data-external-link="tiktok"
+                            data-external-label="Ünal Büyüksungur TikTok profilini aç"><span class="platform-icon"
+                                aria-hidden="true">♪</span><span class="link-copy"><span class="link-platform"
+                                    data-external-platform>TikTok</span><span class="link-account"
+                                    data-external-display>@unal.buyuksungur</span></span></a></li>
+                </ul>
             </div>
         </section>
     </main>
 
     <footer class="site-footer">
-        © Ünal Büyüksungur · Digital World
+        <div class="footer-inner">
+            <span>© Ünal Büyüksungur · Digital World</span>
+            <ul class="footer-links" aria-label="Hızlı erişim">
+                <li><a class="footer-link" data-external-link="instagram"
+                        data-external-label="Instagram profilini aç"><span aria-hidden="true">◎</span></a></li>
+                <li><a class="footer-link" data-external-link="youtube" data-external-label="YouTube kanalını aç"><span
+                            aria-hidden="true">▶</span></a></li>
+                <li><a class="footer-link" data-external-link="spotify"
+                        data-external-label="Spotify sanatçı profilini aç"><span aria-hidden="true">♪</span></a></li>
+                <li><a class="footer-link" data-external-link="blog" data-external-label="ÜNALBLOG'u aç"><span
+                            aria-hidden="true">B</span></a></li>
+            </ul>
+        </div>
     </footer>
 
+    <script src="external-links.js"></script>
     <script>
         (function () {
             var header = document.getElementById("site-header");

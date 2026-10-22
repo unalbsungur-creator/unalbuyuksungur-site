@@ -58,6 +58,12 @@ class BuildPublicationTests(unittest.TestCase):
             dest = self.root / rel
             dest.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(REPO / rel, dest)
+        # Commit öncesi yerel kabulde allowlist'e yeni eklenen, henüz izlenmeyen site dosyalarını da kapsa.
+        for rel in bp.SITE_FILES:
+            dest = self.root / rel
+            if not dest.exists():
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(REPO / rel, dest)
 
     def tearDown(self):
         self._tmp.cleanup()
@@ -81,10 +87,10 @@ class BuildPublicationTests(unittest.TestCase):
     def test_output_is_exactly_the_allowlist(self):
         manifest = self.build()
         web = expected_web_files()
-        self.assertEqual(len(web), 342)
+        self.assertEqual(len(web), 343)
         self.assertEqual(set(self.tree()), web | set(bp.GENERATED))
-        self.assertEqual(manifest["webFiles"], 342)
-        self.assertEqual(manifest["groups"], {"site": 8, "data": 2, "lyrics": 64, "stories": 64, "webp": 204})
+        self.assertEqual(manifest["webFiles"], 343)
+        self.assertEqual(manifest["groups"], {"site": 9, "data": 2, "lyrics": 64, "stories": 64, "webp": 204})
 
     def test_excluded_files_absent(self):
         self.build()
@@ -247,11 +253,11 @@ class BuildPublicationTests(unittest.TestCase):
 
     def test_cli_exit_codes(self):
         run = [sys.executable, "-I", str(SCRIPT), "--root", str(self.root), "--out", "_site"]
-        ok = subprocess.run(run + ["--expect-count", "342"], capture_output=True, text=True, encoding="utf-8")
+        ok = subprocess.run(run + ["--expect-count", "343"], capture_output=True, text=True, encoding="utf-8")
         self.assertEqual(ok.returncode, 0, ok.stderr)
-        self.assertIn("342/342", ok.stdout)
+        self.assertIn("343/343", ok.stdout)
         manifest = json.loads((self.root / "_site-manifest.json").read_text(encoding="utf-8"))
-        self.assertEqual(manifest["totalOutputFiles"], 344)
+        self.assertEqual(manifest["totalOutputFiles"], 345)
         (self.root / "v2/music/catalog.css").unlink()
         failed = subprocess.run(run, capture_output=True, text=True, encoding="utf-8")
         self.assertEqual(failed.returncode, 1)

@@ -386,6 +386,85 @@ input {
     color: var(--text);
 }
 
+.listen-platforms {
+    max-width: 900px;
+    margin-top: clamp(32px, 4.5vw, 52px);
+    padding-top: 28px;
+    border-top: 1px solid var(--line-soft);
+}
+
+.listen-platforms h2 {
+    margin: 0;
+    font-family: var(--font-serif);
+    font-size: clamp(24px, 2.5vw, 34px);
+    font-weight: 400;
+}
+
+.listen-platforms>p {
+    margin: 6px 0 0;
+    color: var(--muted);
+}
+
+.platform-links {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+    margin: 22px 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.platform-link {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+    min-height: 58px;
+    padding: 10px 14px;
+    border: 1px solid rgba(201, 166, 107, 0.2);
+    border-radius: 4px;
+    background: rgba(23, 35, 56, 0.7);
+    color: var(--text);
+    text-decoration: none;
+    transition: border-color 0.3s ease, color 0.3s ease, transform 0.3s ease;
+}
+
+.platform-link:hover {
+    border-color: var(--gold);
+    color: var(--gold);
+    transform: translateY(-2px);
+}
+
+.platform-icon {
+    flex: 0 0 34px;
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    border: 1px solid var(--line);
+    border-radius: 50%;
+    color: var(--gold);
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.link-copy {
+    min-width: 0;
+    font-size: 12px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+
+.link-copy small {
+    display: block;
+    margin-top: 2px;
+    overflow-wrap: anywhere;
+    font-size: 11px;
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--muted);
+}
+
 /* ---------- Koleksiyonlar ---------- */
 
 .collections {
@@ -757,7 +836,7 @@ input {
     color: #9AA6B8;
 }
 
-.work-meta span + span::before {
+.work-meta span+span::before {
     content: "·";
     margin-right: 10px;
     color: var(--gold);
@@ -1066,16 +1145,62 @@ input {
     color: var(--muted);
 }
 
+.footer-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    max-width: var(--content-width);
+    margin: 0 auto;
+}
+
+.footer-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.footer-link {
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    border: 1px solid rgba(201, 166, 107, 0.2);
+    border-radius: 50%;
+    color: var(--muted);
+    text-decoration: none;
+    transition: border-color 0.3s ease, color 0.3s ease;
+}
+
+.footer-link:hover {
+    border-color: var(--gold);
+    color: var(--gold);
+}
+
 /* ---------- Giriş animasyonu (v2/index.html ile aynı) ---------- */
 
 .reveal {
     animation: reveal 0.9s ease both;
 }
 
-.reveal:nth-child(2) { animation-delay: 0.08s; }
-.reveal:nth-child(3) { animation-delay: 0.16s; }
-.reveal:nth-child(4) { animation-delay: 0.24s; }
-.reveal:nth-child(5) { animation-delay: 0.32s; }
+.reveal:nth-child(2) {
+    animation-delay: 0.08s;
+}
+
+.reveal:nth-child(3) {
+    animation-delay: 0.16s;
+}
+
+.reveal:nth-child(4) {
+    animation-delay: 0.24s;
+}
+
+.reveal:nth-child(5) {
+    animation-delay: 0.32s;
+}
 
 @keyframes reveal {
     from {
@@ -1117,6 +1242,10 @@ input {
 }
 
 @media (max-width: 899px) {
+    .platform-links {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
     .work-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
@@ -1208,8 +1337,13 @@ input {
         left: 0;
     }
 
-    .nav-toggle-icon::before { top: -7px; }
-    .nav-toggle-icon::after { top: 7px; }
+    .nav-toggle-icon::before {
+        top: -7px;
+    }
+
+    .nav-toggle-icon::after {
+        top: 7px;
+    }
 
     .nav-toggle[aria-expanded="true"] .nav-toggle-icon {
         background: transparent;
@@ -1264,6 +1398,19 @@ input {
 }
 
 @media (max-width: 560px) {
+    .platform-links {
+        grid-template-columns: 1fr;
+    }
+
+    .platform-link {
+        width: 100%;
+    }
+
+    .footer-inner {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
     .collection-card {
         grid-template-columns: 1fr;
     }

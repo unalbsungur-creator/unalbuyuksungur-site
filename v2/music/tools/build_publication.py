@@ -14,7 +14,7 @@ Kaynak dosyalar yalnızca okunur.
 
 Kullanım:
     python v2/music/tools/build_publication.py --out _site
-    python v2/music/tools/build_publication.py --out _site --expect-count 342
+    python v2/music/tools/build_publication.py --out _site --expect-count 343
 
 Cloudflare Pages (ayrı V2 projesi): build command
     python3 v2/music/tools/build_publication.py --out _site
@@ -45,6 +45,7 @@ DEFAULT_ROOT = Path(__file__).resolve().parents[3]
 # Sabit site dosyaları (depo köküne göre). Başka HTML/CSS/JS/görsel eklenirse burası bilinçli güncellenmeli.
 SITE_FILES = (
     "v2/index.html",
+    "v2/external-links.js",
     "v2/images/unal-digital-world-hero.png",
     "v2/music/index.html",
     "v2/music/catalog.css",
