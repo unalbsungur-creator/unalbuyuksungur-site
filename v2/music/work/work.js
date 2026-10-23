@@ -257,6 +257,8 @@
     }
 
     function applySeo(work) {
+        // Statik eser sayfasında (w-0001.html) title, canonical, Open Graph ve Twitter etiketleri build'de üretildi.
+        if (document.documentElement.hasAttribute("data-work-id")) return;
         var title = work.title + " | Müzik Dünyam | " + SITE_NAME;
         var description = describe(work);
         var canonical = absoluteUrl("./?id=" + encodeURIComponent(work.id));
@@ -618,15 +620,18 @@
 
     function render(catalog) {
         var params = new URLSearchParams(window.location.search);
-        var workId = (params.get("id") || "").trim();
+        // Statik eser sayfası kendi kimliğini taşır (data-work-id); yoksa eski ?id= bağlantısı kullanılır.
+        var pageWorkId = document.documentElement.getAttribute("data-work-id");
+        var workId = (pageWorkId || params.get("id") || "").trim();
         if (!workId) {
             showError("Eser seçilmedi.", "Bu sayfa bir eser kimliğiyle açılmalıdır. Kataloğa dönüp bir eser seçebilirsiniz.");
             return;
         }
         // Eski birleşik eser bağlantıları (ör. ?id=w-0020&kayit=r-0021): kayıt artık kendi eserindeyse oraya yönlendirilir.
+        // Yalnızca ?id= sayfasında: statik sayfada kimlik sabit olduğundan yönlendirme döngüye girerdi.
         var requested = params.get("kayit");
         var moved = catalog.recordings.filter(function (r) { return r.id === requested; })[0];
-        if (moved && moved.workId !== workId && WORK_ID.test(workId)) {
+        if (!pageWorkId && moved && moved.workId !== workId && WORK_ID.test(workId)) {
             params.set("id", moved.workId);
             params.delete("kayit");
             window.location.replace(window.location.pathname + "?" + params.toString() + window.location.hash);

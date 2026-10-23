@@ -7,14 +7,18 @@ catalog.json'daki yollardan türetilir; WebP'ler catalog.json'daki, söz/hikâye
 verify_content_integrity.py'deki onaylı SHA-256 değeriyle doğrulanır; geliştirme araçları (tools/), data/README.md, emekli söz dosyaları,
 Git yapılandırması ve V1 dosyaları pakete hiç girmez.
 
-Sıra: kaynak ve katalog denetimi -> geçici staging klasöründe kopyalama -> SHA-256 ve bağlantı denetimi ->
+Görev 73: her eser için statik sayfa (v2/music/work/w-0001.html …) render_pages.py ile eser şablonundan
+üretilir. Bu sayfalar kaynakta yoktur, yalnızca pakette bulunur; manifestte "pages" altında şablon SHA-256'sıyla
+kaydedilir. Kopyalanan dosyalar (şablonun kendisi dahil) kaynakla bayt bayt aynı kalır.
+
+Sıra: kaynak ve katalog denetimi -> geçici staging klasöründe kopyalama ve sayfa üretimi -> SHA-256 ve bağlantı denetimi ->
 çıktı kümesinin allowlist'e tam eşitliği -> staging'in çıktı klasörüyle güvenli yer değiştirmesi. Herhangi
 bir denetim başarısız olursa staging silinir, mevcut çıktı klasörüne dokunulmaz ve çıkış kodu 1 olur.
 Kaynak dosyalar yalnızca okunur.
 
 Kullanım:
     python v2/music/tools/build_publication.py --out _site
-    python v2/music/tools/build_publication.py --out _site --expect-count 343
+    python v2/music/tools/build_publication.py --out _site --expect-count 411
 
 Cloudflare Pages (ayrı V2 projesi): build command
     python3 v2/music/tools/build_publication.py --out _site
@@ -39,6 +43,7 @@ sys.dont_write_bytecode = True  # v2/ altında __pycache__ oluşmasın (herkese 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from validate_catalog import RETIRED_CONTENT  # noqa: E402  (kurallar tek yerde)
 from verify_content_integrity import CONTENT_SHA256  # noqa: E402  (onaylı söz/hikâye SHA-256 tablosu)
+import render_pages  # noqa: E402  (statik eser sayfaları)
 
 DEFAULT_ROOT = Path(__file__).resolve().parents[3]
 
@@ -70,6 +75,7 @@ JS_CONSTANTS = {
 # Pages yapılandırma dosyaları: statik dosya olarak sunulmaz. İlk satır, bu aracın ürettiği bir çıktı
 # klasörünü tanımak için işarettir (başka bir klasör asla silinmez).
 MARKER = "# build_publication.py tarafından üretildi; elle düzenlemeyin."
+PROFILE = "preview"  # yalnızca preview; production profili bu sürümde yok (render_pages.PROFILES)
 GENERATED = {
     "_headers": MARKER + "\n/*\n  X-Robots-Tag: noindex\n  X-Content-Type-Options: nosniff\n"
                 "  Referrer-Policy: strict-origin-when-cross-origin\n",
@@ -163,6 +169,22 @@ def plan(root, catalog):
     return files
 
 
+def render(root, catalog, files):
+    """Statik eser sayfaları: {paket yolu: bayt}. İki kez üretilip karşılaştırılır (belirlenimcilik)."""
+    template = checked_source(root, render_pages.TEMPLATE)
+    try:
+        pages = render_pages.render_work_pages(catalog, template, PROFILE)
+        again = render_pages.render_work_pages(catalog, template, PROFILE)
+    except render_pages.RenderError as exc:
+        raise BuildError(str(exc)) from None
+    if pages != again:
+        raise BuildError("[SEO-DETERMINISM] aynı girdiyle iki üretim farklı")
+    for rel in pages:
+        if rel in files or rel in GENERATED or FORBIDDEN_OUTPUT.search(rel):
+            raise BuildError(f"[SEO-PATH] üretilen sayfa mevcut ya da yasak bir yolla çakışıyor: {rel}")
+    return pages, sha256(template)
+
+
 class Links(HTMLParser):
     def __init__(self):
         super().__init__()
@@ -250,6 +272,7 @@ def build(root, out, expect_count=None, manifest_path=None, log=print):
     target = safe_out(root, out)
     catalog = load_catalog(root)
     files = plan(root, catalog)
+    pages, template_digest = render(root, catalog, files)
 
     staging = target.with_name(f"{target.name}.staging-{os.getpid()}")
     if staging.exists():
@@ -271,15 +294,24 @@ def build(root, out, expect_count=None, manifest_path=None, log=print):
             if sha256(dest.read_bytes()) != digest:
                 raise BuildError(f"[HASH-COPY] kopya kaynakla aynı değil: {rel}")
             entries.append({"path": rel, "bytes": len(data), "sha256": digest})
+        page_entries = []
+        for rel in sorted(pages):
+            dest = staging / rel
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_bytes(pages[rel])
+            if dest.read_bytes() != pages[rel]:
+                raise BuildError(f"[HASH-COPY] üretilen sayfa yazılamadı: {rel}")
+            page_entries.append({"path": rel, "bytes": len(pages[rel]), "sha256": sha256(pages[rel]),
+                                 "template": render_pages.TEMPLATE, "templateSha256": template_digest})
         for name, text in GENERATED.items():
             (staging / name).write_bytes(text.encode("utf-8"))
 
         def read_staged(rel):
             return (staging / rel).read_bytes()
-        references = check_references(set(files), read_staged)
+        references = check_references(set(files) | set(pages), read_staged)
 
         produced = sorted(p.relative_to(staging).as_posix() for p in staging.rglob("*") if not p.is_dir())
-        expected_set = sorted([*files, *GENERATED])
+        expected_set = sorted([*files, *pages, *GENERATED])
         if produced != expected_set:
             extra = sorted(set(produced) - set(expected_set))
             missing = sorted(set(expected_set) - set(produced))
@@ -287,29 +319,35 @@ def build(root, out, expect_count=None, manifest_path=None, log=print):
         bad = [p for p in produced if p not in GENERATED and FORBIDDEN_OUTPUT.search(p)]
         if bad or any(p.is_symlink() for p in staging.rglob("*")):
             raise BuildError(f"[OUT-FORBIDDEN] çıktıda yasak dosya ya da bağ: {bad[:5]}")
-        if expect_count is not None and len(entries) != expect_count:
-            raise BuildError(f"[OUT-COUNT] {len(entries)} web dosyası; beklenen {expect_count}")
+        web = sorted(entries + page_entries, key=lambda e: e["path"])
+        if expect_count is not None and len(web) != expect_count:
+            raise BuildError(f"[OUT-COUNT] {len(web)} web dosyası; beklenen {expect_count}")
 
-        digest = sha256("".join(f"{e['path']}  {e['sha256']}\n" for e in entries).encode("utf-8"))
+        digest = sha256("".join(f"{e['path']}  {e['sha256']}\n" for e in web).encode("utf-8"))
         groups = {
             "site": sum(rel in SITE_FILES for rel in files),
             "data": sum(rel.startswith(MUSIC + "data/") for rel in files),
             "lyrics": sum(rel.startswith(MUSIC + "content/lyrics/") for rel in files),
             "stories": sum(rel.startswith(MUSIC + "content/stories/") for rel in files),
             "webp": sum(rel.startswith(MUSIC + "images/") for rel in files),
+            "pages": len(pages),
         }
         manifest = {
             "tool": "v2/music/tools/build_publication.py",
             "commit": git_commit(root),
             "output": out.as_posix(),
-            "webFiles": len(entries),
+            "profile": PROFILE,
+            "webFiles": len(web),
+            "copiedFiles": len(entries),
+            "renderedPages": len(page_entries),
             "generatedFiles": sorted(GENERATED),
             "totalOutputFiles": len(produced),
-            "webBytes": sum(e["bytes"] for e in entries),
+            "webBytes": sum(e["bytes"] for e in web),
             "groups": groups,
             "checkedReferences": references,
             "packageDigest": digest,
             "files": entries,
+            "pages": page_entries,
         }
 
         # Güvenli yer değiştirme: eski çıktı önce kenara alınır, yeni paket yerine taşınır, sonra eski silinir.
@@ -331,9 +369,10 @@ def build(root, out, expect_count=None, manifest_path=None, log=print):
     if manifest_path is not None:
         manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     log(f"V2 yayın paketi: {out.as_posix()}/")
-    log(f"  web dosyası {len(entries)} (site {groups['site']}, veri {groups['data']}, söz {groups['lyrics']}, "
-        f"hikâye {groups['stories']}, WebP {groups['webp']}) + Pages yapılandırması {len(GENERATED)} "
-        f"= {len(produced)} dosya, {manifest['webBytes']} bayt")
+    log(f"  web dosyası {len(web)}: kopyalanan {len(entries)} (site {groups['site']}, veri {groups['data']}, "
+        f"söz {groups['lyrics']}, hikâye {groups['stories']}, WebP {groups['webp']}) + üretilen eser sayfası "
+        f"{len(page_entries)} ({PROFILE}) + Pages yapılandırması {len(GENERATED)} = {len(produced)} dosya, "
+        f"{manifest['webBytes']} bayt")
     log(f"  denetlenen bağlantı {references}; kaynak-çıktı SHA-256 eşleşmesi {len(entries)}/{len(entries)}")
     log(f"  commit {manifest['commit']}")
     log(f"  paket özeti (SHA-256) {digest}")
