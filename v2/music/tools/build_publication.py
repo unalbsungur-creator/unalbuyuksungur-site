@@ -18,7 +18,7 @@ Kaynak dosyalar yalnızca okunur.
 
 Kullanım:
     python v2/music/tools/build_publication.py --out _site
-    python v2/music/tools/build_publication.py --out _site --expect-count 411
+    python v2/music/tools/build_publication.py --out _site --expect-count 417
 
 Cloudflare Pages (ayrı V2 projesi): build command
     python3 v2/music/tools/build_publication.py --out _site
@@ -52,6 +52,12 @@ SITE_FILES = (
     "v2/index.html",
     "v2/external-links.js",
     "v2/images/unal-digital-world-hero.png",
+    "v2/images/projects/dilek-kutum-placeholder-1200.webp",
+    "v2/images/projects/istec-placeholder-1200.webp",
+    "v2/images/projects/mindot-homepage-1200.webp",
+    "v2/images/projects/next-point-tr-homepage-1200.webp",
+    "v2/images/projects/openfaos-placeholder-1200.webp",
+    "v2/images/projects/tralvid-placeholder-1200.webp",
     "v2/music/index.html",
     "v2/music/catalog.css",
     "v2/music/catalog.js",

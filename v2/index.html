@@ -494,11 +494,189 @@
             transform: translateX(4px);
         }
 
+        /* ---------- Dijital Projeler ---------- */
+
+        .projects {
+            scroll-margin-top: var(--header-height);
+            padding: clamp(64px, 8vw, 120px) var(--gutter);
+            border-top: 1px solid rgba(201, 166, 107, 0.12);
+            background:
+                radial-gradient(ellipse 55% 35% at 12% 0%, rgba(201, 166, 107, 0.07), transparent 72%),
+                #0E1522;
+        }
+
+        .projects-inner {
+            max-width: 1320px;
+            margin: 0 auto;
+        }
+
+        .projects-head {
+            max-width: 760px;
+            margin-bottom: clamp(36px, 5vw, 60px);
+        }
+
+        .project-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: clamp(20px, 2vw, 28px);
+            margin: 0;
+            padding: 0;
+            list-style: none;
+        }
+
+        .project-card {
+            display: flex;
+            height: 100%;
+            min-width: 0;
+            flex-direction: column;
+            overflow: hidden;
+            border: 1px solid rgba(201, 166, 107, 0.18);
+            border-radius: 6px;
+            background: linear-gradient(160deg, #172338 0%, #0F1828 100%);
+            transition: border-color 0.3s ease, transform 0.3s ease;
+        }
+
+        .project-card:hover,
+        .project-card:focus-within {
+            border-color: rgba(201, 166, 107, 0.62);
+            transform: translateY(-3px);
+        }
+
+        .project-media {
+            position: relative;
+            display: block;
+            aspect-ratio: 16 / 9;
+            margin: 0;
+            overflow: hidden;
+            border-bottom: 1px solid rgba(201, 166, 107, 0.16);
+            background: #0B101B;
+        }
+
+        .project-media img {
+            display: block;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.4s ease;
+        }
+
+        a.project-media:hover img {
+            transform: scale(1.02);
+        }
+
+        a.project-media:focus-visible {
+            z-index: 1;
+            outline-offset: -4px;
+        }
+
+        .project-body {
+            display: flex;
+            flex: 1;
+            min-width: 0;
+            flex-direction: column;
+            padding: clamp(22px, 2.2vw, 30px);
+        }
+
+        .project-meta {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 18px;
+        }
+
+        .project-status,
+        .project-placeholder {
+            display: inline-flex;
+            align-items: center;
+            min-height: 28px;
+            padding: 4px 9px;
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            font-size: 10px;
+            line-height: 1.35;
+            letter-spacing: 1.2px;
+            text-transform: uppercase;
+            color: var(--gold);
+        }
+
+        .project-placeholder {
+            border-color: rgba(184, 194, 209, 0.25);
+            color: var(--muted);
+        }
+
+        .project-card h3 {
+            margin: 0 0 8px;
+            font-family: var(--font-serif);
+            font-size: clamp(25px, 2.1vw, 32px);
+            font-weight: 400;
+            line-height: 1.15;
+        }
+
+        .project-category {
+            margin: 0 0 16px;
+            font-size: 12px;
+            letter-spacing: 1.4px;
+            line-height: 1.5;
+            text-transform: uppercase;
+            color: #D2C1A0;
+        }
+
+        .project-description {
+            margin: 0;
+            color: var(--muted);
+        }
+
+        .project-motto {
+            margin: 16px 0 0;
+            font-family: var(--font-serif);
+            font-size: 17px;
+            color: var(--text);
+        }
+
+        .project-footer {
+            display: flex;
+            align-items: flex-end;
+            min-height: 68px;
+            margin-top: auto;
+            padding-top: 24px;
+        }
+
+        .project-link {
+            display: inline-flex;
+            align-items: center;
+            min-height: 44px;
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: 1.6px;
+            text-transform: uppercase;
+            text-decoration: none;
+            color: var(--gold);
+        }
+
+        .project-link::after {
+            content: "↗";
+            content: "↗" / "";
+            margin-left: 10px;
+            transition: transform 0.3s ease;
+        }
+
+        .project-link:hover::after {
+            transform: translate(2px, -2px);
+        }
+
+        .project-no-link {
+            font-size: 12px;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            color: var(--muted);
+        }
+
         /* ---------- Kompakt hedef bölümler ---------- */
 
         .stops {
             display: grid;
-            grid-template-columns: repeat(4, minmax(0, 1fr));
+            grid-template-columns: repeat(3, minmax(0, 1fr));
             max-width: 1320px;
             margin: 0 auto;
             padding: 0 var(--gutter) clamp(64px, 7vw, 104px);
@@ -987,6 +1165,10 @@
                 grid-template-columns: repeat(2, minmax(0, 1fr));
             }
 
+            .project-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
             .stop:nth-child(odd) {
                 padding-left: 0;
                 border-left: 0;
@@ -1021,6 +1203,14 @@
 
             .stops {
                 grid-template-columns: 1fr;
+            }
+
+            .project-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .project-meta {
+                flex-direction: column;
             }
 
             .stop,
@@ -1232,18 +1422,144 @@
             </ul>
         </section>
 
+        <section class="projects" id="projeler" aria-labelledby="projeler-baslik">
+            <div class="projects-inner">
+                <header class="projects-head">
+                    <p class="eyebrow">DIGITAL WORLD / PROJELER</p>
+                    <h2 class="section-title" id="projeler-baslik">Dijital Projeler</h2>
+                    <p class="section-lead">Fikirden ürüne uzanan dijital çalışmalar, güncel yayın durumlarıyla
+                        birlikte.</p>
+                </header>
+
+                <ul class="project-grid">
+                    <li>
+                        <article class="project-card">
+                            <a class="project-media" href="https://mind-ot.com/" target="_blank"
+                                rel="noopener noreferrer" aria-label="MINDOT web sitesini aç (yeni sekmede)">
+                                <img src="images/projects/mindot-homepage-1200.webp" width="1200" height="675"
+                                    loading="lazy" decoding="async"
+                                    alt="MINDOT ana sayfasındaki düşünce paylaşım arayüzü">
+                            </a>
+                            <div class="project-body">
+                                <div class="project-meta"><span class="project-status">Yayında</span></div>
+                                <h3>MINDOT</h3>
+                                <p class="project-category">Dijital Düşünce ve Paylaşım Platformu</p>
+                                <p class="project-description">Düşünceleri yazma, paylaşma, keşfetme ve anı olarak
+                                    saklama odaklı dijital platform.</p>
+                                <div class="project-footer">
+                                    <a class="project-link" href="https://mind-ot.com/" target="_blank"
+                                        rel="noopener noreferrer"
+                                        aria-label="MINDOT web sitesini aç (yeni sekmede)">Siteyi Ziyaret Et</a>
+                                </div>
+                            </div>
+                        </article>
+                    </li>
+                    <li>
+                        <article class="project-card">
+                            <a class="project-media" href="https://nextpointtr.com/" target="_blank"
+                                rel="noopener noreferrer" aria-label="Next Point TR web sitesini aç (yeni sekmede)">
+                                <img src="images/projects/next-point-tr-homepage-1200.webp" width="1200" height="675"
+                                    loading="lazy" decoding="async"
+                                    alt="Next Point TR ana sayfasındaki Türkiye seyahat vitrini">
+                            </a>
+                            <div class="project-body">
+                                <div class="project-meta"><span class="project-status">Yayında</span></div>
+                                <h3>Next Point TR</h3>
+                                <p class="project-category">Gezi ve Seyahat</p>
+                                <p class="project-description">Türkiye’nin destinasyonlarını, yolculuklarını ve
+                                    deneyimlerini keşfetmeye yönelik seyahat platformu.</p>
+                                <div class="project-footer">
+                                    <a class="project-link" href="https://nextpointtr.com/" target="_blank"
+                                        rel="noopener noreferrer"
+                                        aria-label="Next Point TR web sitesini aç (yeni sekmede)">Siteyi Ziyaret Et</a>
+                                </div>
+                            </div>
+                        </article>
+                    </li>
+                    <li>
+                        <article class="project-card">
+                            <figure class="project-media">
+                                <img src="images/projects/openfaos-placeholder-1200.webp" width="1200" height="675"
+                                    loading="lazy" decoding="async" alt="OpenFAOS için tipografik yer tutucu görsel">
+                            </figure>
+                            <div class="project-body">
+                                <div class="project-meta"><span class="project-status">Geliştirme aşamasında</span><span
+                                        class="project-placeholder">Yer tutucu görsel</span></div>
+                                <h3>OpenFAOS</h3>
+                                <p class="project-category">Futbol Akademisi Operasyon ve Analiz Sistemi</p>
+                                <p class="project-description">Futbol akademileri için oyuncu, takım, antrenman,
+                                    performans, sağlık ve operasyon yönetim sistemi.</p>
+                                <div class="project-footer"><span class="project-no-link">Doğrulanmış public bağlantı
+                                        yok</span></div>
+                            </div>
+                        </article>
+                    </li>
+                    <li>
+                        <article class="project-card">
+                            <figure class="project-media">
+                                <img src="images/projects/tralvid-placeholder-1200.webp" width="1200" height="675"
+                                    loading="lazy" decoding="async" alt="TRALVID için tipografik yer tutucu görsel">
+                            </figure>
+                            <div class="project-body">
+                                <div class="project-meta"><span class="project-status">Özel pilot</span><span
+                                        class="project-placeholder">Yer tutucu görsel</span></div>
+                                <h3>TRALVID</h3>
+                                <p class="project-category">Turizm Operasyonları ve Müşteri Deneyimi Yönetimi</p>
+                                <p class="project-description">Misafir ve iş ortağı e-postalarını izlenebilir vakalara
+                                    ve ortak iletişim akışlarına dönüştüren turizm operasyonları platformu.</p>
+                                <div class="project-footer"><span class="project-no-link">Doğrulanmış public bağlantı
+                                        yok</span></div>
+                            </div>
+                        </article>
+                    </li>
+                    <li>
+                        <article class="project-card">
+                            <figure class="project-media">
+                                <img src="images/projects/istec-placeholder-1200.webp" width="1200" height="675"
+                                    loading="lazy" decoding="async" alt="İŞTEÇ için tipografik yer tutucu görsel">
+                            </figure>
+                            <div class="project-body">
+                                <div class="project-meta"><span class="project-status">Yayın durumu
+                                        doğrulanamadı</span><span class="project-placeholder">Yer tutucu görsel</span>
+                                </div>
+                                <h3>İŞTEÇ</h3>
+                                <p class="project-category">Kariyer ve CV Platformu</p>
+                                <p class="project-description">Turizm sektöründe doğru işi, doğru yeteneği ve doğru
+                                    fırsatı buluşturan kariyer ve yetenek platformu.</p>
+                                <p class="project-motto">İŞİN DOĞRUSU. NOKTA ATIŞI.</p>
+                                <div class="project-footer"><span class="project-no-link">Bağlantı doğrulanana kadar
+                                        kapalı</span></div>
+                            </div>
+                        </article>
+                    </li>
+                    <li>
+                        <article class="project-card">
+                            <figure class="project-media">
+                                <img src="images/projects/dilek-kutum-placeholder-1200.webp" width="1200" height="675"
+                                    loading="lazy" decoding="async" alt="Dilek Kutum için tipografik yer tutucu görsel">
+                            </figure>
+                            <div class="project-body">
+                                <div class="project-meta"><span class="project-status">Çok yakında</span><span
+                                        class="project-placeholder">Yer tutucu görsel</span></div>
+                                <h3>Dilek Kutum</h3>
+                                <p class="project-category">E-Ticaret ve Dijital Hediye Deneyimi</p>
+                                <p class="project-description">Sevdiklerinize özel, özenle hazırlanan hediye kutuları
+                                    için geliştirilmekte olan dijital alışveriş deneyimi.</p>
+                                <div class="project-footer"><span class="project-no-link">Doğrulanmış public bağlantı
+                                        yok</span></div>
+                            </div>
+                        </article>
+                    </li>
+                </ul>
+            </div>
+        </section>
+
         <div class="stops">
             <section class="stop" id="muzik" aria-labelledby="muzik-baslik">
                 <span class="badge">Yayında</span>
                 <h2 id="muzik-baslik">Müzik</h2>
                 <p>Eser kataloğu ve koleksiyonlar yayında.</p>
                 <a class="stop-link" href="music/">Kataloğu Keşfet</a>
-            </section>
-
-            <section class="stop" id="projeler" aria-labelledby="projeler-baslik">
-                <span class="badge">Yakında</span>
-                <h2 id="projeler-baslik">Dijital Projeler</h2>
-                <p>Proje tanıtımları ve vaka çalışmaları ekleniyor.</p>
             </section>
 
             <section class="stop" id="yazilar" aria-labelledby="yazilar-baslik">

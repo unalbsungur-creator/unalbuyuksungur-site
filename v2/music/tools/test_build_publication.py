@@ -91,15 +91,39 @@ class BuildPublicationTests(unittest.TestCase):
     def test_output_is_exactly_the_allowlist(self):
         manifest = self.build()
         web = expected_web_files()
-        self.assertEqual(len(web), 343)
+        self.assertEqual(len(web), 349)
         self.assertEqual(len(PAGES), 68)
         self.assertEqual(set(self.tree()), web | PAGES | set(bp.GENERATED))
-        self.assertEqual(len(self.tree()), 413)
-        self.assertEqual((manifest["webFiles"], manifest["copiedFiles"], manifest["renderedPages"]), (411, 343, 68))
-        self.assertEqual(manifest["totalOutputFiles"], 413)
+        self.assertEqual(len(self.tree()), 419)
+        self.assertEqual((manifest["webFiles"], manifest["copiedFiles"], manifest["renderedPages"]), (417, 349, 68))
+        self.assertEqual(manifest["totalOutputFiles"], 419)
         self.assertEqual(manifest["profile"], "preview")
-        self.assertEqual(manifest["groups"], {"site": 9, "data": 2, "lyrics": 64, "stories": 64, "webp": 204,
+        self.assertEqual(manifest["groups"], {"site": 15, "data": 2, "lyrics": 64, "stories": 64, "webp": 204,
                                               "pages": 68})
+
+    def test_project_portfolio_policy(self):
+        source = (REPO / "v2/index.html").read_text(encoding="utf-8")
+        section = source.split('<section class="projects"', 1)[1].split('</section>', 1)[0]
+        projects = ("MINDOT", "Next Point TR", "OpenFAOS", "TRALVID", "İŞTEÇ", "Dilek Kutum")
+        positions = [section.index(f"<h3>{name}</h3>") for name in projects]
+        self.assertEqual(positions, sorted(positions))
+        self.assertEqual(section.count('<article class="project-card">'), 6)
+        self.assertEqual(section.count('class="project-media" href='), 2)
+        self.assertEqual(section.count('class="project-link" href='), 2)
+        self.assertEqual(section.count('target="_blank"'), 4)
+        self.assertEqual(section.count('rel="noopener noreferrer"'), 4)
+        self.assertEqual(section.count('loading="lazy" decoding="async"'), 6)
+        self.assertEqual(section.count('width="1200" height="675"'), 6)
+        self.assertEqual(section.count('Yer tutucu görsel</span>'), 4)
+        self.assertEqual(section.count("https://mind-ot.com/"), 2)
+        self.assertEqual(section.count("https://nextpointtr.com/"), 2)
+        for forbidden in ('href="#"', "isbuyutec.com", "localhost", "tralvid.com"):
+            self.assertNotIn(forbidden, section)
+        for asset in (
+                "dilek-kutum-placeholder-1200.webp", "istec-placeholder-1200.webp",
+                "mindot-homepage-1200.webp", "next-point-tr-homepage-1200.webp",
+                "openfaos-placeholder-1200.webp", "tralvid-placeholder-1200.webp"):
+            self.assertIn(f'images/projects/{asset}', section)
 
     def test_excluded_files_absent(self):
         self.build()
@@ -114,7 +138,7 @@ class BuildPublicationTests(unittest.TestCase):
     def test_output_bytes_identical_to_source(self):
         manifest = self.build()
         tree = self.tree()
-        self.assertEqual(len(manifest["files"]), 343)
+        self.assertEqual(len(manifest["files"]), 349)
         for entry in manifest["files"]:
             source = (REPO / entry["path"]).read_bytes()
             self.assertEqual(tree[entry["path"]], source, entry["path"])
@@ -295,12 +319,12 @@ class BuildPublicationTests(unittest.TestCase):
 
     def test_cli_exit_codes(self):
         run = [sys.executable, "-I", str(SCRIPT), "--root", str(self.root), "--out", "_site"]
-        ok = subprocess.run(run + ["--expect-count", "411"], capture_output=True, text=True, encoding="utf-8")
+        ok = subprocess.run(run + ["--expect-count", "417"], capture_output=True, text=True, encoding="utf-8")
         self.assertEqual(ok.returncode, 0, ok.stderr)
-        self.assertIn("343/343", ok.stdout)
+        self.assertIn("349/349", ok.stdout)
         self.assertIn("üretilen eser sayfası 68", ok.stdout)
         manifest = json.loads((self.root / "_site-manifest.json").read_text(encoding="utf-8"))
-        self.assertEqual(manifest["totalOutputFiles"], 413)
+        self.assertEqual(manifest["totalOutputFiles"], 419)
         (self.root / "v2/music/catalog.css").unlink()
         failed = subprocess.run(run, capture_output=True, text=True, encoding="utf-8")
         self.assertEqual(failed.returncode, 1)
