@@ -114,10 +114,14 @@ class BuildPublicationTests(unittest.TestCase):
         self.assertEqual(section.count('rel="noopener noreferrer"'), 4)
         self.assertEqual(section.count('loading="lazy" decoding="async"'), 6)
         self.assertEqual(section.count('width="1200" height="675"'), 6)
-        self.assertEqual(section.count('Yer tutucu görsel</span>'), 4)
+        self.assertEqual(section.count('class="project-status"'), 6)
+        self.assertEqual(section.count('alt="'), 6)
+        self.assertEqual(section.count('<figure class="project-media">'), 4)
+        self.assertEqual(section.count('konsept kapak'), 4)
         self.assertEqual(section.count("https://mind-ot.com/"), 2)
         self.assertEqual(section.count("https://nextpointtr.com/"), 2)
-        for forbidden in ('href="#"', "isbuyutec.com", "localhost", "tralvid.com"):
+        for forbidden in ('href="#"', "isbuyutec.com", "localhost", "tralvid.com",
+                          'project-no-link', 'project-placeholder', 'Doğrulanmış public bağlantı'):
             self.assertNotIn(forbidden, section)
         for asset in (
                 "dilek-kutum-placeholder-1200.webp", "istec-placeholder-1200.webp",
