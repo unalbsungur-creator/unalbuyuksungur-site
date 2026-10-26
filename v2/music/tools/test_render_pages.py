@@ -124,7 +124,7 @@ class RenderPagesTests(unittest.TestCase):
         self.assertEqual(len(CATALOG["recordings"]), 68)
         self.assertEqual(len(CATALOG["covers"]), 68)
         with_video = sum(1 for r in CATALOG["recordings"] if r.get("videos"))
-        self.assertEqual((with_video, 68 - with_video), (49, 19))
+        self.assertEqual((with_video, 68 - with_video), (68, 0))
 
     def test_68_pages_with_expected_paths(self):
         ids = sorted(w["id"] for w in CATALOG["works"])

@@ -75,7 +75,7 @@ class ExternalLinksTests(unittest.TestCase):
         catalog = (ROOT / "v2/music/data/catalog.json").read_text(encoding="utf-8")
         self.assertEqual(len(re.findall(r'"id": "w-\d{4}"', catalog)), 68)
         self.assertEqual(len(re.findall(r'"id": "r-\d{4}"', catalog)), 68)
-        self.assertEqual(len(re.findall(r'"videoId": "[A-Za-z0-9_-]{11}"', catalog)), 49)
+        self.assertEqual(len(re.findall(r'"videoId": "[A-Za-z0-9_-]{11}"', catalog)), 68)
 
 
 if __name__ == "__main__":

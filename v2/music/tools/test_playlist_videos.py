@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Görev 40: "Video Klip" oynatma listesindeki 49 videonun kayıt eşleştirmesi için regresyon testi (unittest, yalnızca okur).
+"""Görev 40/86 kararları ve Görev 88'in kullanıcı onaylı dört nihai video eşleşmesi için regresyon testi.
 
 Tek yetkili kaynak kanalın "Video Klip" oynatma listesidir (49 video). Eşleştirmeler Görev 39 envanteri ve kullanıcı
 kararlarıyla verildi; aşağıdaki tablo verify_content_integrity.VIDEO_DECISIONS'tan bağımsız yazılmıştır ve ikisi de
@@ -56,7 +56,7 @@ PLAYLIST = [
     (26, "kiMxnPIWF1Q", "w-0029", "r-0030"),  # Fishka
     (27, "m1RDa0-8338", "w-0035", "r-0036"),  # Haydi Dene
     (28, "aHjCAyxfZeI", "w-0054", "r-0056"),  # Tebessümler Yüzümde
-    (29, "t_-m6kXBRzk", "w-0065", "r-0014"),  # Biliyorum (Rock Ballad Version)
+    (29, "t_-m6kXBRzk", "w-0065", "r-0014"),  # Tarihsel #29; Görev 88'de orijinale taşındı
     (30, "1kW3WenFU5o", "w-0051", "r-0053"),  # Seninle
     (31, "NDLHL_8sCZk", "w-0039", "r-0040"),  # Kabuğumu Bıraktım
     (32, "PGvPgywoiWU", "w-0023", "r-0024"),  # Çat Çat Çat
@@ -82,8 +82,24 @@ PLAYLIST = [
 USER_DECISIONS = {7: "Sonsuza Kadar", 14: "Angaralı Hasret", 20: "Mutlu Yıllar", 24: "Nerdesin",
                   29: "Biliyorum (Rock Ballad Version)", 36: "Babalar Günü", 40: "Söz Verdim", 41: "Beni Yâr Seçtin",
                   43: "Yenik Yüreğim (Pop Version)", 44: "Hasret Bitecek", 48: "Ben Boğa'yım"}
-WITHOUT_VIDEO = ["r-0001", "r-0002", "r-0005", "r-0006", "r-0008", "r-0009", "r-0015", "r-0018", "r-0019", "r-0021",
-                 "r-0039", "r-0042", "r-0045", "r-0046", "r-0050", "r-0051", "r-0057", "r-0062", "r-0063"]
+# Görev 85 bağımsız metadata eşleştirmeleri: (eser, kayıt, YouTube kimliği).
+APPROVED_NEW = [
+    ("w-0001", "r-0001", "00knlTdmDiY"), ("w-0002", "r-0002", "sZLUEY7nxYw"),
+    ("w-0005", "r-0005", "czSpqRazm5c"), ("w-0006", "r-0006", "JpjpqMk5caM"),
+    ("w-0008", "r-0008", "HaweU9fdh6I"), ("w-0009", "r-0009", "ytW6ihQYvgw"),
+    ("w-0017", "r-0018", "FCXO_tmdo9c"), ("w-0018", "r-0019", "-cVGyziJ1d8"),
+    ("w-0038", "r-0039", "XdptcFOz_Q4"), ("w-0041", "r-0042", "wYh2OdgOGzw"),
+    ("w-0044", "r-0045", "4F8DNxAPebM"), ("w-0045", "r-0046", "924i7V1cveE"),
+    ("w-0049", "r-0050", "yPskvlLnjuo"), ("w-0055", "r-0057", "u8ogn4DCO7Q"),
+    ("w-0059", "r-0062", "wmNU02G02II"), ("w-0060", "r-0063", "jMSxX_SbYdY"),
+]
+# Görev 88 kullanıcı onayı: (eser, kayıt, nihai YouTube kimliği). #29 geçmişi PLAYLIST'te tutulur.
+APPROVED_FINAL = [
+    ("w-0014", "r-0015", "t_-m6kXBRzk"),
+    ("w-0065", "r-0014", "ppxYz3UwZ4s"),
+    ("w-0066", "r-0021", "WpcQcrdfvsg"),
+    ("w-0020", "r-0051", "z1znsVt0l6I"),
+]
 VIDEO = lambda vid: [{"provider": "youtube", "videoId": vid, "videoType": "official-music-video"}]  # noqa: E731
 
 
@@ -98,7 +114,14 @@ class PlaylistTableTests(unittest.TestCase):
         self.assertEqual(len({row[3] for row in PLAYLIST}), 49)
 
     def test_table_matches_integrity_decisions(self):
-        self.assertEqual({rid: vid for _, vid, _, rid in PLAYLIST}, VIDEO_DECISIONS)
+        old = {rid: vid for order, vid, _, rid in PLAYLIST if order != 29}
+        new = {rid: vid for _, rid, vid in APPROVED_NEW}
+        self.assertEqual(len(new), 16)
+        self.assertFalse(old.keys() & new.keys())
+        final = {rid: vid for _, rid, vid in APPROVED_FINAL}
+        self.assertEqual(len(old | new), 64)
+        self.assertFalse((old | new).keys() & final.keys())
+        self.assertEqual(VIDEO_DECISIONS, old | new | final)
 
     def test_recordings_belong_to_listed_works(self):
         for order, _, wid, rid in PLAYLIST:
@@ -106,18 +129,36 @@ class PlaylistTableTests(unittest.TestCase):
 
 
 class CatalogVideoTests(unittest.TestCase):
-    def test_catalog_has_exactly_the_49_playlist_videos(self):
+    def test_catalog_has_64_preserved_and_four_final_videos(self):
         on_catalog = {rid: r["videos"] for rid, r in RECORDINGS.items() if "videos" in r}
-        self.assertEqual(on_catalog, {rid: VIDEO(vid) for _, vid, _, rid in PLAYLIST})
+        expected = {rid: VIDEO(vid) for order, vid, _, rid in PLAYLIST if order != 29}
+        expected.update({rid: VIDEO(vid) for _, rid, vid in APPROVED_NEW})
+        expected.update({rid: VIDEO(vid) for _, rid, vid in APPROVED_FINAL})
+        self.assertEqual(len(expected), 68)
+        self.assertEqual(on_catalog, expected)
+        self.assertEqual(len({video[0]["videoId"] for video in on_catalog.values()}), 68)
         self.assertEqual(video_problems(RECORDINGS), [])
+
+    def test_new_videos_belong_to_approved_works(self):
+        for wid, rid, vid in APPROVED_NEW:
+            with self.subTest(recording=rid):
+                self.assertEqual(RECORDINGS[rid]["workId"], wid)
+                self.assertEqual(RECORDINGS[rid]["videos"], VIDEO(vid))
 
     def test_existing_video_preserved_and_48_new(self):
         self.assertEqual(RECORDINGS["r-0026"]["videos"], VIDEO("7c21yJVIsJc"))
         self.assertEqual(by_order(46), (46, "7c21yJVIsJc", "w-0025", "r-0026"))
         self.assertEqual(sum(1 for row in PLAYLIST if row[3] != "r-0026"), 48)
 
-    def test_19_recordings_without_video(self):
-        self.assertEqual(sorted(rid for rid, r in RECORDINGS.items() if "videos" not in r), WITHOUT_VIDEO)
+    def test_four_final_videos_have_correct_work_and_cover(self):
+        covers = {"r-0015": "c-0015", "r-0014": "c-0014", "r-0021": "c-0021", "r-0051": "c-0051"}
+        self.assertEqual(len(APPROVED_FINAL), 4)
+        for wid, rid, vid in APPROVED_FINAL:
+            with self.subTest(recording=rid):
+                self.assertEqual(RECORDINGS[rid]["workId"], wid)
+                self.assertEqual(RECORDINGS[rid]["coverId"], covers[rid])
+                self.assertEqual(RECORDINGS[rid]["videos"], VIDEO(vid))
+        self.assertFalse([rid for rid, r in RECORDINGS.items() if "videos" not in r])
 
     def test_counts_preserved(self):
         self.assertEqual((len(WORKS), len(RECORDINGS), len(CATALOG["covers"])), (68, 68, 68))
@@ -132,7 +173,7 @@ class CatalogVideoTests(unittest.TestCase):
             _, vid, _, rid = by_order(order)
             with self.subTest(order=order):
                 self.assertEqual(RECORDINGS[rid]["title"], title)
-                self.assertEqual(RECORDINGS[rid]["videos"], VIDEO(vid))
+                self.assertEqual(RECORDINGS[rid]["videos"], VIDEO("ppxYz3UwZ4s" if order == 29 else vid))
 
     def test_versions_not_mixed(self):
         # sıra -> (kayıt, isOriginal, versionLabel)
@@ -145,8 +186,8 @@ class CatalogVideoTests(unittest.TestCase):
             with self.subTest(order=order):
                 self.assertEqual(row_rid, rid)
                 self.assertEqual((recording["isOriginal"], recording["versionLabel"]), (original, label))
-                self.assertEqual(recording["videos"], VIDEO(vid))
-        self.assertNotIn("videos", RECORDINGS["r-0015"], "#29 yalnızca Rock Ballad kaydına aittir; Biliyorum Pop kaydına kopyalanmaz")
+                self.assertEqual(recording["videos"], VIDEO("ppxYz3UwZ4s" if order == 29 else vid))
+        self.assertEqual(RECORDINGS["r-0015"]["videos"], VIDEO("t_-m6kXBRzk"))
 
     def test_high_confidence_matches(self):
         high = [row for row in PLAYLIST if row[0] not in USER_DECISIONS and row[0] != 46]

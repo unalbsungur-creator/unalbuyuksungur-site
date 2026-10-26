@@ -1182,7 +1182,14 @@
         "youtubeMusic": null,
         "appleMusic": null,
         "other": []
-      }
+      },
+      "videos": [
+        {
+          "provider": "youtube",
+          "videoId": "00knlTdmDiY",
+          "videoType": "official-music-video"
+        }
+      ]
     },
     {
       "id": "r-0002",
@@ -1199,7 +1206,14 @@
         "youtubeMusic": null,
         "appleMusic": null,
         "other": []
-      }
+      },
+      "videos": [
+        {
+          "provider": "youtube",
+          "videoId": "sZLUEY7nxYw",
+          "videoType": "official-music-video"
+        }
+      ]
     },
     {
       "id": "r-0003",
@@ -1264,7 +1278,14 @@
         "youtubeMusic": null,
         "appleMusic": null,
         "other": []
-      }
+      },
+      "videos": [
+        {
+          "provider": "youtube",
+          "videoId": "czSpqRazm5c",
+          "videoType": "official-music-video"
+        }
+      ]
     },
     {
       "id": "r-0006",
@@ -1281,7 +1302,14 @@
         "youtubeMusic": null,
         "appleMusic": null,
         "other": []
-      }
+      },
+      "videos": [
+        {
+          "provider": "youtube",
+          "videoId": "JpjpqMk5caM",
+          "videoType": "official-music-video"
+        }
+      ]
     },
     {
       "id": "r-0007",
@@ -1322,7 +1350,14 @@
         "youtubeMusic": null,
         "appleMusic": null,
         "other": []
-      }
+      },
+      "videos": [
+        {
+          "provider": "youtube",
+          "videoId": "HaweU9fdh6I",
+          "videoType": "official-music-video"
+        }
+      ]
     },
     {
       "id": "r-0009",
@@ -1339,7 +1374,14 @@
         "youtubeMusic": null,
         "appleMusic": null,
         "other": []
-      }
+      },
+      "videos": [
+        {
+          "provider": "youtube",
+          "videoId": "ytW6ihQYvgw",
+          "videoType": "official-music-video"
+        }
+      ]
     },
     {
       "id": "r-0010",
@@ -1458,7 +1500,7 @@
       "videos": [
         {
           "provider": "youtube",
-          "videoId": "t_-m6kXBRzk",
+          "videoId": "ppxYz3UwZ4s",
           "videoType": "official-music-video"
         }
       ]
@@ -1480,7 +1522,14 @@
         "youtubeMusic": null,
         "appleMusic": null,
         "other": []
-      }
+      },
+      "videos": [
+        {
+          "provider": "youtube",
+          "videoId": "t_-m6kXBRzk",
+          "videoType": "official-music-video"
+        }
+      ]
     },
     {
       "id": "r-0016",
@@ -1545,7 +1594,14 @@
         "youtubeMusic": null,
         "appleMusic": null,
         "other": []
-      }
+      },
+      "videos": [
+        {
+          "provider": "youtube",
+          "videoId": "FCXO_tmdo9c",
+          "videoType": "official-music-video"
+        }
+      ]
     },
     {
       "id": "r-0019",
@@ -1562,7 +1618,14 @@
         "youtubeMusic": null,
         "appleMusic": null,
         "other": []
-      }
+      },
+      "videos": [
+        {
+          "provider": "youtube",
+          "videoId": "-cVGyziJ1d8",
+          "videoType": "official-music-video"
+        }
+      ]
     },
     {
       "id": "r-0020",
@@ -1603,7 +1666,14 @@
         "youtubeMusic": null,
         "appleMusic": null,
         "other": []
-      }
+      },
+      "videos": [
+        {
+          "provider": "youtube",
+          "videoId": "WpcQcrdfvsg",
+          "videoType": "official-music-video"
+        }
+      ]
     },
     {
       "id": "r-0022",
@@ -2028,7 +2098,14 @@
         "youtubeMusic": null,
         "appleMusic": null,
         "other": []
-      }
+      },
+      "videos": [
+        {
+          "provider": "youtube",
+          "videoId": "XdptcFOz_Q4",
+          "videoType": "official-music-video"
+        }
+      ]
     },
     {
       "id": "r-0040",
@@ -2093,7 +2170,14 @@
         "youtubeMusic": null,
         "appleMusic": null,
         "other": []
-      }
+      },
+      "videos": [
+        {
+          "provider": "youtube",
+          "videoId": "wYh2OdgOGzw",
+          "videoType": "official-music-video"
+        }
+      ]
     },
     {
       "id": "r-0043",
@@ -2158,7 +2242,14 @@
         "youtubeMusic": null,
         "appleMusic": null,
         "other": []
-      }
+      },
+      "videos": [
+        {
+          "provider": "youtube",
+          "videoId": "4F8DNxAPebM",
+          "videoType": "official-music-video"
+        }
+      ]
     },
     {
       "id": "r-0046",
@@ -2175,7 +2266,14 @@
         "youtubeMusic": null,
         "appleMusic": null,
         "other": []
-      }
+      },
+      "videos": [
+        {
+          "provider": "youtube",
+          "videoId": "924i7V1cveE",
+          "videoType": "official-music-video"
+        }
+      ]
     },
     {
       "id": "r-0047",
@@ -2264,7 +2362,14 @@
         "youtubeMusic": null,
         "appleMusic": null,
         "other": []
-      }
+      },
+      "videos": [
+        {
+          "provider": "youtube",
+          "videoId": "yPskvlLnjuo",
+          "videoType": "official-music-video"
+        }
+      ]
     },
     {
       "id": "r-0051",
@@ -2281,7 +2386,14 @@
         "youtubeMusic": null,
         "appleMusic": null,
         "other": []
-      }
+      },
+      "videos": [
+        {
+          "provider": "youtube",
+          "videoId": "z1znsVt0l6I",
+          "videoType": "official-music-video"
+        }
+      ]
     },
     {
       "id": "r-0052",
@@ -2418,7 +2530,14 @@
         "youtubeMusic": null,
         "appleMusic": null,
         "other": []
-      }
+      },
+      "videos": [
+        {
+          "provider": "youtube",
+          "videoId": "u8ogn4DCO7Q",
+          "videoType": "official-music-video"
+        }
+      ]
     },
     {
       "id": "r-0058",
@@ -2535,7 +2654,14 @@
         "youtubeMusic": null,
         "appleMusic": null,
         "other": []
-      }
+      },
+      "videos": [
+        {
+          "provider": "youtube",
+          "videoId": "wmNU02G02II",
+          "videoType": "official-music-video"
+        }
+      ]
     },
     {
       "id": "r-0063",
@@ -2552,7 +2678,14 @@
         "youtubeMusic": null,
         "appleMusic": null,
         "other": []
-      }
+      },
+      "videos": [
+        {
+          "provider": "youtube",
+          "videoId": "jMSxX_SbYdY",
+          "videoType": "official-music-video"
+        }
+      ]
     },
     {
       "id": "r-0064",

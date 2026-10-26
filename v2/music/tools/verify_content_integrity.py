@@ -46,21 +46,31 @@ SPLITS = [
 SLUGS = {"w-0020": "oyle-bir-sey", "w-0065": "biliyorum-rock-ballad-version", "w-0066": "boyle-bir-sey",
          "w-0067": "turizmci-pop-versiyon", "w-0068": "yenik-yuregim-thrash-metal-version"}
 # Kayıt videoları: kayıt -> YouTube video kimliği (official-music-video). Kaynak yalnızca kanalın "Video Klip" oynatma
-# listesi (49 video; yorumdaki # liste sırasıdır). Görev 36: r-0026 (ilk video). Görev 40: kalan 48 video, Görev 39
-# envanteri ve kullanıcı kararlarıyla (ör. #7 -> Sonsuza Kadar, #29 -> Rock Ballad, #43 -> Pop). Katalogda bunlar dışında
-# video olamaz; videosu olmayan 19 kayıtta alan yoktur.
+# listesi (ilk 49 video için yorumdaki # liste sırasıdır). Görev 36: r-0026 (ilk video). Görev 40: kalan 48 video,
+# Görev 39 envanteri ve kullanıcı kararlarıyla (ör. #7 -> Sonsuza Kadar, #29 -> Rock Ballad, #43 -> Pop).
+# Görev 86: Görev 85'te doğrulanan 16 eşleşme. Görev 88: kullanıcı onayıyla dört kayıt yeniden eşleştirildi.
 VIDEO_DECISIONS = {
+    "r-0001": "00knlTdmDiY",  # Görev 85 Ağlama
+    "r-0002": "sZLUEY7nxYw",  # Görev 85 Akrep
     "r-0003": "HNKMM9pfTJ8",  # #14 Angaralı Hasret
     "r-0004": "tVrZGaPSRTw",  # #49 Anneler Günü
+    "r-0005": "czSpqRazm5c",  # Görev 85 Aslan
+    "r-0006": "JpjpqMk5caM",  # Görev 85 Aşkım
     "r-0007": "TtxuK4xdhUU",  # #36 Babalar Günü
+    "r-0008": "HaweU9fdh6I",  # Görev 85 Balık
+    "r-0009": "ytW6ihQYvgw",  # Görev 85 Başak
     "r-0010": "0BMN6o_hJUw",  # #48 Ben Boğa'yım
     "r-0011": "z5csFSoSli8",  # #6 Beni Sal
     "r-0012": "OYm6z7ehzKE",  # #41 Beni Yâr Seçtin
     "r-0013": "_ljZcwuJvWU",  # #4 Benimle Yaşlanacaktın
-    "r-0014": "t_-m6kXBRzk",  # #29 Biliyorum (Rock Ballad Version)
+    "r-0014": "ppxYz3UwZ4s",  # Görev 88 Biliyorum (Rock Ballad Version)
+    "r-0015": "t_-m6kXBRzk",  # Görev 88 Biliyorum (orijinal; eski #29)
     "r-0016": "MKnTF1jkwwY",  # #23 Bir Güzel Sevdim
     "r-0017": "-3WL0gfweKo",  # #9 Bir Kedim Var
+    "r-0018": "FCXO_tmdo9c",  # Görev 85 Biten Sadece Zaman
+    "r-0019": "-cVGyziJ1d8",  # Görev 85 Boğa
     "r-0020": "O00SvlTK7UM",  # #25 Boşver Geç
+    "r-0021": "WpcQcrdfvsg",  # Görev 88 Böyle Bir Şey
     "r-0022": "1_uIKEFU5J8",  # #8 Bugün Benim Doğum Günüm
     "r-0023": "U4Y7UcDhEmY",  # #34 Çarpıldım Sana
     "r-0024": "PGvPgywoiWU",  # #32 Çat Çat Çat
@@ -78,22 +88,31 @@ VIDEO_DECISIONS = {
     "r-0036": "m1RDa0-8338",  # #27 Haydi Dene
     "r-0037": "0tni7CybqP8",  # #39 Haziran
     "r-0038": "zTtH67AFB5U",  # #21 Ich meld' mich...
+    "r-0039": "XdptcFOz_Q4",  # Görev 85 İkizler
     "r-0040": "NDLHL_8sCZk",  # #31 Kabuğumu Bıraktım
     "r-0041": "wIMBBZnc7J0",  # #47 Kahve Falı
+    "r-0042": "wYh2OdgOGzw",  # Görev 85 Kahve Molası
     "r-0043": "LUjBENG76ZA",  # #16 Kendimi Arıyorum
     "r-0044": "3Mcc6SnIrs4",  # #33 Kiminle
+    "r-0045": "4F8DNxAPebM",  # Görev 85 Koç
+    "r-0046": "924i7V1cveE",  # Görev 85 Kova
     "r-0047": "xZ5bDIskUVA",  # #20 Mutlu Yıllar
     "r-0048": "AqUwsEjYzaA",  # #24 Nerdesin
     "r-0049": "UmwBKxmgsFs",  # #35 Neredeyim Ben
+    "r-0050": "yPskvlLnjuo",  # Görev 85 Oğlak
+    "r-0051": "z1znsVt0l6I",  # Görev 88 Öyle Bir Şey
     "r-0052": "G5RS_E5hmjE",  # #2 Sebebi Sensin
     "r-0053": "1kW3WenFU5o",  # #30 Seninle
     "r-0054": "1KhGHDbMMGQ",  # #7 Sonsuza Kadar (kullanıcı kararı; listedeki başlık "Galatasaray Marşı")
     "r-0055": "c2HxZlyjlmA",  # #40 Söz Verdim
     "r-0056": "aHjCAyxfZeI",  # #28 Tebessümler Yüzümde
+    "r-0057": "u8ogn4DCO7Q",  # Görev 85 Terazi
     "r-0058": "F-mRzZU-2fI",  # #13 Turizmci (Pop Versiyon)
     "r-0059": "VaKBbcUp5RQ",  # #12 Turizmci (özgün kayıt)
     "r-0060": "H6MG3MK7oEc",  # #22 Türbülans
     "r-0061": "GvXRUO-vPsA",  # #19 Wegen Dir
+    "r-0062": "wmNU02G02II",  # Görev 85 Yay
+    "r-0063": "jMSxX_SbYdY",  # Görev 85 Yengeç
     "r-0064": "L7TthTFzoWM",  # #43 Yenik Yüreğim (Pop Version)
     "r-0065": "n8tlmkgthQU",  # #45 Yenik Yüreğim (Thrash Metal Version)
     "r-0066": "oDxRo89ih-0",  # #37 Yine Üşüyorum
@@ -286,7 +305,7 @@ def expected_split_catalog(before):
 
 
 def apply_later_decisions(data):
-    """Görev 25'ten sonra onaylanan katalog kararlarını ekler (Görev 36 ve 40: kayıt videoları)."""
+    """Görev 25'ten sonra onaylanan kayıt videolarını ekler (Görev 36, 40 ve 86)."""
     data = json.loads(json.dumps(data))
     for recording in data["recordings"]:
         if recording["id"] in VIDEO_DECISIONS:
@@ -506,7 +525,7 @@ def archive_checks(report, catalog, archive):
         problems.append("Görev 25 yedek kataloğu beklenen sürüm değil")
     expected = apply_later_decisions(expected_split_catalog(json.loads(before_path.read_text(encoding="utf-8"))))
     problems += [key for key in sorted(set(expected) | set(catalog)) if expected.get(key) != catalog.get(key)]
-    report.check("Katalog = Görev 25 öncesi yedek + ayırma kararı + onaylı 49 video kararı (başka hiçbir fark yok)",
+    report.check("Katalog = Görev 25 öncesi yedek + ayırma kararı + onaylı 49 eski ve 16 yeni video (başka fark yok)",
                  problems)
 
     backup = {}
