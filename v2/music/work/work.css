@@ -430,6 +430,13 @@
     text-transform: none;
 }
 
+@media (max-width: 560px) {
+    .listen-links li,
+    .listen-links .button {
+        width: 100%;
+    }
+}
+
 /* ---------- Video klip ---------- */
 
 /* 16:9 alan; kapak yerel görseldir, YouTube oynatıcısı yalnızca oynat düğmesine basılınca yüklenir. */

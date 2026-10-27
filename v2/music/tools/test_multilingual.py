@@ -75,6 +75,68 @@ class MultilingualTests(unittest.TestCase):
             for asset in ("lyrics", "story"):
                 self.assertTrue((ROOT / "v2/music" / work[asset]["file"]).is_file())
 
+    @unittest.skipUnless(shutil.which("node"), "Node.js required for work-page behavior smoke")
+    def test_listen_links_are_recording_specific_safe_and_conditional(self):
+        source = (ROOT / "v2/music/work/work.js").read_text(encoding="utf-8")
+        template = (ROOT / "v2/music/work/index.html").read_text(encoding="utf-8")
+        style = (ROOT / "v2/music/work/work.css").read_text(encoding="utf-8")
+        self.assertIn('id="work-listen-section" aria-labelledby="listen-title" hidden', template)
+        self.assertNotIn("Dinleme bağlantıları yakında eklenecek", source + template)
+        self.assertIn("@media (max-width: 560px)", style)
+        self.assertIn(".listen-links .button {\n        width: 100%;", style)
+        recording = next(r for r in CATALOG["recordings"] if r["links"]["spotify"])
+        messages = {loc: json.loads((ROOT / f"v2/i18n/{loc}.json").read_text(encoding="utf-8"))
+                    for loc in ("tr", "en", "de")}
+        titles = {"tr": "Müzik Platformlarında Dinle", "en": "Listen on Music Platforms",
+                  "de": "Auf Musikplattformen anhören"}
+        for locale, title in titles.items():
+            self.assertEqual(messages[locale]["music.listenPlatforms"], title)
+            page = template if locale == "tr" else self.pages[f"v2/{locale}/music/work/{recording['workId']}.html"].decode("utf-8")
+            self.assertIn(f'id="listen-title">{title}</h2>', page)
+        platform_code = source[source.index("var LISTEN_PLATFORMS = ["):]
+        platform_code = platform_code[:platform_code.index("];\n") + 2]
+        url_code = source[source.index("function isHttpsUrl("):source.index("/* ---------- Görseller")]
+        listen_code = source[source.index("function renderListen("):source.index("// Seçili kaydın ilk geçerli videosu")]
+        smoke_source = platform_code + url_code + listen_code
+        small_messages = {loc: {key: value for key, value in entries.items()
+                                if key in ("music.spotifyListen", "music.appleListen", "music.youtubeMusicListen", "music.newTab")}
+                          for loc, entries in messages.items()}
+        node = r'''
+            const vm = require('node:vm');
+            const source = process.argv[1];
+            const recording = JSON.parse(process.argv[2]);
+            const messages = JSON.parse(process.argv[3]);
+            for (const locale of ['tr', 'en', 'de']) {
+                const dom = {listenSection: {hidden: true}, listen: {nodes: [], replaceChildren(...nodes) { this.nodes = nodes; }}};
+                const context = {URL, dom, tr: (key, fallback) => messages[locale][key] || fallback,
+                    el: (tag, attrs, children = []) => ({tag, attrs, children})};
+                vm.runInNewContext(source + '\nthis.run = renderListen;', context);
+                const work = {recordings: [recording]};
+                const empty = {...recording, links: {spotify: null, appleMusic: null, youtubeMusic: null,
+                    youtube: 'https://www.youtube.com/watch?v=abcDEF12345', other: []}};
+                context.run(work, empty);
+                if (!dom.listenSection.hidden || dom.listen.nodes.length) throw Error('empty section must disappear');
+                context.run(work, recording);
+                const anchors = dom.listen.nodes[0].children.map(item => item.children[0]);
+                if (dom.listenSection.hidden || anchors.length !== 3) throw Error('missing direct links');
+                if (anchors.some(a => a.attrs.href !== recording.links[
+                    a.attrs.text.includes('Spotify') ? 'spotify' : a.attrs.text.includes('Apple') ? 'appleMusic' : 'youtubeMusic'])) throw Error('wrong destination');
+                if (anchors.some(a => a.attrs.target !== '_blank' || a.attrs.rel !== 'noopener noreferrer' || !a.children.length)) throw Error('unsafe navigation');
+                const bad = {...recording, links: {...recording.links, spotify: 'https://open.spotify.com/artist/0123456789abcdefABCDEF',
+                    appleMusic: 'https://music.apple.com/us/artist/example/123', youtubeMusic: 'https://www.youtube.com/watch?v=abcDEF12345'}};
+                context.run(work, bad);
+                if (!dom.listenSection.hidden || dom.listen.nodes.length) throw Error('artist/video links rendered');
+                context.run(work, {...recording, links: {...recording.links, spotify: 'https://open.spotify.com.evil.test/track/0123456789abcdefABCDEF', appleMusic: '', youtubeMusic: null}});
+                if (!dom.listenSection.hidden) throw Error('malformed link rendered');
+                context.run(work, {...recording, links: {...recording.links, spotify: null, youtubeMusic: null}});
+                if (dom.listenSection.hidden || dom.listen.nodes[0].children.length !== 1 || dom.listen.nodes[0].children[0].children[0].attrs.href !== recording.links.appleMusic) throw Error('single link');
+            }
+        '''
+        result = subprocess.run([shutil.which("node"), "-e", node, smoke_source,
+                                 json.dumps({"links": recording["links"], "workId": recording["workId"]}),
+                                 json.dumps(small_messages)], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
     @unittest.skipUnless(shutil.which("node"), "Node.js required for runtime behavior smoke")
     def test_runtime_choice_storage_keyboard_native_links_and_url_mapping(self):
         runtime = (ROOT / "v2/i18n/runtime.js").read_text(encoding="utf-8")

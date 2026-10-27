@@ -27,8 +27,7 @@
     var LISTEN_PLATFORMS = [
         { key: "spotify", name: tr("music.spotifyListen", "Spotify'da Dinle") },
         { key: "appleMusic", name: tr("music.appleListen", "Apple Music'te Dinle") },
-        { key: "youtubeMusic", name: tr("music.youtubeMusicListen", "YouTube Music'te Dinle") },
-        { key: "youtube", name: tr("music.youtubeListen", "YouTube'da Dinle") }
+        { key: "youtubeMusic", name: tr("music.youtubeMusicListen", "YouTube Music'te Dinle") }
     ];
     // Kayıt videoları (bkz. data/README.md). Adres katalogda saklanmaz; doğrulanmış videoId'den türetilir.
     // Doğrulayıcının (kontrol 37) tarayıcıdaki karşılığı: bilinmeyen sağlayıcı, tür veya kimlik gösterilmez.
@@ -51,8 +50,7 @@
         story: {
             empty: tr("music.storyEmpty", "Bu eserin hikâyesi yakında burada yer alacak."),
             error: tr("music.storyError", "Hikâye şu anda yüklenemedi. Lütfen daha sonra yeniden deneyin.")
-        },
-        listenEmpty: tr("music.listenEmpty", "Dinleme bağlantıları yakında eklenecek.")
+        }
     };
     // Kapak çerçevesi: masaüstünde sol sütun (en fazla ~560px), mobilde tam genişlik
     var HERO_SIZES = "(min-width: 1320px) 560px, (min-width: 900px) 42vw, (min-width: 600px) 560px, calc(100vw - 40px)";
@@ -94,6 +92,19 @@
         } catch (error) {
             return false;
         }
+    }
+
+    // Only direct catalog-supplied music release/song URLs; never profiles, searches or video clips.
+    function isMusicUrl(key, value) {
+        if (!isHttpsUrl(value)) return false;
+        var url = new URL(value);
+        if (key === "spotify") return url.hostname === "open.spotify.com" &&
+            /^\/(?:intl-[a-z]{2}\/)?(?:track|album)\/[A-Za-z0-9]{22}\/?$/.test(url.pathname);
+        if (key === "appleMusic") return url.hostname === "music.apple.com" &&
+            /^\/[a-z]{2}\/song\/[^/]+\/\d+\/?$/.test(url.pathname);
+        if (key === "youtubeMusic") return url.hostname === "music.youtube.com" &&
+            url.pathname === "/watch" && /^[A-Za-z0-9_-]{11}$/.test(url.searchParams.get("v") || "");
+        return false;
     }
 
     /* ---------- Görseller ---------- */
@@ -460,18 +471,16 @@
         return recording.lyrics && recording.lyrics.status === "published" ? recording.lyrics : work.data.lyrics;
     }
 
-    // Yalnızca katalogda kayıtlı, https ile başlayan bağlantılar gösterilir.
+    // Only verified recording-specific platform links, never video IDs or site-wide artist profiles.
     function renderListen(work, recording) {
         var links = [];
         LISTEN_PLATFORMS.forEach(function (platform) {
-            var url = recording.links[platform.key];
-            if (isHttpsUrl(url)) links.push({ name: platform.name, url: url });
+            var url = recording.links && recording.links[platform.key];
+            if (isMusicUrl(platform.key, url)) links.push({ name: platform.name, url: url });
         });
-        (recording.links.other || []).forEach(function (link) {
-            if (isHttpsUrl(link.url) && link.platform) links.push({ name: link.platform, url: link.url });
-        });
+        dom.listenSection.hidden = !links.length;
         if (!links.length) {
-            dom.listen.replaceChildren(el("p", { className: "empty-note", text: TEXTS.listenEmpty }));
+            dom.listen.replaceChildren();
             return;
         }
         var children = [];
@@ -751,6 +760,7 @@
             lyrics: document.getElementById("work-lyrics"),
             story: document.getElementById("work-story"),
             listen: document.getElementById("work-listen"),
+            listenSection: document.getElementById("work-listen-section"),
             video: document.getElementById("work-video"),
             videoSection: document.getElementById("work-video-section"),
             related: document.getElementById("work-related"),
