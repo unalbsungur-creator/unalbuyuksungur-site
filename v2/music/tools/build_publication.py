@@ -58,6 +58,7 @@ SITE_FILES = (
     "v2/i18n/de.json",
     "v2/i18n/runtime.js",
     "v2/i18n/selector.css",
+    "v2/images/favicon.jpg.jpeg",
     "v2/images/unal-digital-world-hero.png",
     "v2/images/projects/dilek-kutum-placeholder-1200.webp",
     "v2/images/projects/istec-placeholder-1200.webp",

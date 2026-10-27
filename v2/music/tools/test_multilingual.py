@@ -2,6 +2,7 @@
 
 import json
 import html
+import re
 import shutil
 import subprocess
 import unittest
@@ -74,6 +75,34 @@ class MultilingualTests(unittest.TestCase):
                 self.assertIn('data-work-id="' + work_id + '"', page)
             for asset in ("lyrics", "story"):
                 self.assertTrue((ROOT / "v2/music" / work[asset]["file"]).is_file())
+
+    def test_music_eyebrows_and_favicon_for_every_locale(self):
+        _, messages = render_site.load_messages(SOURCES.__getitem__)
+        self.assertEqual((ROOT / "v2/images/favicon.jpg.jpeg").read_bytes(),
+                         (ROOT / "images/favicon.jpg.jpeg").read_bytes())
+        for locale in ("tr", "en", "de"):
+            prefix = "" if locale == "tr" else locale + "/"
+            pages = {
+                "home": (ROOT / "v2/index.html").read_text(encoding="utf-8") if locale == "tr"
+                else self.pages[f"v2/{locale}/index.html"].decode("utf-8"),
+                "catalog": (ROOT / "v2/music/index.html").read_text(encoding="utf-8") if locale == "tr"
+                else self.pages[f"v2/{locale}/music/index.html"].decode("utf-8"),
+                "work": self.pages[f"v2/{prefix}music/work/w-0025.html"].decode("utf-8"),
+            }
+            for surface, relative in (("home", "images/" if locale == "tr" else "../images/"),
+                                      ("catalog", "../images/" if locale == "tr" else "../../images/"),
+                                      ("work", "../../images/" if locale == "tr" else "../../../images/")):
+                self.assertIn(f'<link rel="icon" type="image/jpeg" href="{relative}favicon.jpg.jpeg">', pages[surface])
+            for surface, keys in (("catalog", ("collections", "catalog")),
+                                  ("work", ("work", "video", "lyrics", "story", "listen", "related", "catalog"))):
+                rendered = re.findall(r'<p class="eyebrow[^\"]*">([^<]+)</p>', pages[surface])
+                for key in keys:
+                    with self.subTest(locale=locale, surface=surface, key=key):
+                        self.assertIn(messages[locale]["music.eyebrow." + key], rendered)
+                        if locale != "tr":
+                            self.assertNotIn(messages["tr"]["music.eyebrow." + key], rendered)
+        self.assertEqual(render_site.lookup({"tr": messages["tr"], "en": {}}, "en", "music.eyebrow.video"),
+                         messages["tr"]["music.eyebrow.video"])
 
     @unittest.skipUnless(shutil.which("node"), "Node.js required for work-page behavior smoke")
     def test_listen_links_are_recording_specific_safe_and_conditional(self):

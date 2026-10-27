@@ -145,10 +145,11 @@ def render_page(text, locale, surface, messages, config, work=None, catalog=None
             "home": {"images/": "../images/", "external-links.js": "../external-links.js",
                      "i18n/": "../i18n/"},
             "catalog": {"catalog.css": "../../music/catalog.css", "catalog.js": "../../music/catalog.js",
-                        "../external-links.js": "../../external-links.js", "../i18n/": "../../i18n/"},
+                        "../images/": "../../images/", "../external-links.js": "../../external-links.js",
+                        "../i18n/": "../../i18n/"},
             "work": {"../catalog.css": "../../../music/catalog.css", "work.css": "../../../music/work/work.css",
-                     "work.js": "../../../music/work/work.js", "../../external-links.js": "../../../external-links.js",
-                     "../../i18n/": "../../../i18n/"},
+                      "work.js": "../../../music/work/work.js", "../../external-links.js": "../../../external-links.js",
+                      "../../images/": "../../../images/", "../../i18n/": "../../../i18n/"},
         }[surface]
 
         def asset(m):

@@ -96,15 +96,15 @@ class BuildPublicationTests(unittest.TestCase):
     def test_output_is_exactly_the_allowlist(self):
         manifest = self.build()
         web = expected_web_files()
-        self.assertEqual(len(web), 355)
+        self.assertEqual(len(web), 356)
         self.assertEqual(len(PAGES), 68)
         self.assertEqual(set(self.tree()), web | ALL_PAGES | set(bp.GENERATED))
-        self.assertEqual(len(self.tree()), 567)
-        self.assertEqual((manifest["webFiles"], manifest["copiedFiles"], manifest["renderedPages"]), (565, 355, 210))
-        self.assertEqual(manifest["totalOutputFiles"], 567)
+        self.assertEqual(len(self.tree()), 568)
+        self.assertEqual((manifest["webFiles"], manifest["copiedFiles"], manifest["renderedPages"]), (566, 356, 210))
+        self.assertEqual(manifest["totalOutputFiles"], 568)
         self.assertEqual(manifest["profile"], "preview")
-        self.assertEqual(manifest["groups"], {"site": 21, "data": 2, "lyrics": 64, "stories": 64, "webp": 204,
-                                              "pages": 210})
+        self.assertEqual(manifest["groups"], {"site": 22, "data": 2, "lyrics": 64, "stories": 64, "webp": 204,
+                                               "pages": 210})
 
     def test_project_portfolio_policy(self):
         source = (REPO / "v2/index.html").read_text(encoding="utf-8")
@@ -147,7 +147,8 @@ class BuildPublicationTests(unittest.TestCase):
     def test_output_bytes_identical_to_source(self):
         manifest = self.build()
         tree = self.tree()
-        self.assertEqual(len(manifest["files"]), 355)
+        self.assertEqual(len(manifest["files"]), 356)
+        self.assertEqual(tree["v2/images/favicon.jpg.jpeg"], (REPO / "images/favicon.jpg.jpeg").read_bytes())
         for entry in manifest["files"]:
             source = (REPO / entry["path"]).read_bytes()
             self.assertEqual(tree[entry["path"]], source, entry["path"])
@@ -334,12 +335,12 @@ class BuildPublicationTests(unittest.TestCase):
 
     def test_cli_exit_codes(self):
         run = [sys.executable, "-I", str(SCRIPT), "--root", str(self.root), "--out", "_site"]
-        ok = subprocess.run(run + ["--expect-count", "565"], capture_output=True, text=True, encoding="utf-8")
+        ok = subprocess.run(run + ["--expect-count", "566"], capture_output=True, text=True, encoding="utf-8")
         self.assertEqual(ok.returncode, 0, ok.stderr)
-        self.assertIn("355/355", ok.stdout)
+        self.assertIn("356/356", ok.stdout)
         self.assertIn("üretilen eser sayfası 210", ok.stdout)
         manifest = json.loads((self.root / "_site-manifest.json").read_text(encoding="utf-8"))
-        self.assertEqual(manifest["totalOutputFiles"], 567)
+        self.assertEqual(manifest["totalOutputFiles"], 568)
         (self.root / "v2/music/catalog.css").unlink()
         failed = subprocess.run(run, capture_output=True, text=True, encoding="utf-8")
         self.assertEqual(failed.returncode, 1)
