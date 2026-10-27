@@ -1,0 +1,18 @@
+{
+    "default": "tr",
+    "locales": [
+        "tr",
+        "en",
+        "de"
+    ],
+    "ogLocales": {
+        "tr": "tr_TR",
+        "en": "en_US",
+        "de": "de_DE"
+    },
+    "names": {
+        "tr": "Türkçe",
+        "en": "English",
+        "de": "Deutsch"
+    }
+}

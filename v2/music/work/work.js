@@ -6,6 +6,9 @@
     var CATALOG_URL = "../data/catalog.json";
     // Katalogdaki göreli yollar (webImages.path, lyrics.file, story.file) v2/music/ klasörüne göredir.
     var MUSIC_ROOT = "../";
+    var ASSET_ROOT = window.UNAL_UI && window.UNAL_UI.locale !== "tr" ? window.UNAL_UI.musicRoot : MUSIC_ROOT;
+    if (ASSET_ROOT !== MUSIC_ROOT) CATALOG_URL = ASSET_ROOT + "data/catalog.json";
+    function tr(key, fallback) { return (window.UNAL_MESSAGES && window.UNAL_MESSAGES[key]) || fallback; }
     // Yayımlanmış söz/hikâye dosyası yolu: yalnızca bu kalıp kabul edilir (mutlak yol, URL, ../ yok).
     var CONTENT_PATH = /^content\/(lyrics|stories)\/[wr]-\d{4}\.txt$/;
     var WORK_ID = /^w-\d{4}$/;
@@ -14,18 +17,18 @@
     var LANGUAGE_NAMES = { tr: "Türkçe", de: "Almanca" };
     var GENRE_NAMES = { pop: "Pop", "rock-ballad": "Rock Ballad", "thrash-metal": "Thrash Metal" };
     var DATE_RANGE_NOTES = {
-        "cover-verified": "Kapak üzerindeki tarih; henüz doğrulanmadı.",
-        conflict: "Kapak üzerindeki tarih; komşu burçla çakıştığı için doğrulama bekliyor.",
-        unverified: "Henüz doğrulanmadı."
+        "cover-verified": tr("music.dateUnverified", "Kapak üzerindeki tarih; henüz doğrulanmadı."),
+        conflict: tr("music.dateConflict", "Kapak üzerindeki tarih; komşu burçla çakıştığı için doğrulama bekliyor."),
+        unverified: tr("music.unverified", "Henüz doğrulanmadı.")
     };
     // Başlığında sürüm adı geçmeyen kayıtlar için arayüz etiketi (Word arşivindeki bölüm başlıkları
     // 55 "Akustik", 56 "Rock'n Roll"). Katalogdaki title/versionLabel/genres değiştirilmez.
     var VERSION_TAGS = { "r-0051": "Akustik", "r-0021": "Rock'n Roll" };
     var LISTEN_PLATFORMS = [
-        { key: "spotify", name: "Spotify'da Dinle" },
-        { key: "appleMusic", name: "Apple Music'te Dinle" },
-        { key: "youtubeMusic", name: "YouTube Music'te Dinle" },
-        { key: "youtube", name: "YouTube'da Dinle" }
+        { key: "spotify", name: tr("music.spotifyListen", "Spotify'da Dinle") },
+        { key: "appleMusic", name: tr("music.appleListen", "Apple Music'te Dinle") },
+        { key: "youtubeMusic", name: tr("music.youtubeMusicListen", "YouTube Music'te Dinle") },
+        { key: "youtube", name: tr("music.youtubeListen", "YouTube'da Dinle") }
     ];
     // Kayıt videoları (bkz. data/README.md). Adres katalogda saklanmaz; doğrulanmış videoId'den türetilir.
     // Doğrulayıcının (kontrol 37) tarayıcıdaki karşılığı: bilinmeyen sağlayıcı, tür veya kimlik gösterilmez.
@@ -42,14 +45,14 @@
     var VIDEO_TYPES = { "official-music-video": "Video Klip" };
     var TEXTS = {
         lyrics: {
-            empty: "Bu eserin şarkı sözleri henüz yayımlanmadı.",
-            error: "Şarkı sözleri şu anda yüklenemedi. Lütfen daha sonra yeniden deneyin."
+            empty: tr("music.lyricsEmpty", "Bu eserin şarkı sözleri henüz yayımlanmadı."),
+            error: tr("music.lyricsError", "Şarkı sözleri şu anda yüklenemedi. Lütfen daha sonra yeniden deneyin.")
         },
         story: {
-            empty: "Bu eserin hikâyesi yakında burada yer alacak.",
-            error: "Hikâye şu anda yüklenemedi. Lütfen daha sonra yeniden deneyin."
+            empty: tr("music.storyEmpty", "Bu eserin hikâyesi yakında burada yer alacak."),
+            error: tr("music.storyError", "Hikâye şu anda yüklenemedi. Lütfen daha sonra yeniden deneyin.")
         },
-        listenEmpty: "Dinleme bağlantıları yakında eklenecek."
+        listenEmpty: tr("music.listenEmpty", "Dinleme bağlantıları yakında eklenecek.")
     };
     // Kapak çerçevesi: masaüstünde sol sütun (en fazla ~560px), mobilde tam genişlik
     var HERO_SIZES = "(min-width: 1320px) 560px, (min-width: 900px) 42vw, (min-width: 600px) 560px, calc(100vw - 40px)";
@@ -75,7 +78,7 @@
     }
 
     function languageName(code) {
-        return LANGUAGE_NAMES[code] || String(code).toUpperCase();
+        return tr("music.lang." + code, LANGUAGE_NAMES[code] || String(code).toUpperCase());
     }
 
     function absoluteUrl(path) {
@@ -97,7 +100,7 @@
 
     // SHA-256'nın ilk 12 karakteri önbellek sürümü olarak eklenir (katalogla aynı kural).
     function imageUrl(image) {
-        return MUSIC_ROOT + image.path + "?v=" + image.sha256.slice(0, 12);
+        return ASSET_ROOT + image.path + "?v=" + image.sha256.slice(0, 12);
     }
 
     function sortedImages(cover) {
@@ -214,7 +217,7 @@
     // id ilk sırada kalır: ./?id=w-0001&koleksiyon=...
     function workHref(workId, returnState) {
         var rest = returnState.toString();
-        return "./?id=" + encodeURIComponent(workId) + (rest ? "&" + rest : "");
+        return "./" + encodeURIComponent(workId) + ".html" + (rest ? "?" + rest : "");
     }
 
     /* ---------- SEO ve paylaşım ---------- */
@@ -289,8 +292,8 @@
 
     // İlk/alternatif etiketi yalnızca isOriginal doğrulanmışsa (true/false) gösterilir.
     function originTag(recording) {
-        if (recording.isOriginal === true) return el("span", { className: "tag tag--gold", text: "İlk kayıt" });
-        if (recording.isOriginal === false) return el("span", { className: "tag", text: "Alternatif kayıt" });
+        if (recording.isOriginal === true) return el("span", { className: "tag tag--gold", text: tr("music.firstRecording", "İlk kayıt") });
+        if (recording.isOriginal === false) return el("span", { className: "tag", text: tr("music.alternateRecording", "Alternatif kayıt") });
         return null;
     }
 
@@ -299,21 +302,21 @@
         function fact(term, children) {
             facts.push(el("div", { className: "work-fact" }, [el("dt", { text: term }), el("dd", {}, children)]));
         }
-        fact("Dil", [languageName(work.data.language)]);
+        fact(tr("music.workLanguage", "Dil"), [languageName(work.data.language)]);
         work.collections.forEach(function (m) {
-            fact("Koleksiyon", [el("a", {
+            fact(tr("music.collection", "Koleksiyon"), [el("a", {
                 href: catalogHref(new URLSearchParams({ koleksiyon: m.collection.slug })),
                 text: m.collection.title
             })]);
             if (m.dateRange) {
-                fact("Tarih aralığı", [
+                fact(tr("music.dateRange", "Tarih aralığı"), [
                     m.dateRange.label,
                     el("small", { text: DATE_RANGE_NOTES[m.dateRange.status] || DATE_RANGE_NOTES.unverified })
                 ]);
             }
         });
         var count = work.recordings.length;
-        fact("Kayıt", [count > 1 ? count + " versiyon" : "1 kayıt"]);
+        fact(tr("music.recording", "Kayıt"), [count > 1 ? count + " " + tr("music.versions", "Versiyon") : "1 " + tr("music.recording", "kayıt")]);
         dom.facts.replaceChildren.apply(dom.facts, facts);
     }
 
@@ -383,13 +386,13 @@
                 ]);
             });
             var fieldset = el("fieldset", { className: "versions" }, [
-                el("legend", { className: "versions-title", text: work.recordings.length + " Versiyon" }),
-                el("p", { className: "versions-hint", text: "Kapağı ve kayıt bilgilerini görmek için bir versiyon seçin." }),
+                el("legend", { className: "versions-title", text: work.recordings.length + " " + tr("music.versions", "Versiyon") }),
+                el("p", { className: "versions-hint", text: tr("music.chooseVersion", "Kapağı ve kayıt bilgilerini görmek için bir versiyon seçin.") }),
                 el("ul", { className: "version-list" }, options)
             ]);
             children.push(fieldset);
             if (!work.recordings.some(function (r) { return r.isOriginal === true; })) {
-                children.push(el("p", { className: "work-note", text: "Hangi kaydın ilk/orijinal versiyon olduğu henüz belirlenmedi." }));
+                children.push(el("p", { className: "work-note", text: tr("music.originalUnknown", "Hangi kaydın ilk/orijinal versiyon olduğu henüz belirlenmedi.") }));
             }
         }
         dom.versions.replaceChildren.apply(dom.versions, children);
@@ -397,7 +400,7 @@
 
     function renderCover(work, recording) {
         var cover = work.covers[recording.coverId];
-        var image = coverImage(cover, { minWidth: 1200, sizes: HERO_SIZES, alt: recording.title + " kapak görseli", lazy: false, priority: true });
+        var image = coverImage(cover, { minWidth: 1200, sizes: HERO_SIZES, alt: recording.title + " " + tr("music.cover", "kapak görseli"), lazy: false, priority: true });
         dom.frame.replaceChildren(image);
         // Alt yazı yalnızca birden fazla versiyonda seçili kaydı gösterir; tek kayıtta bilgi zaten yanda yazılı.
         dom.caption.hidden = work.recordings.length < 2;
@@ -406,7 +409,7 @@
         var origin = originTag(recording);
         if (origin) tags.push(origin);
         dom.caption.replaceChildren.apply(dom.caption, [
-            el("span", { className: "work-caption-label", text: "Seçili versiyon" }),
+            el("span", { className: "work-caption-label", text: tr("music.selectedVersion", "Seçili versiyon") }),
             el("span", { className: "work-caption-title", text: recording.title })
         ].concat(tags.length ? [el("span", { className: "version-tags" }, tags)] : []));
     }
@@ -430,8 +433,8 @@
             note(texts.error);
             return;
         }
-        note("Yükleniyor…");
-        fetch(MUSIC_ROOT + asset.file, { cache: "no-cache" }).then(function (response) {
+        note(tr("music.loading", "Yükleniyor…"));
+        fetch(ASSET_ROOT + asset.file, { cache: "no-cache" }).then(function (response) {
             if (!response.ok) throw new Error("HTTP " + response.status);
             return response.arrayBuffer();
         }).then(function (buffer) {
@@ -480,7 +483,7 @@
                 target: "_blank",
                 rel: "noopener noreferrer",
                 text: link.name
-            }, [el("span", { className: "visually-hidden", text: " (yeni sekmede açılır)" })])]);
+            }, [el("span", { className: "visually-hidden", text: tr("music.newTab", " (yeni sekmede açılır)") })])]);
         })));
         dom.listen.replaceChildren.apply(dom.listen, children);
     }
@@ -517,8 +520,8 @@
         var play = el("button", { className: "video-play", type: "button" }, [
             coverImage(work.covers[recording.coverId], { minWidth: 800, sizes: "(min-width: 900px) 58vw, calc(100vw - 40px)", alt: "", lazy: true }),
             el("span", { className: "video-play-icon", "aria-hidden": "true" }),
-            el("span", { className: "video-play-label", text: "Oynat" }),
-            el("span", { className: "visually-hidden", text: ": " + label + " — " + VIDEO_TYPES[video.videoType] + " (" + provider.name + " oynatıcısı yüklenir)" })
+            el("span", { className: "video-play-label", text: tr("music.play", "Oynat") }),
+            el("span", { className: "visually-hidden", text: ": " + label + " — " + tr("music.video", VIDEO_TYPES[video.videoType]) + " (" + provider.name + tr("music.playerLoads", " oynatıcısı yüklenir") + ")" })
         ]);
         play.addEventListener("click", function () {
             var frame = el("iframe", {
@@ -543,9 +546,9 @@
                     href: provider.watch(encodeURIComponent(video.videoId)),
                     target: "_blank",
                     rel: "noopener noreferrer",
-                    text: provider.watchLabel
-                }, [el("span", { className: "visually-hidden", text: " (yeni sekmede açılır)" })]),
-                el("p", { className: "video-note", text: "Oynat düğmesine bastığınızda video " + provider.name + " üzerinden yüklenir." })
+                    text: tr("music.youtubeWatch", provider.watchLabel)
+                }, [el("span", { className: "visually-hidden", text: tr("music.newTab", " (yeni sekmede açılır)") })]),
+                el("p", { className: "video-note", text: tr("music.videoLoads", "Oynat düğmesine bastığınızda video YouTube üzerinden yüklenir.") })
             ])
         );
     }
@@ -560,7 +563,7 @@
             return el("li", {}, [el("a", { className: "related-work", href: workHref(relation.work.id, returnState) }, [
                 coverImage(relation.cover, { minWidth: 400, sizes: "96px", alt: "", lazy: true }),
                 el("span", { className: "related-text" }, [
-                    el("span", { className: "related-kind", text: relation.type === "adaptation" ? "Dil uyarlaması" : "İlişkili eser" }),
+                    el("span", { className: "related-kind", text: relation.type === "adaptation" ? tr("music.adaptation", "Dil uyarlaması") : tr("music.relatedOne", "İlişkili eser") }),
                     el("span", { className: "related-title", text: title }),
                     el("span", { className: "related-lang", text: languageName(relation.work.language) })
                 ])
@@ -594,11 +597,11 @@
     /* ---------- Hata durumu ---------- */
 
     function showError(title, text, retry, detail) {
-        document.title = title + " | Müzik Dünyam | " + SITE_NAME;
+        document.title = title + " | " + tr("home.card.music", "Müzik Dünyam") + " | " + SITE_NAME;
         setMeta("name", "robots", "noindex");
-        var actions = [el("a", { className: "button button-primary", href: "../#katalog", text: "Tüm Eserleri Keşfet" })];
+        var actions = [el("a", { className: "button button-primary", href: catalogHref(new URLSearchParams()) + "#katalog", text: tr("music.back", "Tüm Eserleri Keşfet") })];
         if (retry) {
-            var button = el("button", { className: "button button-secondary", type: "button", text: "Yeniden dene" });
+            var button = el("button", { className: "button button-secondary", type: "button", text: tr("music.retry", "Yeniden dene") });
             button.addEventListener("click", retry);
             actions.unshift(button);
         }
@@ -609,7 +612,7 @@
             el("h1", { className: "work-state-title", text: title }),
             el("p", { text: text })
         ];
-        if (detail) children.push(el("p", { className: "visually-hidden", text: "Teknik ayrıntı: " + detail }));
+        if (detail) children.push(el("p", { className: "visually-hidden", text: tr("music.technical", "Teknik ayrıntı: ") + detail }));
         children.push(el("div", { className: "work-state-actions" }, actions));
         dom.state.replaceChildren.apply(dom.state, children);
         dom.state.hidden = false;
@@ -649,6 +652,10 @@
         applySeo(work);
         var version = versionLabel(work);
         dom.title.textContent = version ? version.title : work.title;
+        dom.title.setAttribute("lang", work.data.language);
+        dom.lyrics.setAttribute("lang", work.data.language);
+        // Story translations are not part of this task. The existing story asset is the Turkish fallback.
+        dom.story.setAttribute("lang", "tr");
         if (version) {
             dom.version.textContent = version.label;
             dom.version.hidden = false;
@@ -656,7 +663,7 @@
         renderCrumbTitle(work, version);
         dom.crumbCatalog.setAttribute("href", catalogHref(returnState));
         if (!work.titleConfirmed) {
-            dom.titleNote.textContent = "Bu eserin kesin başlığı henüz belirlenmedi; şimdilik iki kaydın adıyla birlikte gösteriliyor.";
+            dom.titleNote.textContent = tr("music.titleUnknown", "Bu eserin kesin başlığı henüz belirlenmedi; şimdilik iki kaydın adıyla birlikte gösteriliyor.");
             dom.titleNote.hidden = false;
         }
         renderFacts(work);

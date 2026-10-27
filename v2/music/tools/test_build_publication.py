@@ -30,6 +30,11 @@ CATALOG = json.loads((REPO / bp.CATALOG).read_text(encoding="utf-8"))
 EXCLUDED = ("v2/music/data/README.md", "v2/music/content/lyrics/r-0058.txt",
             "v2/music/content/lyrics/r-0065.txt", ".gitignore", ".gitattributes")
 PAGES = {f"v2/music/work/{w['id']}.html" for w in CATALOG["works"]}  # Görev 73: üretilen statik eser sayfaları
+LOCALE_PAGES = {f"v2/{locale}/music/work/{w['id']}.html" for locale in ("en", "de")
+                for w in CATALOG["works"]}
+LOCALE_SHELLS = {f"v2/{locale}/{route}index.html" for locale in ("en", "de")
+                 for route in ("", "music/", "music/work/")}
+ALL_PAGES = PAGES | LOCALE_PAGES | LOCALE_SHELLS
 # Görev 73 öncesindeki _headers baytları: preview noindex korunmalı, dosya birebir aynı kalmalı.
 HEADERS_BEFORE = ("# build_publication.py tarafından üretildi; elle düzenlemeyin.\n/*\n  X-Robots-Tag: noindex\n"
                   "  X-Content-Type-Options: nosniff\n  Referrer-Policy: strict-origin-when-cross-origin\n").encode("utf-8")
@@ -91,15 +96,15 @@ class BuildPublicationTests(unittest.TestCase):
     def test_output_is_exactly_the_allowlist(self):
         manifest = self.build()
         web = expected_web_files()
-        self.assertEqual(len(web), 349)
+        self.assertEqual(len(web), 355)
         self.assertEqual(len(PAGES), 68)
-        self.assertEqual(set(self.tree()), web | PAGES | set(bp.GENERATED))
-        self.assertEqual(len(self.tree()), 419)
-        self.assertEqual((manifest["webFiles"], manifest["copiedFiles"], manifest["renderedPages"]), (417, 349, 68))
-        self.assertEqual(manifest["totalOutputFiles"], 419)
+        self.assertEqual(set(self.tree()), web | ALL_PAGES | set(bp.GENERATED))
+        self.assertEqual(len(self.tree()), 567)
+        self.assertEqual((manifest["webFiles"], manifest["copiedFiles"], manifest["renderedPages"]), (565, 355, 210))
+        self.assertEqual(manifest["totalOutputFiles"], 567)
         self.assertEqual(manifest["profile"], "preview")
-        self.assertEqual(manifest["groups"], {"site": 15, "data": 2, "lyrics": 64, "stories": 64, "webp": 204,
-                                              "pages": 68})
+        self.assertEqual(manifest["groups"], {"site": 21, "data": 2, "lyrics": 64, "stories": 64, "webp": 204,
+                                              "pages": 210})
 
     def test_project_portfolio_policy(self):
         source = (REPO / "v2/index.html").read_text(encoding="utf-8")
@@ -142,7 +147,7 @@ class BuildPublicationTests(unittest.TestCase):
     def test_output_bytes_identical_to_source(self):
         manifest = self.build()
         tree = self.tree()
-        self.assertEqual(len(manifest["files"]), 349)
+        self.assertEqual(len(manifest["files"]), 355)
         for entry in manifest["files"]:
             source = (REPO / entry["path"]).read_bytes()
             self.assertEqual(tree[entry["path"]], source, entry["path"])
@@ -152,16 +157,22 @@ class BuildPublicationTests(unittest.TestCase):
     def test_rendered_pages_in_manifest(self):
         manifest = self.build()
         tree = self.tree()
-        template_digest = bp.sha256((REPO / "v2/music/work/index.html").read_bytes())
-        self.assertEqual({e["path"] for e in manifest["pages"]}, PAGES)
+        self.assertEqual({e["path"] for e in manifest["pages"]}, ALL_PAGES)
         for entry in manifest["pages"]:
             self.assertEqual(bp.sha256(tree[entry["path"]]), entry["sha256"])
-            self.assertEqual((entry["template"], entry["templateSha256"]), ("v2/music/work/index.html", template_digest))
+            source = ("v2/index.html" if entry["path"] in {"v2/en/index.html", "v2/de/index.html"}
+                      else "v2/music/index.html" if entry["path"] in {"v2/en/music/index.html", "v2/de/music/index.html"}
+                      else "v2/music/work/index.html")
+            self.assertEqual((entry["template"], entry["templateSha256"]),
+                             (source, bp.sha256((REPO / source).read_bytes())))
             self.assertFalse((REPO / entry["path"]).exists(), "statik sayfa kaynakta olmamalı")
-            work_id = entry["path"][-11:-5]
-            self.assertIn(f'data-work-id="{work_id}"'.encode(), tree[entry["path"]])
-            self.assertIn(f'href="https://unalbuyuksungur-v2.pages.dev/v2/music/work/{work_id}"'.encode(),
-                          tree[entry["path"]])
+            if entry["path"] not in LOCALE_SHELLS:
+                work_id = entry["path"][-11:-5]
+                locale = entry["path"].split("/")[1]
+                locale_prefix = locale + "/" if locale in ("en", "de") else ""
+                self.assertIn(f'data-work-id="{work_id}"'.encode(), tree[entry["path"]])
+                self.assertIn(f'href="https://unalbuyuksungur-v2.pages.dev/v2/{locale_prefix}music/work/{work_id}"'.encode(),
+                              tree[entry["path"]])
 
     def test_catalog_and_page_references_resolve(self):
         self.build()
@@ -175,7 +186,7 @@ class BuildPublicationTests(unittest.TestCase):
         for cover in CATALOG["covers"]:
             for image in cover["webImages"]:
                 self.assertIn(bp.MUSIC + image["path"], names)
-        for page in ("v2/index.html", "v2/music/index.html", "v2/music/work/index.html", *sorted(PAGES)):
+        for page in ("v2/index.html", "v2/music/index.html", "v2/music/work/index.html", *sorted(ALL_PAGES)):
             parser = bp.Links()
             parser.feed(self.tree()[page].decode("utf-8"))
             for ref in parser.refs:
@@ -323,12 +334,12 @@ class BuildPublicationTests(unittest.TestCase):
 
     def test_cli_exit_codes(self):
         run = [sys.executable, "-I", str(SCRIPT), "--root", str(self.root), "--out", "_site"]
-        ok = subprocess.run(run + ["--expect-count", "417"], capture_output=True, text=True, encoding="utf-8")
+        ok = subprocess.run(run + ["--expect-count", "565"], capture_output=True, text=True, encoding="utf-8")
         self.assertEqual(ok.returncode, 0, ok.stderr)
-        self.assertIn("349/349", ok.stdout)
-        self.assertIn("üretilen eser sayfası 68", ok.stdout)
+        self.assertIn("355/355", ok.stdout)
+        self.assertIn("üretilen eser sayfası 210", ok.stdout)
         manifest = json.loads((self.root / "_site-manifest.json").read_text(encoding="utf-8"))
-        self.assertEqual(manifest["totalOutputFiles"], 419)
+        self.assertEqual(manifest["totalOutputFiles"], 567)
         (self.root / "v2/music/catalog.css").unlink()
         failed = subprocess.run(run, capture_output=True, text=True, encoding="utf-8")
         self.assertEqual(failed.returncode, 1)

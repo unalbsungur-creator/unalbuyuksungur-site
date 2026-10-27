@@ -1,0 +1,41 @@
+.language-switcher {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    gap: 4px;
+    margin-left: auto;
+    padding: 3px;
+    border: 1px solid rgba(201, 166, 107, 0.55);
+    border-radius: 6px;
+    background: #0b101b;
+    line-height: 1;
+}
+
+.language-switcher a {
+    display: inline-block;
+    padding: 8px 6px;
+    color: #f5f0e8;
+    font: 700 12px/1 system-ui, sans-serif;
+    text-decoration: none;
+    border-radius: 3px;
+}
+
+.language-switcher a[aria-current="true"] {
+    color: #0b101b;
+    background: #c9a66b;
+}
+
+.language-switcher a:focus-visible {
+    outline: 3px solid #fff;
+    outline-offset: 2px;
+}
+
+@media (max-width: 860px) {
+    .language-switcher {
+        margin-left: auto;
+    }
+
+    .language-switcher a {
+        padding: 9px 5px;
+    }
+}

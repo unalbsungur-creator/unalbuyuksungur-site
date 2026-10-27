@@ -44,6 +44,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from validate_catalog import RETIRED_CONTENT  # noqa: E402  (kurallar tek yerde)
 from verify_content_integrity import CONTENT_SHA256  # noqa: E402  (onaylı söz/hikâye SHA-256 tablosu)
 import render_pages  # noqa: E402  (statik eser sayfaları)
+import render_site  # noqa: E402  (statik TR/EN/DE arayüz ve eser sayfaları)
 
 DEFAULT_ROOT = Path(__file__).resolve().parents[3]
 
@@ -51,6 +52,12 @@ DEFAULT_ROOT = Path(__file__).resolve().parents[3]
 SITE_FILES = (
     "v2/index.html",
     "v2/external-links.js",
+    "v2/i18n/config.json",
+    "v2/i18n/tr.json",
+    "v2/i18n/en.json",
+    "v2/i18n/de.json",
+    "v2/i18n/runtime.js",
+    "v2/i18n/selector.css",
     "v2/images/unal-digital-world-hero.png",
     "v2/images/projects/dilek-kutum-placeholder-1200.webp",
     "v2/images/projects/istec-placeholder-1200.webp",
@@ -176,12 +183,14 @@ def plan(root, catalog):
 
 
 def render(root, catalog, files):
-    """Statik eser sayfaları: {paket yolu: bayt}. İki kez üretilip karşılaştırılır (belirlenimcilik)."""
+    """Statik TR/EN/DE arayüz ve eser sayfaları; iki kez üretilip karşılaştırılır."""
     template = checked_source(root, render_pages.TEMPLATE)
+    sources = {rel: checked_source(root, rel) for rel in SITE_FILES
+               if rel.endswith((".html", ".json"))}
     try:
-        pages = render_pages.render_work_pages(catalog, template, PROFILE)
-        again = render_pages.render_work_pages(catalog, template, PROFILE)
-    except render_pages.RenderError as exc:
+        pages = render_site.render(catalog, sources, PROFILE)
+        again = render_site.render(catalog, sources, PROFILE)
+    except (render_pages.RenderError, render_site.LocaleError, ValueError) as exc:
         raise BuildError(str(exc)) from None
     if pages != again:
         raise BuildError("[SEO-DETERMINISM] aynı girdiyle iki üretim farklı")
@@ -307,8 +316,11 @@ def build(root, out, expect_count=None, manifest_path=None, log=print):
             dest.write_bytes(pages[rel])
             if dest.read_bytes() != pages[rel]:
                 raise BuildError(f"[HASH-COPY] üretilen sayfa yazılamadı: {rel}")
+            source = ("v2/index.html" if re.fullmatch(r"v2/(en|de)/index\.html", rel)
+                      else "v2/music/index.html" if re.fullmatch(r"v2/(en|de)/music/index\.html", rel)
+                      else render_pages.TEMPLATE)
             page_entries.append({"path": rel, "bytes": len(pages[rel]), "sha256": sha256(pages[rel]),
-                                 "template": render_pages.TEMPLATE, "templateSha256": template_digest})
+                                 "template": source, "templateSha256": sha256(checked_source(root, source))})
         for name, text in GENERATED.items():
             (staging / name).write_bytes(text.encode("utf-8"))
 

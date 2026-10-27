@@ -5,13 +5,17 @@
 
     var CATALOG_URL = "data/catalog.json";
     var DETAIL_URL = "work/";
+    // Yerel katalog sayfası kendi work/ yolunu kullanır; veri ve kapaklar üç dilde ortaktır.
+    var ASSET_ROOT = window.UNAL_UI && window.UNAL_UI.locale !== "tr" ? window.UNAL_UI.musicRoot : "";
+    if (ASSET_ROOT) CATALOG_URL = ASSET_ROOT + "data/catalog.json";
+    function tr(key, fallback) { return (window.UNAL_MESSAGES && window.UNAL_MESSAGES[key]) || fallback; }
     var LANGUAGE_NAMES = { tr: "Türkçe", de: "Almanca" };
     // Galeri sütunlarıyla (4 / 3 / 2 / 1) uyumlu görüntü genişlikleri
     var CARD_SIZES = "(min-width: 1500px) 310px, (min-width: 1200px) 22vw, (min-width: 900px) 29vw, (min-width: 360px) 45vw, 90vw";
     var EAGER_CARDS = 4;
     var SEARCH_DELAY = 120;
-    var EMPTY_TITLE = "Seçili arama ve filtrelerle eşleşen eser bulunamadı.";
-    var EMPTY_HINT = "Farklı bir dil veya koleksiyon seçebilir ya da filtreleri temizleyebilirsiniz.";
+    var EMPTY_TITLE = tr("music.noResults", "Seçili arama ve filtrelerle eşleşen eser bulunamadı.");
+    var EMPTY_HINT = tr("music.noResultsHint", "Farklı bir dil veya koleksiyon seçebilir ya da filtreleri temizleyebilirsiniz.");
 
     var collator = new Intl.Collator("tr", { sensitivity: "base", numeric: true });
 
@@ -62,7 +66,7 @@
     // webImages.path, v2/music/ klasörüne göredir; bu sayfa da o klasörde.
     // SHA-256'nın ilk 12 karakteri önbellek sürümü olarak eklenir.
     function imageUrl(image) {
-        return image.path + "?v=" + image.sha256.slice(0, 12);
+        return ASSET_ROOT + image.path + "?v=" + image.sha256.slice(0, 12);
     }
 
     function sortedImages(cover) {
@@ -176,7 +180,7 @@
     }
 
     function languageName(code) {
-        return LANGUAGE_NAMES[code] || String(code).toUpperCase();
+        return tr("music.lang." + code, LANGUAGE_NAMES[code] || String(code).toUpperCase());
     }
 
     /* ---------- Filtre durumu ---------- */
@@ -215,7 +219,7 @@
         if (state.collection) params.set("koleksiyon", state.collection);
         if (state.language) params.set("dil", state.language);
         var rest = params.toString();
-        return DETAIL_URL + "?id=" + encodeURIComponent(workId) + (rest ? "&" + rest : "");
+        return DETAIL_URL + encodeURIComponent(workId) + ".html" + (rest ? "?" + rest : "");
     }
 
     function isFiltered() {
@@ -267,13 +271,13 @@
                 mosaic.appendChild(coverImage(work.cover, { minWidth: 400, sizes: "160px", alt: "", lazy: false }));
             });
             var count = collection.members.length;
-            var foot = el("div", { className: "collection-foot" }, [el("span", { text: "Eserleri göster" })]);
+            var foot = el("div", { className: "collection-foot" }, [el("span", { text: tr("music.showWorks", "Eserleri göster") })]);
             foot.insertAdjacentHTML("beforeend", arrow);
 
             var card = el("article", { className: "collection-card", "data-collection": collection.slug }, [
                 mosaic,
                 el("div", { className: "collection-body" }, [
-                    el("p", { className: "collection-count", text: count + " eser" }),
+                    el("p", { className: "collection-count", text: count + " " + tr("music.items", "eser") }),
                     el("h3", {}, [el("button", {
                         className: "collection-open",
                         type: "button",
@@ -301,11 +305,11 @@
     }
 
     function renderFilters(index) {
-        dom.collectionFilter.appendChild(chip("Tümü", index.works.length, "collection", ""));
+        dom.collectionFilter.appendChild(chip(tr("music.everything", "Tümü"), index.works.length, "collection", ""));
         index.collections.forEach(function (collection) {
             dom.collectionFilter.appendChild(chip(collection.title, collection.members.length, "collection", collection.slug));
         });
-        dom.languageFilter.appendChild(chip("Tüm diller", null, "language", ""));
+        dom.languageFilter.appendChild(chip(tr("music.allLanguages", "Tüm diller"), null, "language", ""));
         index.languages.forEach(function (code) {
             var count = index.works.filter(function (w) { return w.language === code; }).length;
             dom.languageFilter.appendChild(chip(languageName(code), count, "language", code));
@@ -321,20 +325,20 @@
             coverImage(work.cover, {
                 minWidth: 400,
                 sizes: CARD_SIZES,
-                alt: work.title + " kapak görseli",
+                alt: work.title + " " + tr("music.cover", "kapak görseli"),
                 lazy: position >= EAGER_CARDS
             }),
-            versions > 1 ? el("span", { className: "version-badge", text: versions + " Versiyon" }) : null
+            versions > 1 ? el("span", { className: "version-badge", text: versions + " " + tr("music.versions", "Versiyon") }) : null
         ]);
 
         var card = el("article", { className: "work-card" }, [
             cover,
             el("div", { className: "work-body" }, [
-                el("h3", {}, [el("a", {
+                el("h3", { lang: work.language }, [el("a", {
                     className: "work-open",
                     href: detailUrl(work.id),
                     "data-work": work.id,
-                    "aria-label": work.title + (versions > 1 ? ", " + versions + " versiyon" : ""),
+                    "aria-label": work.title + (versions > 1 ? ", " + versions + " " + tr("music.versionCount", "versiyon") : ""),
                     text: work.title
                 })]),
                 el("p", { className: "work-meta" }, meta)
@@ -378,9 +382,9 @@
         var total = index.works.length;
         dom.resultCount.innerHTML = "";
         if (visible.length === total) {
-            dom.resultCount.append("Tüm eserler gösteriliyor: ", el("strong", { text: String(total) }));
+            dom.resultCount.append(tr("music.allResults", "Tüm eserler gösteriliyor: "), el("strong", { text: String(total) }));
         } else {
-            dom.resultCount.append(el("strong", { text: String(visible.length) }), " eser gösteriliyor (toplam " + total + ")");
+            dom.resultCount.append(el("strong", { text: String(visible.length) }), tr("music.someResults", " eser gösteriliyor (toplam ") + total + ")");
         }
         if (!visible.length) {
             // Boş durum kutusu canlı bölge değildir; açıklama sonuç sayacıyla birlikte duyurulur.
@@ -388,7 +392,7 @@
         }
         dom.emptyState.hidden = visible.length !== 0;
         dom.clearButton.disabled = !isFiltered();
-        dom.heading.textContent = state.collection ? index.collectionsBySlug[state.collection].title : "Tüm Eserler";
+        dom.heading.textContent = state.collection ? index.collectionsBySlug[state.collection].title : tr("music.all", "Tüm Eserler");
         writeStateToUrl(historyMode || "replace");
     }
 
@@ -401,16 +405,16 @@
 
     function showError(error, retry) {
         var hint = window.location.protocol === "file:"
-            ? "Sayfa doğrudan dosya olarak açılmış görünüyor. Tarayıcılar bu durumda katalog verisinin yüklenmesine izin vermez; sayfayı bir yerel HTTP sunucusu üzerinden açın."
-            : "Bağlantınızı kontrol edip yeniden deneyebilirsiniz.";
-        var button = el("button", { className: "button button-secondary", type: "button", text: "Yeniden dene" });
+            ? tr("music.localFileHint", "Sayfa doğrudan dosya olarak açılmış görünüyor. Tarayıcılar bu durumda katalog verisinin yüklenmesine izin vermez; sayfayı bir yerel HTTP sunucusu üzerinden açın.")
+            : tr("music.connectionHint", "Bağlantınızı kontrol edip yeniden deneyebilirsiniz.");
+        var button = el("button", { className: "button button-secondary", type: "button", text: tr("music.retry", "Yeniden dene") });
         button.addEventListener("click", retry);
         dom.state.className = "state state--error";
         dom.state.setAttribute("role", "alert");
         dom.state.replaceChildren(
-            el("p", { className: "state-title", text: "Katalog yüklenemedi." }),
+            el("p", { className: "state-title", text: tr("music.loadError", "Katalog yüklenemedi.") }),
             el("p", { text: hint }),
-            el("p", { className: "visually-hidden", text: "Teknik ayrıntı: " + error.message }),
+            el("p", { className: "visually-hidden", text: tr("music.technical", "Teknik ayrıntı: ") + error.message }),
             button
         );
         dom.state.hidden = false;
