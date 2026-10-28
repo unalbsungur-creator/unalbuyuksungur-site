@@ -13,7 +13,7 @@ import render_site
 ROOT = Path(__file__).resolve().parents[3]
 CATALOG = json.loads((ROOT / "v2/music/data/catalog.json").read_text(encoding="utf-8"))
 SOURCES = {p: (ROOT / p).read_bytes() for p in (
-    "v2/index.html", "v2/music/index.html", "v2/music/work/index.html",
+    "v2/index.html", "v2/music/index.html", "v2/music/work/index.html", "v2/studio/index.html",
     "v2/i18n/config.json", "v2/i18n/tr.json", "v2/i18n/en.json", "v2/i18n/de.json")}
 
 
@@ -35,11 +35,12 @@ class MultilingualTests(unittest.TestCase):
     def test_static_locales_and_metadata(self):
         ids = {w["id"] for w in CATALOG["works"]}
         self.assertEqual(len(ids), 68)
-        self.assertEqual(len(self.pages), 210)  # Turkish: 68; EN/DE: 68 works + 3 shells each.
+        self.assertEqual(len(self.pages), 212)  # Turkish: 68; EN/DE: 68 works + 4 shells each.
         for locale in ("en", "de"):
             home = self.pages[f"v2/{locale}/index.html"].decode("utf-8")
             catalog = self.pages[f"v2/{locale}/music/index.html"].decode("utf-8")
-            for page, route in ((home, ""), (catalog, "music/")):
+            studio = self.pages[f"v2/{locale}/studio/index.html"].decode("utf-8")
+            for page, route in ((home, ""), (catalog, "music/"), (studio, "studio/")):
                 with self.subTest(locale=locale, route=route):
                     self.assertIn(f'<html lang="{locale}">', page)
                     self.assertIn(f'<link rel="canonical" href="{render_site.locale_url(locale, route)}">', page)
@@ -55,6 +56,8 @@ class MultilingualTests(unittest.TestCase):
             self.assertIn('href="music/"', home)
             self.assertIn('href="../../music/catalog.css"', catalog)
             self.assertIn('src="../../music/catalog.js"', catalog)
+            self.assertIn('href="../../studio/studio.css"', studio)
+            self.assertIn('src="../../i18n/runtime.js"', studio)
             for work_id in ids:
                 page = self.pages[f"v2/{locale}/music/work/{work_id}.html"].decode("utf-8")
                 self.assertIn(f'<html lang="{locale}" data-work-id="{work_id}">', page)
@@ -62,6 +65,51 @@ class MultilingualTests(unittest.TestCase):
                 self.assertEqual(page.count('rel="alternate" hreflang='), 3)
                 self.assertIn('src="../../../music/work/work.js"', page)
                 self.assertIn('src="../../../i18n/runtime.js"', page)
+
+    def test_studio_packages_and_inactive_ordering(self):
+        messages = {locale: json.loads((ROOT / f"v2/i18n/{locale}.json").read_text(encoding="utf-8"))
+                    for locale in ("tr", "en", "de")}
+        for locale in ("tr", "en", "de"):
+            prefix = "" if locale == "tr" else locale + "/"
+            studio = (ROOT / "v2/studio/index.html").read_text(encoding="utf-8") if locale == "tr" else \
+                self.pages[f"v2/{locale}/studio/index.html"].decode("utf-8")
+            with self.subTest(locale=locale):
+                self.assertIn(f'<html lang="{locale}">', studio)
+                for package, price, revisions, alternatives in (("START", "690 TL", 3, 8),
+                                                                 ("PLUS", "1.190 TL", 5, 12),
+                                                                 ("PREMIUM", "2.290 TL", 10, 22)):
+                    card = studio.split(f'<h3 id="studio-{package.lower()}">{package}</h3>', 1)[1].split('</article>', 1)[0]
+                    self.assertIn(price, card)
+                    self.assertIn(f'<strong>{revisions}</strong> {messages[locale]["studio.revisionCount"]}', card)
+                    self.assertIn(f'<strong>{alternatives}</strong> {messages[locale]["studio.alternatives"]}', card)
+                for key in ("studio.status", "studio.clock", "studio.revisions", "studio.formats",
+                            "studio.rights", "studio.weekday", "studio.holidays"):
+                    self.assertIn(messages[locale][key], " ".join(html.unescape(studio).split()))
+                self.assertNotRegex(studio.lower(), r'<form\b|checkout|shopier|type="email"|<iframe\b')
+                self.assertEqual(studio.count('aria-current="page"'), 1)
+                self.assertIn('href="../music/"', studio)
+                self.assertIn('href="./" aria-current="page"', studio)
+
+    def test_studio_navigation_and_responsive_styles(self):
+        for locale in ("tr", "en", "de"):
+            prefix = "" if locale == "tr" else locale + "/"
+            for source, route, href in (("v2/index.html", "index.html", "studio/"),
+                                        ("v2/music/index.html", "music/index.html", "../studio/"),
+                                        ("v2/music/work/index.html", "music/work/index.html", "../../studio/")):
+                with self.subTest(locale=locale, route=route):
+                    page = (ROOT / source).read_text(encoding="utf-8") if locale == "tr" else \
+                        self.pages[f"v2/{prefix}{route}"].decode("utf-8")
+                    self.assertIn(f'href="{href}">{ {"tr": "Müzik Stüdyosu", "en": "Music Studio", "de": "Musikstudio"}[locale]}</a>', page)
+            studio = (ROOT / "v2/studio/index.html").read_text(encoding="utf-8") if locale == "tr" else \
+                self.pages[f"v2/{prefix}studio/index.html"].decode("utf-8")
+            for target in ("tr", "en", "de"):
+                path = render_site.relative_route(f"v2/{prefix}studio/index.html", target, "studio/")
+                self.assertRegex(studio, rf'<a data-locale="{target}" href="{re.escape(path)}"')
+        css = (ROOT / "v2/studio/studio.css").read_text(encoding="utf-8")
+        self.assertIn("grid-template-columns: repeat(3, minmax(0, 1fr))", css)
+        self.assertIn("@media (max-width: 900px)", css)
+        self.assertIn("grid-template-columns: 1fr", css)
+        self.assertIn("@media (max-width: 860px)", (ROOT / "v2/music/catalog.css").read_text(encoding="utf-8"))
 
     def test_work_creative_content_unchanged(self):
         ids = {w["id"]: w for w in CATALOG["works"]}

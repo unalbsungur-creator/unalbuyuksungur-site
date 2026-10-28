@@ -72,6 +72,8 @@ SITE_FILES = (
     "v2/music/work/index.html",
     "v2/music/work/work.css",
     "v2/music/work/work.js",
+    "v2/studio/index.html",
+    "v2/studio/studio.css",
 )
 MUSIC = "v2/music/"
 CATALOG = MUSIC + "data/catalog.json"
@@ -319,6 +321,7 @@ def build(root, out, expect_count=None, manifest_path=None, log=print):
                 raise BuildError(f"[HASH-COPY] üretilen sayfa yazılamadı: {rel}")
             source = ("v2/index.html" if re.fullmatch(r"v2/(en|de)/index\.html", rel)
                       else "v2/music/index.html" if re.fullmatch(r"v2/(en|de)/music/index\.html", rel)
+                      else "v2/studio/index.html" if re.fullmatch(r"v2/(en|de)/studio/index\.html", rel)
                       else render_pages.TEMPLATE)
             page_entries.append({"path": rel, "bytes": len(pages[rel]), "sha256": sha256(pages[rel]),
                                  "template": source, "templateSha256": sha256(checked_source(root, source))})

@@ -17,6 +17,7 @@ SURFACES = {
     "home": ("v2/index.html", "index.html"),
     "catalog": ("v2/music/index.html", "music/index.html"),
     "work": ("v2/music/work/index.html", "music/work/index.html"),
+    "studio": ("v2/studio/index.html", "studio/index.html"),
 }
 TEXT_NODE = re.compile(r">([^<>]+)<")
 ATTRIBUTE = re.compile(r'\b(?P<name>aria-label|data-external-label|alt|placeholder)="(?P<value>[^"]*)"')
@@ -93,7 +94,7 @@ def relative_route(source, locale, route):
 def render_page(text, locale, surface, messages, config, work=None, catalog=None):
     """Localize a source HTML document while keeping stable catalog facts and shared assets."""
     original, route = SURFACES[surface]
-    seo_route = {"home": "", "catalog": "music/", "work": "music/work/"}[surface]
+    seo_route = {"home": "", "catalog": "music/", "work": "music/work/", "studio": "studio/"}[surface]
     if work is not None:
         if not WORK_ID.fullmatch(work["id"]):
             raise LocaleError("[I18N-WORK] invalid work id")
@@ -104,8 +105,9 @@ def render_page(text, locale, surface, messages, config, work=None, catalog=None
     if locale != "tr":
         text = replace_once(text, '<html lang="tr"', f'<html lang="{locale}"')
         text = localize_text(text, locale, messages)
-        if surface in ("home", "catalog"):
-            description_key = "home.meta" if surface == "home" else "music.description"
+        if surface in ("home", "catalog", "studio"):
+            description_key = {"home": "home.meta", "catalog": "music.description",
+                               "studio": "studio.meta"}[surface]
             text = re.sub(r'(<meta name="description" content=")[^"]*(")',
                           lambda m: m[1] + html.escape(lookup(messages, locale, description_key), quote=True) + m[2],
                           text, count=1)
@@ -150,6 +152,9 @@ def render_page(text, locale, surface, messages, config, work=None, catalog=None
             "work": {"../catalog.css": "../../../music/catalog.css", "work.css": "../../../music/work/work.css",
                       "work.js": "../../../music/work/work.js", "../../external-links.js": "../../../external-links.js",
                       "../../images/": "../../../images/", "../../i18n/": "../../../i18n/"},
+            "studio": {"../music/catalog.css": "../../music/catalog.css",
+                       "studio.css": "../../studio/studio.css", "../images/": "../../images/",
+                       "../i18n/": "../../i18n/"},
         }[surface]
 
         def asset(m):
