@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
-import { createCore, OrderError, PACKAGES, STATES } from "./core.mjs";
+import { APPROVED_REVIEW_POLICY, createCore, OrderError, PACKAGES, STATES } from "./core.mjs";
 import { loadCalendar } from "./calendar.mjs";
 
 const SERVER = Symbol("synthetic-server-session");
@@ -40,7 +40,17 @@ function signRestoration(record) {
 
 function signReview(record) {
     return hmac(["review", record.orderId, record.type ?? null, record.reviewId ?? null, record.outcome ?? null,
-        record.authorizationRef, record.source]);
+        record.authorizationRef, record.source, record.actorId ?? null, record.reasonCode ?? null]);
+}
+
+// Synthetic server session: binds an actor id to a role. A client cannot mint one without the server key.
+function session(actorId, role) {
+    return hmac(["session", actorId, role]);
+}
+
+function signReplan(record) {
+    return hmac(["replan", record.kind, record.orderId, record.proposedDeadline, record.replanId ?? null,
+        record.decision ?? null, record.authorizationRef ?? null, record.confirmationRef ?? null, record.source]);
 }
 
 function signatureMatches(signature, expected) {
@@ -51,24 +61,29 @@ function signatureMatches(signature, expected) {
 function setup(overrides = {}) {
     let now = FIXED_TIME;
     const core = createCore({
-        authorize: (principal) => principal.auth === SERVER,
+        authorize: (principal) => principal.auth === SERVER && (principal.actorId === undefined ||
+            signatureMatches(principal.session, session(principal.actorId, principal.role))),
         verifyPayment: (proof) => signatureMatches(proof.signature, sign(proof)),
         verifyEmail: (proof) => proof.code === "SYNTHETIC-ONE-USE-CODE",
         verifyBooking: (record) => signatureMatches(record.signature, signBooking(record)),
         verifyRestoration: (record) => signatureMatches(record.signature, signRestoration(record)),
         verifyReview: (record) => signatureMatches(record.signature, signReview(record)),
+        verifyReplan: (record) => signatureMatches(record.signature, signReplan(record)),
         calendar: CALENDAR,
         clock: () => now,
         ...overrides
     });
     let counter = 0;
-    function actor(role, order, auth = SERVER) {
-        return { role, orderId: order.id, auth };
+    function actor(role, order, auth = SERVER, actorId = undefined) {
+        return actorId === undefined ? { role, orderId: order.id, auth }
+            : { role, orderId: order.id, auth, actorId, session: session(actorId, role) };
     }
     async function send(order, kind, role, data = {}, options = {}) {
         const requestId = options.requestId || `synthetic-request-${++counter}`;
         const command = { kind, requestId, expectedVersion: options.version ?? order.version, data };
-        return core.dispatch(order, command, actor(role, order, options.auth ?? SERVER));
+        const principal = actor(role, order, options.auth ?? SERVER, options.actorId);
+        if (Object.hasOwn(options, "session")) principal.session = options.session;
+        return core.dispatch(order, command, principal);
     }
     function payment(order, extra = {}) {
         const proof = {
@@ -96,30 +111,57 @@ function setup(overrides = {}) {
     function restore(order, revisionId, record = restoration(order, revisionId), role = "creative", options = {}) {
         return send(order, "restore_revision_right", role, { revisionId, restoration: record }, options);
     }
+    // Görev 135: by default one synthetic person opens and a different person of the same team decides.
+    const staff = (source, step) => `synthetic-${source === "admin_console" ? "admin" : "finance"}-${step}`;
     function reviewRecord(order, type, extra = {}) {
+        const source = extra.source ?? "finance_console";
         const record = {
-            orderId: order.id, type, authorizationRef: `synthetic-review-${++counter}`, source: "finance_console", ...extra
+            orderId: order.id, type, authorizationRef: `synthetic-review-${++counter}`, source,
+            actorId: staff(source, "opener"), ...extra
         };
         return { ...record, signature: signReview(record) };
     }
     function resolution(order, reviewId, outcome, extra = {}) {
+        const source = extra.source ?? "finance_console";
         const record = {
             orderId: order.id, reviewId, outcome, authorizationRef: `synthetic-decision-${++counter}`,
-            source: "finance_console", ...extra
+            source, actorId: staff(source, "decider"), ...extra
         };
         return { ...record, signature: signReview(record) };
     }
+    // The principal's actor id defaults to the one named in the record; tests override it to forge mismatches.
     function openReview(order, type, record = reviewRecord(order, type), role = "finance", options = {}) {
-        return send(order, "open_review", role, { review: record }, options);
+        return send(order, "open_review", role, { review: record }, { actorId: record?.actorId, ...options });
     }
     function resolveReview(order, outcome, record = resolution(order, order.reviews.at(-1).reviewId, outcome),
         role = "finance", options = {}) {
-        return send(order, "resolve_review", role, { resolution: record }, options);
+        return send(order, "resolve_review", role, { resolution: record }, { actorId: record?.actorId, ...options });
+    }
+    function proposal(order, proposedDeadline, extra = {}) {
+        const record = {
+            kind: "DELIVERY_PROPOSAL", orderId: order.id, proposedDeadline,
+            authorizationRef: `synthetic-proposal-${++counter}`, source: "producer_console", ...extra
+        };
+        return { ...record, signature: signReplan(record) };
+    }
+    function confirmation(order, decision, replan = order.deliveryReplans.at(-1), extra = {}) {
+        const record = {
+            kind: "DELIVERY_CONFIRMATION", orderId: order.id, replanId: replan.replanId,
+            proposedDeadline: replan.proposedDeadline, decision, confirmationRef: `synthetic-confirmation-${++counter}`,
+            source: "customer_confirmation_service", ...extra
+        };
+        return { ...record, signature: signReplan(record) };
+    }
+    function propose(order, proposedDeadline, record = proposal(order, proposedDeadline), role = "creative", options = {}) {
+        return send(order, "propose_delivery_date", role, { proposal: record }, options);
+    }
+    function confirm(order, decision, record = confirmation(order, decision), role = "customer", options = {}) {
+        return send(order, "confirm_delivery_date", role, { confirmation: record }, options);
     }
     const setNow = value => { now = value; };
     return {
         core, actor, send, payment, booking, restoration, restore, reviewRecord, resolution, openReview,
-        resolveReview, setNow
+        resolveReview, proposal, confirmation, propose, confirm, setNow
     };
 }
 
@@ -1176,6 +1218,611 @@ test("RB/21: opening or resolving a review never moves the SLA start or the comm
             assert.equal(order.slaStartsAt, h.order.slaStartsAt);
             assert.deepEqual(order.booking, h.order.booking);
             assert.equal(order.productionStartedAt, h.order.productionStartedAt);
+        }
+    }
+});
+
+// ---- Görev 134 / Decision 134-A: delivery replanning after a review ----
+
+const AFTER_DEADLINE = "2026-11-02T07:00:00.000Z"; // Monday 10:00 Istanbul, after the Friday 15:00 deadline
+const NEW_DEADLINE = "2026-11-04T12:00:00.000Z"; // Wednesday 15:00 Istanbul
+
+/** A revision is pending, a dispute review ran past the deadline and was resolved with CONTINUE. */
+async function overdueAfterReview(h = setup()) {
+    const p = await pendingRevision("PLUS", h);
+    const reviewed = await p.openReview(p.order, "DISPUTE");
+    p.setNow(AFTER_DEADLINE);
+    const order = await p.resolveReview(reviewed, "CONTINUE");
+    assert.equal(order.state, STATES.REVISION_PENDING);
+    return { ...p, before: p.order, order };
+}
+
+test("DR/1,2,13: CONTINUE creates no new date; booked deadline, SLA start and delay history are kept", async () => {
+    const h = await overdueAfterReview();
+    assert.equal(h.order.booking.deadline, DEADLINE);
+    assert.equal(h.order.slaStartsAt, PLANNED_START);
+    assert.equal(h.order.replannedDeadline, null);
+    assert.deepEqual(h.order.deliveryReplans, []);
+    const proposed = await h.propose(h.order, NEW_DEADLINE);
+    const confirmed = await h.confirm(proposed, "ACCEPT");
+    assert.equal(confirmed.replannedDeadline, NEW_DEADLINE);
+    assert.equal(confirmed.booking.deadline, DEADLINE);
+    assert.deepEqual(confirmed.booking, h.before.booking);
+    assert.equal(confirmed.slaStartsAt, PLANNED_START);
+    const [replan] = confirmed.deliveryReplans;
+    assert.equal(replan.missedDeadline, DEADLINE);
+    assert.equal(replan.bookedDeadline, DEADLINE);
+    assert.equal(replan.proposal.at, AFTER_DEADLINE);
+    assert.deepEqual(confirmed.events.slice(0, h.order.events.length), h.order.events);
+    assert.ok(Object.isFrozen(replan));
+});
+
+test("DR/3,4: only a verified producer or admin proposal is accepted, and only after a missed deadline", async () => {
+    const h = await overdueAfterReview();
+    for (const role of ["customer", "finance", "scheduler"]) {
+        await assert.rejects(h.propose(h.order, NEW_DEADLINE, h.proposal(h.order, NEW_DEADLINE), role), /UNAUTHORIZED/);
+    }
+    await assert.rejects(h.propose(h.order, NEW_DEADLINE, h.proposal(h.order, NEW_DEADLINE), "creative",
+        { auth: Symbol("browser") }), /UNAUTHORIZED/);
+    await assert.rejects(h.propose(h.order, NEW_DEADLINE, { ...h.proposal(h.order, NEW_DEADLINE), signature: undefined }),
+        /UNTRUSTED_PROPOSAL/);
+    await assert.rejects(h.propose(h.order, NEW_DEADLINE,
+        { ...h.proposal(h.order, NEW_DEADLINE), proposedDeadline: "2026-11-05T12:00:00.000Z" }), /UNTRUSTED_PROPOSAL/);
+    await assert.rejects(h.propose(h.order, NEW_DEADLINE, h.proposal(h.order, NEW_DEADLINE, { source: "admin_console" })),
+        /INVALID_PROPOSAL/);
+    const other = await overdueAfterReview();
+    await assert.rejects(h.propose(h.order, NEW_DEADLINE, h.proposal(other.order, NEW_DEADLINE)), /INVALID_PROPOSAL/);
+    await assert.rejects(h.propose(h.order, NEW_DEADLINE, h.proposal(h.order, NEW_DEADLINE, { kind: "DELIVERY_CONFIRMATION" })),
+        /INVALID_PROPOSAL/);
+    const unverified = await overdueAfterReview(setup({ verifyReplan: undefined }));
+    await assert.rejects(unverified.propose(unverified.order, NEW_DEADLINE), /UNTRUSTED_PROPOSAL/);
+    assert.equal(h.order.deliveryReplans.length, 0);
+    // Producer and admin console proposals are accepted.
+    const byProducer = await h.propose(h.order, NEW_DEADLINE);
+    assert.equal(byProducer.deliveryReplans[0].proposedBy, "creative");
+    const byAdmin = await other.propose(other.order, NEW_DEADLINE,
+        other.proposal(other.order, NEW_DEADLINE, { source: "admin_console" }), "admin");
+    assert.equal(byAdmin.deliveryReplans[0].proposedBy, "admin");
+    // One open proposal at a time; an authorization reference is used once.
+    await assert.rejects(h.propose(byProducer, "2026-11-05T12:00:00.000Z"), /REPLAN_PENDING/);
+    // No proposal while the commitment is still running, nor for an order that was never reviewed.
+    const running = await pendingRevision();
+    const resumed = await running.resolveReview(await running.openReview(running.order, "REFUND"), "CONTINUE");
+    await assert.rejects(running.propose(resumed, NEW_DEADLINE), /DEADLINE_NOT_MISSED/);
+    const unreviewed = await pendingRevision();
+    unreviewed.setNow(AFTER_DEADLINE);
+    await assert.rejects(unreviewed.propose(unreviewed.order, NEW_DEADLINE), /REPLAN_NOT_ALLOWED/);
+});
+
+test("DR/5,6: a proposal becomes the deadline only with a verified customer confirmation", async () => {
+    const h = await overdueAfterReview();
+    const proposed = await h.propose(h.order, NEW_DEADLINE);
+    assert.equal(proposed.replannedDeadline, null);
+    assert.equal(proposed.deliveryReplans[0].status, "PROPOSED");
+    await assert.rejects(h.send(proposed, "revision_options", "creative", { options: ["synthetic-b1", "synthetic-b2"] }),
+        /DELIVERY_REPLAN_REQUIRED/);
+    const confirmed = await h.confirm(proposed, "ACCEPT");
+    assert.equal(confirmed.replannedDeadline, NEW_DEADLINE);
+    assert.equal(confirmed.deliveryReplans[0].status, "CONFIRMED");
+    assert.equal(confirmed.deliveryReplans[0].confirmation.decision, "ACCEPT");
+    assert.equal(confirmed.events.at(-1).audit.replanId, "replan-0001");
+    // Time-bound work resumes against the confirmed date.
+    let order = await h.send(confirmed, "revision_options", "creative", { options: ["synthetic-b1", "synthetic-b2"] });
+    order = await h.send(order, "request_revision", "customer");
+    assert.equal(order.revisionsUsed, 2);
+    assert.equal(order.replannedDeadline, NEW_DEADLINE);
+    assert.equal(order.booking.deadline, DEADLINE);
+});
+
+test("DR/7,8: forged, free-form, foreign or non-customer confirmations are rejected", async () => {
+    const h = await overdueAfterReview();
+    const proposed = await h.propose(h.order, NEW_DEADLINE);
+    const other = await overdueAfterReview();
+    const otherProposed = await other.propose(other.order, NEW_DEADLINE);
+    await assert.rejects(h.confirm(proposed, "ACCEPT", { ...h.confirmation(proposed, "ACCEPT"), signature: undefined }),
+        /UNTRUSTED_CONFIRMATION/);
+    await assert.rejects(h.confirm(proposed, "ACCEPT", { ...h.confirmation(proposed, "REJECT"), decision: "ACCEPT" }),
+        /UNTRUSTED_CONFIRMATION/);
+    // A free-form customer claim without the confirmation service's record shape is not a confirmation.
+    await assert.rejects(h.confirm(proposed, "ACCEPT", { accepted: true, orderId: proposed.id }), /INVALID_CONFIRMATION/);
+    await assert.rejects(h.confirm(proposed, "ACCEPT", h.confirmation(proposed, "ACCEPT", undefined, { source: "browser" })),
+        /INVALID_CONFIRMATION/);
+    await assert.rejects(h.confirm(proposed, "MAYBE", h.confirmation(proposed, "MAYBE")), /INVALID_CONFIRMATION/);
+    await assert.rejects(h.confirm(proposed, "ACCEPT",
+        h.confirmation(proposed, "ACCEPT", undefined, { proposedDeadline: "2026-11-05T12:00:00.000Z" })),
+    /INVALID_CONFIRMATION/);
+    await assert.rejects(h.confirm(proposed, "ACCEPT",
+        h.confirmation(proposed, "ACCEPT", undefined, { replanId: "replan-0002" })), /INVALID_CONFIRMATION/);
+    // Another order's genuine confirmation cannot be replayed here.
+    await assert.rejects(h.confirm(proposed, "ACCEPT", other.confirmation(otherProposed, "ACCEPT")), /INVALID_CONFIRMATION/);
+    // Another order's customer, staff roles and browser sessions cannot confirm.
+    const foreignCustomer = { role: "customer", orderId: otherProposed.id, auth: SERVER };
+    await assert.rejects(h.core.dispatch(proposed, { kind: "confirm_delivery_date", requestId: "synthetic-foreign-01",
+        expectedVersion: proposed.version, data: { confirmation: h.confirmation(proposed, "ACCEPT") } }, foreignCustomer),
+    /UNAUTHORIZED/);
+    for (const role of ["creative", "admin", "finance"]) {
+        await assert.rejects(h.confirm(proposed, "ACCEPT", h.confirmation(proposed, "ACCEPT"), role), /UNAUTHORIZED/);
+    }
+    await assert.rejects(h.confirm(proposed, "ACCEPT", h.confirmation(proposed, "ACCEPT"), "customer",
+        { auth: Symbol("browser") }), /UNAUTHORIZED/);
+    // A server verifier that does not vouch for confirmations rejects even a well-formed, signed one.
+    const proposalsOnly = await overdueAfterReview(setup({
+        verifyReplan: (record) => record.kind === "DELIVERY_PROPOSAL" && signatureMatches(record.signature, signReplan(record))
+    }));
+    const pending = await proposalsOnly.propose(proposalsOnly.order, NEW_DEADLINE);
+    await assert.rejects(proposalsOnly.confirm(pending, "ACCEPT"), /UNTRUSTED_CONFIRMATION/);
+    assert.equal(proposed.replannedDeadline, null);
+    // Failed attempts registered nothing; the genuine confirmation still applies once.
+    assert.equal((await h.confirm(proposed, "ACCEPT")).replannedDeadline, NEW_DEADLINE);
+});
+
+test("DR/9: a repeated confirmation never creates a second transition", async () => {
+    const h = await overdueAfterReview();
+    const proposed = await h.propose(h.order, NEW_DEADLINE);
+    const record = h.confirmation(proposed, "ACCEPT");
+    const first = await h.confirm(proposed, "ACCEPT", record, "customer", { requestId: "synthetic-confirm-once" });
+    const replay = await h.confirm(proposed, "ACCEPT", record, "customer", { requestId: "synthetic-confirm-once" });
+    assert.equal(replay, first);
+    await assert.rejects(h.confirm(first, "ACCEPT", record), /REPLAN_NOT_PENDING/);
+    // A later proposal cannot be confirmed with the old, already used confirmation.
+    h.setNow("2026-11-05T07:00:00.000Z"); // Thursday 10:00, after the confirmed Wednesday date
+    const again = await h.propose(first, "2026-11-06T12:00:00.000Z");
+    await assert.rejects(h.confirm(again, "ACCEPT", record), /INVALID_CONFIRMATION/);
+    const reused = h.confirmation(again, "ACCEPT", undefined, { confirmationRef: record.confirmationRef });
+    await assert.rejects(h.confirm(again, "ACCEPT", reused), /REPLAN_REFERENCE_USED/);
+    assert.equal(again.events.length, first.events.length + 1);
+    assert.equal(again.deliveryReplans[1].missedDeadline, NEW_DEADLINE);
+});
+
+test("DR/10: a rejected proposal leaves every commitment unchanged", async () => {
+    const h = await overdueAfterReview();
+    const proposed = await h.propose(h.order, NEW_DEADLINE);
+    const rejected = await h.confirm(proposed, "REJECT");
+    assert.equal(rejected.deliveryReplans[0].status, "REJECTED");
+    assert.equal(rejected.replannedDeadline, null);
+    assert.deepEqual(rejected.booking, h.order.booking);
+    assert.equal(rejected.slaStartsAt, PLANNED_START);
+    await assert.rejects(h.send(rejected, "revision_options", "creative", { options: ["synthetic-b1", "synthetic-b2"] }),
+        /DELIVERY_REPLAN_REQUIRED/);
+    const next = await h.propose(rejected, "2026-11-05T12:00:00.000Z");
+    assert.equal(next.deliveryReplans.length, 2);
+});
+
+test("DR/11: a date outside the tariff's hours or the approved calendar is never proposed or confirmed", async () => {
+    const h = await overdueAfterReview();
+    for (const date of ["2026-11-07T12:00:00.000Z", "2026-11-04T06:00:00.000Z", "2026-11-04T17:00:00.000Z"]) {
+        await assert.rejects(h.propose(h.order, date), /DEADLINE_NOT_ELIGIBLE/); // Sat 15:00, Wed 09:00, Wed 20:00
+    }
+    await assert.rejects(h.propose(h.order, "2027-01-05T12:00:00.000Z"), /CALENDAR_MISSING/);
+    await assert.rejects(h.propose(h.order, "not-a-date"), /INVALID_PROPOSAL/);
+    assert.equal((await h.propose(h.order, "2026-11-04T15:00:00.000Z")).deliveryReplans[0].proposedDeadline,
+        "2026-11-04T15:00:00.000Z"); // Wednesday 18:00 close of the standard window
+    const holidayLoaded = loadCalendar({
+        timeZone: "Europe/Istanbul", version: "synthetic-core-2026.3",
+        source: { kind: "SYNTHETIC", reference: "task-134-holiday-fixture" },
+        coverage: { from: "2026-01-01", to: "2026-12-31" },
+        annualApprovals: [{ year: 2026, approvedBy: "synthetic-producer", approverRole: "PRODUCER",
+            approvedAt: "2026-01-02T09:00:00Z", reference: "task-134-synthetic-approval" }],
+        days: [{ date: "2026-11-04", kind: "HOLIDAY" }]
+    }, { allowSynthetic: true });
+    const onHoliday = await overdueAfterReview(setup({ calendar: holidayLoaded }));
+    await assert.rejects(onHoliday.propose(onHoliday.order, NEW_DEADLINE), /DEADLINE_NOT_ELIGIBLE/);
+});
+
+test("DR/12: a past date is rejected when proposed and when confirmed", async () => {
+    const h = await overdueAfterReview();
+    for (const date of ["2026-10-30T12:00:00.000Z", AFTER_DEADLINE]) {
+        await assert.rejects(h.propose(h.order, date), /DEADLINE_IN_PAST/);
+    }
+    // Görev 135: a date inside the 48-hour answer window, so the date passes before the proposal expires.
+    const proposed = await h.propose(h.order, "2026-11-03T12:00:00.000Z"); // Tuesday 15:00 Istanbul
+    h.setNow("2026-11-03T12:00:00.000Z"); // the proposed date itself has arrived, 29 hours after the proposal
+    await assert.rejects(h.confirm(proposed, "ACCEPT"), /DEADLINE_IN_PAST/);
+    assert.equal(proposed.replannedDeadline, null);
+    assert.equal((await h.confirm(proposed, "REJECT")).deliveryReplans[0].status, "REJECTED");
+});
+
+test("DR/14: after a review, time-bound work is blocked until a new date is confirmed", async () => {
+    const pending = await overdueAfterReview();
+    await assert.rejects(pending.send(pending.order, "revision_options", "creative",
+        { options: ["synthetic-b1", "synthetic-b2"] }), /DELIVERY_REPLAN_REQUIRED/);
+    // A producer non-delivery restoration is not time-bound and stays available.
+    assert.equal((await pending.restore(pending.order, "revision-0001")).revisionsUsed, 0);
+    const production = await producing();
+    const reviewed = await production.openReview(production.order, "REFUND");
+    production.setNow(AFTER_DEADLINE);
+    const resumed = await production.resolveReview(reviewed, "CONTINUE");
+    await assert.rejects(production.send(resumed, "request_revision", "customer"), /DELIVERY_REPLAN_REQUIRED/);
+    const selected = await production.send(resumed, "select_final", "customer", { selectedOption: "synthetic-a1" });
+    await assert.rejects(production.send(selected, "complete", "creative", { mp3Ref: "synthetic-mp3", wavFeasible: false }),
+        /DELIVERY_REPLAN_REQUIRED/);
+    const started = await ready();
+    const inProduction = await started.send(started.order, "start_production", "creative");
+    const paused = await started.openReview(inProduction, "CANCELLATION");
+    started.setNow(AFTER_DEADLINE);
+    const back = await started.resolveReview(paused, "CONTINUE");
+    await assert.rejects(started.send(back, "initial_options", "creative", { options: ["synthetic-a1", "synthetic-a2"] }),
+        /DELIVERY_REPLAN_REQUIRED/);
+    // Orders that never went through a review keep the existing behaviour after the deadline.
+    const plain = await producing();
+    plain.setNow(AFTER_DEADLINE);
+    await assert.rejects(plain.send(plain.order, "request_revision", "customer"), /NEW_ORDER_REVIEW_REQUIRED/);
+});
+
+// ---- Görev 134 / Decision 134-B: pending revisions on a closed order ----
+
+test("PF/15,16,17,18: closing keeps pending revisions and rights, flags them for review and moves no money", async () => {
+    let paymentChecks = 0;
+    const h = await pendingRevision("PLUS", setup({
+        verifyPayment: (proof) => { paymentChecks += 1; return signatureMatches(proof.signature, sign(proof)); }
+    }));
+    const checksBefore = paymentChecks;
+    const closed = await h.resolveReview(await h.openReview(h.order, "REFUND"), "CLOSE");
+    assert.equal(paymentChecks, checksBefore);
+    assert.equal(closed.state, STATES.CLOSED);
+    assert.deepEqual(closed.revisions, h.order.revisions);
+    assert.equal(closed.revisions[0].status, "ACCEPTED");
+    assert.equal(closed.revisions[0].deliveredAt, null);
+    assert.equal(closed.revisionsUsed, 1);
+    assert.equal(closed.paymentReference, h.order.paymentReference);
+    assert.deepEqual(closed.financialAssessments, [{
+        assessmentId: "assessment-0001", orderId: closed.id, reviewId: "review-0001", revisionId: "revision-0001",
+        reason: "ACCEPTED_NOT_DELIVERED", status: "PENDING_FINANCIAL_REVIEW", amountKurus: null,
+        moneyMovement: "NONE", createdAt: FIXED_TIME
+    }]);
+    assert.ok(Object.isFrozen(closed.financialAssessments[0]));
+    // CONTINUE and a close without pending revisions create no assessment.
+    const resumed = await pendingRevision();
+    assert.deepEqual((await resumed.resolveReview(await resumed.openReview(resumed.order, "DISPUTE"), "CONTINUE"))
+        .financialAssessments, []);
+    const empty = await producing();
+    assert.deepEqual((await empty.resolveReview(await empty.openReview(empty.order, "DISPUTE"), "REFUND"))
+        .financialAssessments, []);
+});
+
+test("PF/19,20: restored or delivered revisions are not flagged; a closed order takes no restoration or revision", async () => {
+    const h = await pendingRevision("PLUS");
+    let order = await h.restore(h.order, "revision-0001"); // revision-0001 RESTORED, rights back to 0
+    order = await h.send(order, "request_revision", "customer"); // revision-0002
+    order = await h.send(order, "revision_options", "creative", { options: ["synthetic-b1", "synthetic-b2"] });
+    order = await h.send(order, "request_revision", "customer"); // revision-0003 stays pending
+    const closed = await h.resolveReview(await h.openReview(order, "CANCELLATION"), "CLOSE");
+    assert.deepEqual(closed.revisions.map(revision => revision.status), ["RESTORED", "DELIVERED", "ACCEPTED"]);
+    assert.deepEqual(closed.financialAssessments.map(item => item.revisionId), ["revision-0003"]);
+    assert.equal(closed.revisionsUsed, 2);
+    await assert.rejects(h.restore(closed, "revision-0001"), /INVALID_TRANSITION/);
+    await assert.rejects(h.restore(closed, "revision-0003"), /INVALID_TRANSITION/);
+    await assert.rejects(h.send(closed, "request_revision", "customer"), /INVALID_TRANSITION/);
+    await assert.rejects(h.propose(closed, NEW_DEADLINE), /INVALID_TRANSITION/);
+    assert.equal(closed.revisionsUsed, 2);
+});
+
+// ---- Görev 135: approved review policy UNAI-REVIEW-POLICY-v1.0 ----
+
+const POLICY_REFERENCE = "UNAI-REVIEW-POLICY-v1.0";
+const ADMIN = { source: "admin_console" };
+
+test("AP/1,2: finance and admin can each open all three review types; actor and policy are recorded", async () => {
+    for (const [type, state] of REVIEW_TYPES) {
+        for (const [role, extra] of [["finance", {}], ["admin", ADMIN]]) {
+            const h = await pendingRevision();
+            const order = await h.openReview(h.order, type, h.reviewRecord(h.order, type, extra), role);
+            assert.equal(order.state, state);
+            const opening = order.reviews[0].opening;
+            assert.equal(opening.actorId, `synthetic-${role}-opener`);
+            assert.equal(opening.role, role);
+            assert.equal(opening.policyReference, POLICY_REFERENCE);
+            assert.equal(opening.at, FIXED_TIME);
+            assert.match(opening.authorizationRef, /^synthetic-review-/);
+            assert.deepEqual(order.events.at(-1).audit, opening);
+        }
+    }
+});
+
+test("AP/3,4,5,6,17: finance decides every outcome; admin CONTINUE or CLOSE but never REFUND", async () => {
+    let accepted = 0;
+    for (const [type] of REVIEW_TYPES) {
+        for (const outcome of ["CONTINUE", "REFUND", "CLOSE"]) {
+            const h = await pendingRevision();
+            const open = await h.openReview(h.order, type);
+            const done = await h.resolveReview(open, outcome);
+            const resolution = done.reviews[0].resolution;
+            assert.deepEqual([resolution.outcome, resolution.role, resolution.actorId, resolution.policyReference],
+                [outcome, "finance", "synthetic-finance-decider", POLICY_REFERENCE]);
+            accepted += 1;
+        }
+        for (const outcome of ["CONTINUE", "CLOSE"]) {
+            const h = await pendingRevision();
+            const open = await h.openReview(h.order, type);
+            const record = h.resolution(open, open.reviews[0].reviewId, outcome,
+                { ...ADMIN, reasonCode: "SYNTHETIC_CASE_RESOLVED" });
+            const done = await h.resolveReview(open, outcome, record, "admin");
+            assert.deepEqual([done.reviews[0].resolution.role, done.reviews[0].resolution.policyReference],
+                ["admin", POLICY_REFERENCE]);
+            accepted += 1;
+        }
+        const h = await pendingRevision();
+        const open = await h.openReview(h.order, type);
+        await assert.rejects(h.resolveReview(open, "REFUND", h.resolution(open, open.reviews[0].reviewId, "REFUND",
+            { ...ADMIN, reasonCode: "SYNTHETIC_CASE_RESOLVED" }), "admin"), /REVIEW_OUTCOME_NOT_PERMITTED/);
+        assert.equal(open.state, REVIEW_TYPES.find(([t]) => t === type)[1]);
+    }
+    assert.equal(accepted, 15);
+});
+
+test("AP/7,18: only the approved 15-combination policy applies; no injected policy can widen it", async () => {
+    assert.deepEqual(APPROVED_REVIEW_POLICY, {
+        status: "APPROVED", reference: POLICY_REFERENCE, matrix: Object.fromEntries(REVIEW_TYPES.map(([type]) =>
+            [type, { finance: ["CONTINUE", "REFUND", "CLOSE"], admin: ["CONTINUE", "CLOSE"] }]))
+    });
+    assert.ok(Object.isFrozen(APPROVED_REVIEW_POLICY.matrix.REFUND.admin));
+    const combinations = Object.values(APPROVED_REVIEW_POLICY.matrix)
+        .flatMap(roles => Object.values(roles)).reduce((sum, outcomes) => sum + outcomes.length, 0);
+    assert.equal(combinations, 15);
+    assert.equal("INTERIM_REVIEW_POLICY" in await import("./core.mjs"), false);
+    const valid = { status: "APPROVED", reference: "synthetic-narrowed-policy" };
+    for (const policy of [
+        { ...valid, matrix: { REFUND: { admin: ["REFUND"] } } }, // the old interim grant
+        { ...valid, matrix: { REFUND_ALL: { finance: ["CLOSE"] } } }, { ...valid, matrix: { REFUND: { customer: ["CLOSE"] } } },
+        { ...valid, matrix: { REFUND: { creative: ["CONTINUE"] } } }, { ...valid, matrix: { REFUND: { finance: ["RESET_RIGHTS"] } } },
+        { ...valid, matrix: { REFUND: { finance: ["CLOSE", "CLOSE"] } } }, { ...valid, matrix: { REFUND: { finance: "CLOSE" } } },
+        { ...valid, matrix: JSON.parse('{"__proto__": {"finance": ["CLOSE"]}}') },
+        { status: "INTERIM_UNAPPROVED", reference: "task-130-behaviour", matrix: {} },
+        { status: "APPROVED", matrix: {} }, { ...valid }, null]) {
+        assert.throws(() => setup({ reviewPolicy: policy }), /INVALID_REVIEW_POLICY/);
+    }
+    // A narrower approved policy is enforced as given and copied at creation.
+    const narrowed = { ...valid, matrix: { REFUND: { finance: ["CONTINUE", "REFUND"] }, DISPUTE: { admin: ["CONTINUE"] } } };
+    const h = await pendingRevision("PLUS", setup({ reviewPolicy: narrowed }));
+    narrowed.matrix.REFUND.finance.push("CLOSE");
+    narrowed.matrix.CANCELLATION = { finance: ["CLOSE"] };
+    await assert.rejects(h.openReview(h.order, "CANCELLATION"), /REVIEW_NOT_PERMITTED/);
+    await assert.rejects(h.openReview(h.order, "DISPUTE"), /REVIEW_NOT_PERMITTED/);
+    const reviewed = await h.openReview(h.order, "REFUND");
+    const close = h.resolution(reviewed, reviewed.reviews[0].reviewId, "CLOSE");
+    await assert.rejects(h.resolveReview(reviewed, "CLOSE", close), /REVIEW_OUTCOME_NOT_PERMITTED/);
+    const refund = await h.resolveReview(reviewed, "REFUND", h.resolution(reviewed, reviewed.reviews[0].reviewId,
+        "REFUND", { authorizationRef: close.authorizationRef }));
+    assert.equal(refund.reviews[0].resolution.policyReference, "synthetic-narrowed-policy");
+});
+
+// ---- Görev 135: four eyes and trusted actor identity ----
+
+test("FE/8: the actor who opened a review can never decide it, whatever role they use", async () => {
+    const h = await pendingRevision();
+    const reviewed = await h.openReview(h.order, "REFUND");
+    const id = reviewed.reviews[0].reviewId;
+    const opener = "synthetic-finance-opener";
+    await assert.rejects(h.resolveReview(reviewed, "CONTINUE", h.resolution(reviewed, id, "CONTINUE", { actorId: opener })),
+        /FOUR_EYES_VIOLATION/);
+    await assert.rejects(h.resolveReview(reviewed, "CLOSE", h.resolution(reviewed, id, "CLOSE",
+        { ...ADMIN, actorId: opener, reasonCode: "SYNTHETIC_CASE_RESOLVED" }), "admin"), /FOUR_EYES_VIOLATION/);
+    const admin = await pendingRevision();
+    const byAdmin = await admin.openReview(admin.order, "DISPUTE", admin.reviewRecord(admin.order, "DISPUTE", ADMIN), "admin");
+    await assert.rejects(admin.resolveReview(byAdmin, "CONTINUE", admin.resolution(byAdmin, byAdmin.reviews[0].reviewId,
+        "CONTINUE", { ...ADMIN, actorId: "synthetic-admin-opener" }), "admin"), /FOUR_EYES_VIOLATION/);
+    // A rejected decision changed nothing and registered nothing.
+    const blocked = h.resolution(reviewed, id, "CONTINUE", { actorId: opener });
+    await assert.rejects(h.resolveReview(reviewed, "CONTINUE", blocked), /FOUR_EYES_VIOLATION/);
+    const resumed = await h.resolveReview(reviewed, "CONTINUE",
+        h.resolution(reviewed, id, "CONTINUE", { authorizationRef: blocked.authorizationRef }));
+    assert.equal(resumed.version, reviewed.version + 1);
+    assert.equal(resumed.events.length, reviewed.events.length + 1);
+    assert.equal(resumed.revisionsUsed, reviewed.revisionsUsed);
+});
+
+test("FE/9,10: a different actor with the same role decides; their own role is authorized separately", async () => {
+    const h = await pendingRevision();
+    const reviewed = await h.openReview(h.order, "CANCELLATION");
+    const id = reviewed.reviews[0].reviewId;
+    const colleague = h.resolution(reviewed, id, "CONTINUE", { actorId: "synthetic-finance-colleague" });
+    // The colleague's session must be for the role they act in: a finance session cannot act as admin.
+    await assert.rejects(h.resolveReview(reviewed, "CONTINUE", h.resolution(reviewed, id, "CONTINUE",
+        { ...ADMIN, actorId: "synthetic-finance-colleague" }), "admin",
+    { session: session("synthetic-finance-colleague", "finance") }), /UNAUTHORIZED/);
+    for (const role of ["creative", "customer", "scheduler"]) {
+        await assert.rejects(h.resolveReview(reviewed, "CONTINUE", colleague, role), /UNAUTHORIZED/);
+    }
+    const done = await h.resolveReview(reviewed, "CONTINUE", colleague);
+    assert.equal(done.reviews[0].opening.role, done.reviews[0].resolution.role);
+    assert.notEqual(done.reviews[0].opening.actorId, done.reviews[0].resolution.actorId);
+});
+
+test("FE/11,12: forged, mismatched or missing actor identities are rejected", async () => {
+    const h = await pendingRevision();
+    const record = h.reviewRecord(h.order, "DISPUTE");
+    // A client-made session for any actor id fails the server's authentication.
+    await assert.rejects(h.openReview(h.order, "DISPUTE", record, "finance", { session: "0".repeat(64) }), /UNAUTHORIZED/);
+    await assert.rejects(h.openReview(h.order, "DISPUTE", record, "finance", { session: undefined }), /UNAUTHORIZED/);
+    // A genuine session of another actor cannot use a record issued to this actor.
+    await assert.rejects(h.openReview(h.order, "DISPUTE", record, "finance", { actorId: "synthetic-finance-other" }),
+        /INVALID_REVIEW/);
+    await assert.rejects(h.openReview(h.order, "DISPUTE", { ...record, actorId: "synthetic-finance-other" }),
+        /UNTRUSTED_REVIEW/);
+    // Missing or malformed actor ids fail closed.
+    await assert.rejects(h.openReview(h.order, "DISPUTE", record, "finance", { actorId: undefined }), /ACTOR_REQUIRED/);
+    await assert.rejects(h.openReview(h.order, "DISPUTE", h.reviewRecord(h.order, "DISPUTE", { actorId: undefined })),
+        /ACTOR_REQUIRED/);
+    await assert.rejects(h.openReview(h.order, "DISPUTE", h.reviewRecord(h.order, "DISPUTE", { actorId: "free text" })),
+        /ACTOR_REQUIRED/);
+    const reviewed = await h.openReview(h.order, "DISPUTE", record);
+    const id = reviewed.reviews[0].reviewId;
+    await assert.rejects(h.resolveReview(reviewed, "CONTINUE", h.resolution(reviewed, id, "CONTINUE"), "finance",
+        { actorId: undefined }), /ACTOR_REQUIRED/);
+    await assert.rejects(h.resolveReview(reviewed, "CONTINUE", h.resolution(reviewed, id, "CONTINUE"), "finance",
+        { session: "f".repeat(64) }), /UNAUTHORIZED/);
+    await assert.rejects(h.resolveReview(reviewed, "CONTINUE", h.resolution(reviewed, id, "CONTINUE"), "finance",
+        { actorId: "synthetic-finance-third" }), /INVALID_REVIEW/);
+    assert.equal(reviewed.reviews[0].status, "OPEN");
+});
+
+test("FE/13,14: authorization references are single-use and bound to their own order", async () => {
+    const shared = setup();
+    const a = await pendingRevision("PLUS", shared);
+    const b = await pendingRevision("PLUS", shared);
+    const opening = shared.reviewRecord(a.order, "REFUND");
+    const openA = await shared.openReview(a.order, "REFUND", opening);
+    await assert.rejects(shared.openReview(b.order, "REFUND", opening), /INVALID_REVIEW/);
+    await assert.rejects(shared.openReview(b.order, "REFUND",
+        shared.reviewRecord(b.order, "REFUND", { authorizationRef: opening.authorizationRef })), /REVIEW_REFERENCE_USED/);
+    const openB = await shared.openReview(b.order, "REFUND");
+    const decision = shared.resolution(openA, openA.reviews[0].reviewId, "CONTINUE");
+    await assert.rejects(shared.resolveReview(openB, "CONTINUE", decision), /INVALID_REVIEW/);
+    await shared.resolveReview(openA, "CONTINUE", decision);
+    await assert.rejects(shared.resolveReview(openB, "CONTINUE", shared.resolution(openB, openB.reviews[0].reviewId,
+        "CONTINUE", { authorizationRef: decision.authorizationRef })), /REVIEW_REFERENCE_USED/);
+    assert.equal(openB.state, STATES.REFUND_REVIEW);
+});
+
+test("FE/15,16: an admin CLOSE needs a verified reason code and is fully audited", async () => {
+    const h = await pendingRevision();
+    const reviewed = await h.openReview(h.order, "CANCELLATION");
+    const id = reviewed.reviews[0].reviewId;
+    await assert.rejects(h.resolveReview(reviewed, "CLOSE", h.resolution(reviewed, id, "CLOSE", ADMIN), "admin"),
+        /CLOSE_REASON_REQUIRED/);
+    await assert.rejects(h.resolveReview(reviewed, "CLOSE",
+        h.resolution(reviewed, id, "CLOSE", { ...ADMIN, reasonCode: "müşteri istedi" }), "admin"), /INVALID_REVIEW/);
+    await assert.rejects(h.resolveReview(reviewed, "CLOSE",
+        { ...h.resolution(reviewed, id, "CLOSE", ADMIN), reasonCode: "SYNTHETIC_ADDED_LATER" }, "admin"), /UNTRUSTED_REVIEW/);
+    const closed = await h.resolveReview(reviewed, "CLOSE",
+        h.resolution(reviewed, id, "CLOSE", { ...ADMIN, reasonCode: "SYNTHETIC_DUPLICATE_ORDER" }), "admin");
+    const resolution = closed.reviews[0].resolution;
+    assert.equal(closed.state, STATES.CLOSED);
+    assert.deepEqual([resolution.outcome, resolution.reasonCode, resolution.actorId, resolution.role,
+        resolution.policyReference, resolution.at, resolution.moneyMovement],
+    ["CLOSE", "SYNTHETIC_DUPLICATE_ORDER", "synthetic-admin-decider", "admin", POLICY_REFERENCE, FIXED_TIME, "NONE"]);
+    assert.equal(closed.events.at(-1).audit.reasonCode, "SYNTHETIC_DUPLICATE_ORDER");
+    assert.equal(closed.revisionsUsed, 1);
+    assert.equal(closed.financialAssessments.length, 1);
+    // Finance closes without a reason code, as before.
+    const f = await pendingRevision();
+    assert.equal((await f.resolveReview(await f.openReview(f.order, "DISPUTE"), "CLOSE")).state, STATES.CLOSED);
+});
+
+// ---- Görev 135: 48-hour answer window for delivery-date proposals ----
+
+const PROPOSAL_EXPIRES = "2026-11-04T07:00:00.000Z"; // AFTER_DEADLINE + 48 hours
+
+function expireProposal(h, order, role = "creative", options = {}) {
+    return h.send(order, "expire_delivery_proposal", role, {}, options);
+}
+
+test("EX/19,20: a proposal lives exactly 48 hours; an answer just before the end is accepted", async () => {
+    const h = await overdueAfterReview();
+    const proposed = await h.propose(h.order, NEW_DEADLINE);
+    const [replan] = proposed.deliveryReplans;
+    assert.equal(replan.createdAt, AFTER_DEADLINE);
+    assert.equal(replan.expiresAt, PROPOSAL_EXPIRES);
+    assert.equal(Date.parse(replan.expiresAt) - Date.parse(replan.createdAt), 48 * 60 * 60 * 1000);
+    assert.equal(replan.proposal.expiresAt, PROPOSAL_EXPIRES);
+    h.setNow("2026-11-04T06:59:59.999Z");
+    const confirmed = await h.confirm(proposed, "ACCEPT");
+    assert.equal(confirmed.replannedDeadline, NEW_DEADLINE);
+});
+
+test("EX/21,22,27: at or after expiry no answer is accepted and the proposal never comes back", async () => {
+    for (const now of [PROPOSAL_EXPIRES, "2026-11-04T08:00:00.000Z"]) {
+        const h = await overdueAfterReview();
+        const proposed = await h.propose(h.order, NEW_DEADLINE);
+        h.setNow(now);
+        const accept = h.confirmation(proposed, "ACCEPT");
+        await assert.rejects(h.confirm(proposed, "ACCEPT", accept), /PROPOSAL_EXPIRED/);
+        await assert.rejects(h.confirm(proposed, "REJECT"), /PROPOSAL_EXPIRED/);
+        assert.equal(proposed.replannedDeadline, null);
+        const expired = await expireProposal(h, proposed);
+        assert.equal(expired.deliveryReplans[0].status, "EXPIRED");
+        // The record keeps the real end of the window apart from the moment the expiry was noticed.
+        assert.equal(expired.deliveryReplans[0].expiry.expiredAt, PROPOSAL_EXPIRES);
+        assert.equal(expired.deliveryReplans[0].expiry.recordedAt, now);
+        // Neither the old confirmation, a fresh one, nor an earlier clock can revive it.
+        await assert.rejects(h.confirm(expired, "ACCEPT", accept), /REPLAN_NOT_PENDING/);
+        h.setNow("2026-11-03T07:00:00.000Z");
+        await assert.rejects(h.confirm(expired, "ACCEPT"), /REPLAN_NOT_PENDING/);
+        await assert.rejects(expireProposal(h, expired), /REPLAN_NOT_PENDING/);
+        assert.equal(expired.deliveryReplans[0].expiresAt, PROPOSAL_EXPIRES);
+    }
+});
+
+test("EX/23,24,25,26: expiry is recorded and changes no SLA, deadline, delay history, right or money", async () => {
+    let paymentChecks = 0;
+    const h = await overdueAfterReview(setup({
+        verifyPayment: (proof) => { paymentChecks += 1; return signatureMatches(proof.signature, sign(proof)); }
+    }));
+    const proposed = await h.propose(h.order, NEW_DEADLINE);
+    const checksBefore = paymentChecks;
+    h.setNow("2026-11-04T06:59:59.999Z");
+    await assert.rejects(expireProposal(h, proposed), /PROPOSAL_NOT_EXPIRED/);
+    h.setNow(PROPOSAL_EXPIRES);
+    await assert.rejects(expireProposal(h, proposed, "customer"), /UNAUTHORIZED/);
+    const expired = await expireProposal(h, proposed, "admin");
+    const [replan] = expired.deliveryReplans;
+    assert.deepEqual(replan.expiry, {
+        orderId: expired.id, replanId: "replan-0001", expiredAt: PROPOSAL_EXPIRES, recordedAt: PROPOSAL_EXPIRES,
+        recordedBy: "expire_delivery_proposal", role: "admin", idempotencyKey: expired.events.at(-1).requestId
+    });
+    assert.deepEqual(expired.events.at(-1).audit, replan.expiry);
+    assert.equal(replan.missedDeadline, DEADLINE);
+    assert.equal(expired.state, proposed.state);
+    assert.equal(expired.slaStartsAt, PLANNED_START);
+    assert.deepEqual(expired.booking, proposed.booking);
+    assert.equal(expired.replannedDeadline, null);
+    assert.equal(expired.revisionsUsed, proposed.revisionsUsed);
+    assert.deepEqual(expired.revisions, proposed.revisions);
+    assert.deepEqual(expired.financialAssessments, []);
+    assert.equal(expired.paymentReference, proposed.paymentReference);
+    assert.equal(paymentChecks, checksBefore);
+    // Time-bound work is still blocked: an expired proposal is not a commitment.
+    await assert.rejects(h.send(expired, "revision_options", "creative", { options: ["synthetic-b1", "synthetic-b2"] }),
+        /DELIVERY_REPLAN_REQUIRED/);
+});
+
+test("EX/28,29: one active proposal at a time; a new one starts its own 48 hours after the old one ends", async () => {
+    const h = await overdueAfterReview();
+    const first = await h.propose(h.order, NEW_DEADLINE);
+    h.setNow("2026-11-04T06:59:59.999Z");
+    await assert.rejects(h.propose(first, "2026-11-06T12:00:00.000Z"), /REPLAN_PENDING/);
+    h.setNow(PROPOSAL_EXPIRES);
+    const second = await h.propose(first, "2026-11-06T12:00:00.000Z");
+    const [old, fresh] = second.deliveryReplans;
+    assert.equal(old.status, "EXPIRED");
+    assert.equal(old.expiry.recordedBy, "propose_delivery_date");
+    assert.equal(old.proposedDeadline, NEW_DEADLINE);
+    assert.deepEqual([fresh.status, fresh.createdAt, fresh.expiresAt],
+        ["PROPOSED", PROPOSAL_EXPIRES, "2026-11-06T07:00:00.000Z"]);
+    assert.equal(second.deliveryReplans.filter(replan => replan.status === "PROPOSED").length, 1);
+    // The old proposal's confirmation does not fit the new one.
+    await assert.rejects(h.confirm(second, "ACCEPT", h.confirmation(second, "ACCEPT", old)), /INVALID_CONFIRMATION/);
+    assert.equal((await h.confirm(second, "ACCEPT")).replannedDeadline, "2026-11-06T12:00:00.000Z");
+});
+
+test("EX/30: another order's customer or confirmation cannot answer a proposal", async () => {
+    const h = await overdueAfterReview();
+    const proposed = await h.propose(h.order, NEW_DEADLINE);
+    const other = await overdueAfterReview();
+    const otherProposed = await other.propose(other.order, NEW_DEADLINE);
+    await assert.rejects(h.confirm(proposed, "ACCEPT", other.confirmation(otherProposed, "ACCEPT")), /INVALID_CONFIRMATION/);
+    await assert.rejects(h.core.dispatch(proposed, { kind: "confirm_delivery_date", requestId: "synthetic-foreign-02",
+        expectedVersion: proposed.version, data: { confirmation: h.confirmation(proposed, "ACCEPT") } },
+    { role: "customer", orderId: otherProposed.id, auth: SERVER }), /UNAUTHORIZED/);
+});
+
+test("EX/31: acceptance and expiry racing at the same instant resolve by trusted time, in any order", async () => {
+    for (const [now, winner] of [["2026-11-04T06:59:59.999Z", "ACCEPTED"], [PROPOSAL_EXPIRES, "EXPIRED"]]) {
+        for (const confirmFirst of [true, false]) {
+            const h = await overdueAfterReview();
+            const proposed = await h.propose(h.order, NEW_DEADLINE);
+            h.setNow(now);
+            const attempts = [() => h.confirm(proposed, "ACCEPT"), () => expireProposal(h, proposed)];
+            const [confirmed, expired] = await Promise.allSettled(confirmFirst ? attempts.map(run => run())
+                : attempts.reverse().map(run => run()).reverse());
+            const won = winner === "ACCEPTED" ? confirmed : expired;
+            const lost = winner === "ACCEPTED" ? expired : confirmed;
+            assert.equal(won.status, "fulfilled");
+            assert.equal(lost.status, "rejected");
+            assert.match(lost.reason.code, winner === "ACCEPTED"
+                ? /PROPOSAL_NOT_EXPIRED|REPLAN_NOT_PENDING|VERSION_CONFLICT/ : /PROPOSAL_EXPIRED|REPLAN_NOT_PENDING|VERSION_CONFLICT/);
+            assert.equal(won.value.deliveryReplans[0].status, winner === "ACCEPTED" ? "CONFIRMED" : "EXPIRED");
+            assert.equal(won.value.replannedDeadline, winner === "ACCEPTED" ? NEW_DEADLINE : null);
         }
     }
 });
