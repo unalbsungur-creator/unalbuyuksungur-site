@@ -1,7 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
-import { APPROVED_REVIEW_POLICY, createCore, OrderError, PACKAGES, PROPOSAL_VISIBILITY, proposalVisibility, STATES }
+import { APPROVED_CLOSE_REASONS, APPROVED_REVIEW_POLICY, CLOSE_DECISION_FIELDS, CLOSE_EVIDENCE_FIELDS,
+    closeDecisionBinding, createCore, OrderError, PACKAGES, PROPOSAL_VISIBILITY, proposalVisibility, STATES }
     from "./core.mjs";
 import { loadCalendar } from "./calendar.mjs";
 
@@ -41,8 +42,30 @@ function signRestoration(record) {
 }
 
 function signReview(record) {
+    if (record.outcome === "CLOSE") return hmac(["close-decision", closeDecisionBinding(record)]);
     return hmac(["review", record.orderId, record.type ?? null, record.reviewId ?? null, record.outcome ?? null,
-        record.authorizationRef, record.source, record.actorId ?? null, record.reasonCode ?? null]);
+        record.authorizationRef, record.source, record.actorId ?? null, record.reasonCode ?? null,
+        record.closeReasonPolicy ?? null, JSON.stringify(record.evidence ?? null)]);
+}
+
+// Synthetic evidence service: it alone can vouch for a close evidence reference (Görev 147).
+function signEvidence(evidence) {
+    return hmac(["evidence", evidence.evidenceId, evidence.orderId, evidence.reviewId, evidence.evidenceKind,
+        evidence.source, evidence.createdAt, evidence.digest, evidence.financialObligation,
+        evidence.linkedOrderId ?? null, evidence.finding ?? null]);
+}
+
+function syntheticAttestation(evidence, request) {
+    if (!evidence || !signatureMatches(evidence.signature, signEvidence(evidence))) return null;
+    return {
+        status: "VERIFIED", verifier: { kind: "SYNTHETIC", id: "synthetic-evidence-service" },
+        evidenceId: evidence.evidenceId, evidenceKind: evidence.evidenceKind, source: evidence.source,
+        orderId: evidence.orderId, reviewId: evidence.reviewId,
+        createdAt: new Date(Date.parse(evidence.createdAt)).toISOString(), digest: evidence.digest,
+        financialObligation: evidence.financialObligation, linkedOrderId: evidence.linkedOrderId ?? null,
+        finding: evidence.finding ?? null, closeReasonPolicy: request.closeReasonPolicy, reasonCode: request.reasonCode,
+        decision: request.decision, decisionBinding: request.decisionBinding
+    };
 }
 
 // Synthetic server session: binds an actor id to a role. A client cannot mint one without the server key.
@@ -61,6 +84,18 @@ function signatureMatches(signature, expected) {
     return timingSafeEqual(Buffer.from(signature, "hex"), Buffer.from(expected, "hex"));
 }
 
+const CLOSE_POLICY = "UNAI-CLOSE-REASONS-v1.0";
+const CLOSE_EVIDENCE = {
+    DUPLICATE_ORDER: { evidenceKind: "DUPLICATE_PAYMENT_RECONCILIATION", source: "payment_provider_reconciliation",
+        financialObligation: "RESOLVED" }, // linkedOrderId: the harness's paid twin order (Görev 150)
+    CUSTOMER_WITHDREW_AFTER_SETTLEMENT: { evidenceKind: "CUSTOMER_CLOSURE_CONFIRMATION",
+        source: "customer_confirmation_service", financialObligation: "NONE" },
+    DISPUTE_RESOLVED_BY_PROVIDER: { evidenceKind: "PROVIDER_DISPUTE_OUTCOME", source: "payment_provider_reconciliation",
+        financialObligation: "NONE" },
+    FRAUD_CONFIRMED: { evidenceKind: "RISK_REVIEW_RECORD", source: "risk_review_console", financialObligation: "NONE",
+        finding: "CONFIRMED" }
+};
+
 function setup(overrides = {}) {
     let now = FIXED_TIME;
     const core = createCore({
@@ -70,8 +105,14 @@ function setup(overrides = {}) {
         verifyEmail: (proof) => proof.code === "SYNTHETIC-ONE-USE-CODE",
         verifyBooking: (record) => signatureMatches(record.signature, signBooking(record)),
         verifyRestoration: (record) => signatureMatches(record.signature, signRestoration(record)),
-        verifyReview: (record) => signatureMatches(record.signature, signReview(record)),
+        verifyReview: (record, order, context) => context === undefined
+            ? signatureMatches(record.signature, signReview(record))
+            : { verified: signatureMatches(record.signature, hmac(["close-decision", context.binding])),
+                binding: context.binding },
         verifyReplan: (record) => signatureMatches(record.signature, signReplan(record)),
+        verifyEvidence: syntheticAttestation,
+        allowSyntheticEvidence: true, // test fixture only: the synthetic evidence service is never a production verifier
+        environment: "TEST", // Görev 152 (F151-04): the only environment in which the flag above is accepted
         calendar: CALENDAR,
         clock: () => now,
         ...overrides
@@ -160,11 +201,28 @@ function setup(overrides = {}) {
         };
         return { ...record, signature: signReview(record) };
     }
+    // Görev 147: a close evidence reference as the synthetic evidence service issues it, for one code.
+    function evidence(order, reviewId, code, extra = {}) {
+        const record = {
+            evidenceId: `synthetic-close-evidence-${++counter}`, orderId: order.id, reviewId, ...CLOSE_EVIDENCE[code],
+            ...(code === "DUPLICATE_ORDER" ? { linkedOrderId: twinId } : {}),
+            createdAt: now, digest: createHash("sha256").update(`synthetic-evidence-content-${counter}`).digest("hex"),
+            ...extra
+        };
+        return { ...record, signature: signEvidence(record) };
+    }
+    function closeFields(order, reviewId, code, evidenceExtra = {}) {
+        return { reasonCode: code, closeReasonPolicy: CLOSE_POLICY, evidence: evidence(order, reviewId, code, evidenceExtra) };
+    }
+    // A CLOSE without an explicit reasonCode gets an approved code that fits the review type, with its evidence.
     function resolution(order, reviewId, outcome, extra = {}) {
         const source = extra.source ?? "finance_console";
+        const type = order.reviews.find(review => review.reviewId === reviewId)?.type;
+        const close = outcome === "CLOSE" && !Object.hasOwn(extra, "reasonCode")
+            ? closeFields(order, reviewId, type === "DISPUTE" ? "DISPUTE_RESOLVED_BY_PROVIDER" : "DUPLICATE_ORDER") : {};
         const record = {
             orderId: order.id, reviewId, outcome, authorizationRef: `synthetic-decision-${++counter}`,
-            source, actorId: staff(source, "decider"), ...extra
+            source, actorId: staff(source, "decider"), ...close, ...extra
         };
         return { ...record, signature: signReview(record) };
     }
@@ -200,13 +258,26 @@ function setup(overrides = {}) {
         return send(order, "confirm_delivery_date", role, { confirmation: record }, options);
     }
     const setNow = value => { now = value; };
+    // Görev 150 (F-02): a paid order of the same core that a DUPLICATE_ORDER evidence names as the other order.
+    let twinId = null;
+    const setTwin = id => { twinId = id; };
+    const twin = () => twinId;
     return {
         core, actor, send, payment, booking, restoration, restorationDecision, proposeRestoration, decideRestoration,
-        restore, reviewRecord, resolution, openReview, resolveReview, proposal, confirmation, propose, confirm, setNow
+        restore, reviewRecord, evidence, closeFields, resolution, openReview, resolveReview, proposal, confirmation, propose, confirm, setNow,
+        setTwin, twin
     };
 }
 
+async function paidOrder(h, packageId = "START", tag = "twin") {
+    let order = h.core.createOrder(packageId);
+    order = await h.send(order, "submit", "customer", {}, { requestId: `synthetic-${tag}-submit-${order.id}` });
+    return h.send(order, "verify_payment", "finance", { proof: h.payment(order) },
+        { requestId: `synthetic-${tag}-paid-${order.id}` });
+}
+
 async function booked(packageId = "START", h = setup()) {
+    h.setTwin((await paidOrder(h, packageId)).id); // the paid twin a DUPLICATE_ORDER close refers to
     let order = h.core.createOrder(packageId);
     order = await h.send(order, "submit", "customer");
     order = await h.send(order, "verify_payment", "finance", { proof: h.payment(order) });
@@ -1266,7 +1337,7 @@ test("RB/20: a restored right is never restored twice, also after a review resum
 
 test("RB/21: opening or resolving a review never moves the SLA start or the committed deadline", async () => {
     for (const outcome of ["CONTINUE", "REFUND", "CLOSE"]) {
-        const h = await pendingRevision();
+        const h = await producing("PLUS"); // Görev 148: no undelivered revision, so CLOSE is possible
         h.setNow("2026-10-29T09:00:00.000Z");
         const reviewed = await h.openReview(h.order, "REFUND");
         h.setNow("2026-11-05T09:00:00.000Z"); // a week later
@@ -1508,13 +1579,16 @@ test("DR/14: after a review, time-bound work is blocked until a new date is conf
 
 // ---- Görev 134 / Decision 134-B: pending revisions on a closed order ----
 
-test("PF/15,16,17,18: closing keeps pending revisions and rights, flags them for review and moves no money", async () => {
+test("PF/15,16,17,18: a REFUND keeps pending revisions and rights, flags them for review and moves no money", async () => {
     let paymentChecks = 0;
     const h = await pendingRevision("PLUS", setup({
         verifyPayment: (proof) => { paymentChecks += 1; return signatureMatches(proof.signature, sign(proof)); }
     }));
     const checksBefore = paymentChecks;
-    const closed = await h.resolveReview(await h.openReview(h.order, "REFUND"), "CLOSE");
+    const reviewed = await h.openReview(h.order, "REFUND");
+    // Görev 148 (D-3): a CLOSE no longer settles an undelivered revision; it waits for the financial case process.
+    await assert.rejects(h.resolveReview(reviewed, "CLOSE"), /FINANCIAL_CASE_REQUIRED/);
+    const closed = await h.resolveReview(reviewed, "REFUND");
     assert.equal(paymentChecks, checksBefore);
     assert.equal(closed.state, STATES.CLOSED);
     assert.deepEqual(closed.revisions, h.order.revisions);
@@ -1528,7 +1602,7 @@ test("PF/15,16,17,18: closing keeps pending revisions and rights, flags them for
         moneyMovement: "NONE", createdAt: FIXED_TIME
     }]);
     assert.ok(Object.isFrozen(closed.financialAssessments[0]));
-    // CONTINUE and a close without pending revisions create no assessment.
+    // CONTINUE and a closing without pending revisions create no assessment.
     const resumed = await pendingRevision();
     assert.deepEqual((await resumed.resolveReview(await resumed.openReview(resumed.order, "DISPUTE"), "CONTINUE"))
         .financialAssessments, []);
@@ -1543,7 +1617,9 @@ test("PF/19,20: restored or delivered revisions are not flagged; a closed order 
     order = await h.send(order, "request_revision", "customer"); // revision-0002
     order = await h.send(order, "revision_options", "creative", { options: ["synthetic-b1", "synthetic-b2"] });
     order = await h.send(order, "request_revision", "customer"); // revision-0003 stays pending
-    const closed = await h.resolveReview(await h.openReview(order, "CANCELLATION"), "CLOSE");
+    const reviewed = await h.openReview(order, "CANCELLATION");
+    await assert.rejects(h.resolveReview(reviewed, "CLOSE"), /FINANCIAL_CASE_REQUIRED/); // Görev 148: revision-0003
+    const closed = await h.resolveReview(reviewed, "REFUND");
     assert.deepEqual(closed.revisions.map(revision => revision.status), ["RESTORED", "DELIVERED", "ACCEPTED"]);
     assert.deepEqual(closed.financialAssessments.map(item => item.revisionId), ["revision-0003"]);
     assert.equal(closed.revisionsUsed, 2);
@@ -1576,11 +1652,11 @@ test("AP/1,2: finance and admin can each open all three review types; actor and 
     }
 });
 
-test("AP/3,4,5,6,17: finance decides every outcome; admin CONTINUE or CLOSE but never REFUND", async () => {
+test("AP/3,4,5,6,17: finance decides every outcome; admin CONTINUE, CLOSE where a close reason allows it, never REFUND", async () => {
     let accepted = 0;
     for (const [type] of REVIEW_TYPES) {
         for (const outcome of ["CONTINUE", "REFUND", "CLOSE"]) {
-            const h = await pendingRevision();
+            const h = await producing("PLUS"); // Görev 148: CLOSE needs an order without an undelivered revision
             const open = await h.openReview(h.order, type);
             const done = await h.resolveReview(open, outcome);
             const resolution = done.reviews[0].resolution;
@@ -1589,10 +1665,15 @@ test("AP/3,4,5,6,17: finance decides every outcome; admin CONTINUE or CLOSE but 
             accepted += 1;
         }
         for (const outcome of ["CONTINUE", "CLOSE"]) {
-            const h = await pendingRevision();
+            const h = await producing("PLUS");
             const open = await h.openReview(h.order, type);
             const record = h.resolution(open, open.reviews[0].reviewId, outcome,
-                { ...ADMIN, reasonCode: "SYNTHETIC_CASE_RESOLVED" });
+                outcome === "CONTINUE" ? { ...ADMIN, reasonCode: "SYNTHETIC_CASE_RESOLVED" } : ADMIN);
+            if (outcome === "CLOSE" && type !== "DISPUTE") {
+                // Görev 147: the policy allows the combination, but no live close reason is open to admin here.
+                await assert.rejects(h.resolveReview(open, outcome, record, "admin"), /CLOSE_REASON_ROLE_NOT_PERMITTED/);
+                continue;
+            }
             const done = await h.resolveReview(open, outcome, record, "admin");
             assert.deepEqual([done.reviews[0].resolution.role, done.reviews[0].resolution.policyReference],
                 ["admin", POLICY_REFERENCE]);
@@ -1604,7 +1685,7 @@ test("AP/3,4,5,6,17: finance decides every outcome; admin CONTINUE or CLOSE but 
             { ...ADMIN, reasonCode: "SYNTHETIC_CASE_RESOLVED" }), "admin"), /REVIEW_OUTCOME_NOT_PERMITTED/);
         assert.equal(open.state, REVIEW_TYPES.find(([t]) => t === type)[1]);
     }
-    assert.equal(accepted, 15);
+    assert.equal(accepted, 13); // 15 policy combinations less the two admin CLOSEs no close reason allows
 });
 
 test("AP/7,18: only the approved 15-combination policy applies; no injected policy can widen it", async () => {
@@ -1710,7 +1791,7 @@ test("FE/11,12: forged, mismatched or missing actor identities are rejected", as
         { session: "f".repeat(64) }), /UNAUTHORIZED/);
     await assert.rejects(h.resolveReview(reviewed, "CONTINUE", h.resolution(reviewed, id, "CONTINUE"), "finance",
         { actorId: "synthetic-finance-third" }), /INVALID_REVIEW/);
-    assert.equal(reviewed.reviews[0].status, "OPEN");
+    await assertCanonicalUnchanged(h, reviewed);
 });
 
 test("FE/13,14: authorization references are single-use and bound to their own order", async () => {
@@ -1731,29 +1812,44 @@ test("FE/13,14: authorization references are single-use and bound to their own o
     assert.equal(openB.state, STATES.REFUND_REVIEW);
 });
 
-test("FE/15,16: an admin CLOSE needs a verified reason code and is fully audited", async () => {
-    const h = await pendingRevision();
-    const reviewed = await h.openReview(h.order, "CANCELLATION");
+test("FE/15,16 (Görev 147, K-06): every CLOSE, by admin or finance, needs an approved reason and evidence, fully audited", async () => {
+    const h = await producing("PLUS");
+    const reviewed = await h.openReview(h.order, "DISPUTE");
     const id = reviewed.reviews[0].reviewId;
-    await assert.rejects(h.resolveReview(reviewed, "CLOSE", h.resolution(reviewed, id, "CLOSE", ADMIN), "admin"),
+    // No reason code: refused for admin and, unlike before Görev 147, for finance too.
+    await assert.rejects(h.resolveReview(reviewed, "CLOSE",
+        h.resolution(reviewed, id, "CLOSE", { ...ADMIN, reasonCode: undefined }), "admin"), /CLOSE_REASON_REQUIRED/);
+    await assert.rejects(h.resolveReview(reviewed, "CLOSE", h.resolution(reviewed, id, "CLOSE", { reasonCode: undefined })),
         /CLOSE_REASON_REQUIRED/);
     await assert.rejects(h.resolveReview(reviewed, "CLOSE",
         h.resolution(reviewed, id, "CLOSE", { ...ADMIN, reasonCode: "müşteri istedi" }), "admin"), /INVALID_REVIEW/);
+    // Evidence swapped after the decision was signed, even for genuine evidence of the same kind: refused.
+    const signed = h.resolution(reviewed, id, "CLOSE", ADMIN);
     await assert.rejects(h.resolveReview(reviewed, "CLOSE",
-        { ...h.resolution(reviewed, id, "CLOSE", ADMIN), reasonCode: "SYNTHETIC_ADDED_LATER" }, "admin"), /UNTRUSTED_REVIEW/);
-    const closed = await h.resolveReview(reviewed, "CLOSE",
-        h.resolution(reviewed, id, "CLOSE", { ...ADMIN, reasonCode: "SYNTHETIC_DUPLICATE_ORDER" }), "admin");
+        { ...signed, evidence: h.evidence(reviewed, id, "DISPUTE_RESOLVED_BY_PROVIDER") }, "admin"), /UNTRUSTED_REVIEW/);
+    const closed = await h.resolveReview(reviewed, "CLOSE", signed, "admin");
     const resolution = closed.reviews[0].resolution;
     assert.equal(closed.state, STATES.CLOSED);
-    assert.deepEqual([resolution.outcome, resolution.reasonCode, resolution.actorId, resolution.role,
-        resolution.policyReference, resolution.at, resolution.moneyMovement],
-    ["CLOSE", "SYNTHETIC_DUPLICATE_ORDER", "synthetic-admin-decider", "admin", POLICY_REFERENCE, FIXED_TIME, "NONE"]);
-    assert.equal(closed.events.at(-1).audit.reasonCode, "SYNTHETIC_DUPLICATE_ORDER");
-    assert.equal(closed.revisionsUsed, 1);
-    assert.equal(closed.financialAssessments.length, 1);
-    // Finance closes without a reason code, as before.
-    const f = await pendingRevision();
-    assert.equal((await f.resolveReview(await f.openReview(f.order, "DISPUTE"), "CLOSE")).state, STATES.CLOSED);
+    assert.deepEqual([resolution.outcome, resolution.reasonCode, resolution.closeReasonPolicy, resolution.actorId,
+        resolution.actorType, resolution.role, resolution.policyReference, resolution.at, resolution.moneyMovement],
+    ["CLOSE", "DISPUTE_RESOLVED_BY_PROVIDER", CLOSE_POLICY, "synthetic-admin-decider", "HUMAN", "admin",
+        POLICY_REFERENCE, FIXED_TIME, "NONE"]);
+    // Only the reference, kind, source, time, digest and stated money outcome are kept.
+    assert.deepEqual(resolution.evidence, {
+        evidenceId: signed.evidence.evidenceId, evidenceKind: "PROVIDER_DISPUTE_OUTCOME",
+        source: "payment_provider_reconciliation", createdAt: FIXED_TIME, digest: signed.evidence.digest,
+        financialObligation: "NONE", verifier: { kind: "SYNTHETIC", id: "synthetic-evidence-service" } // Görev 150
+    });
+    const { moneyMovement, ...eventAudit } = resolution;
+    assert.equal(moneyMovement, "NONE");
+    assert.deepEqual(closed.events.at(-1).audit, eventAudit);
+    // Rights are untouched and nothing is flagged or settled (undelivered revisions block a CLOSE: Görev 148).
+    assert.deepEqual([closed.revisionsUsed, closed.revisions, closed.financialAssessments], [0, [], []]);
+    // Finance closes with an approved code and evidence.
+    const f = await producing("PLUS");
+    const financeClosed = await f.resolveReview(await f.openReview(f.order, "CANCELLATION"), "CLOSE");
+    assert.deepEqual([financeClosed.state, financeClosed.reviews[0].resolution.reasonCode],
+        [STATES.CLOSED, "DUPLICATE_ORDER"]);
 });
 
 // ---- Görev 135: 48-hour answer window for delivery-date proposals ----
@@ -2063,11 +2159,11 @@ test("CHR/18,19,20,21: a backwards clock is refused before any state, right or r
     const r = await pendingRevision();
     r.setNow("2026-10-29T09:00:00.000Z");
     const reviewed = await r.openReview(r.order, "REFUND");
-    const decision = r.resolution(reviewed, reviewed.reviews[0].reviewId, "CLOSE");
+    const decision = r.resolution(reviewed, reviewed.reviews[0].reviewId, "REFUND"); // Görev 148: not CLOSE
     r.setNow("2026-10-29T08:00:00.000Z");
-    await assert.rejects(r.resolveReview(reviewed, "CLOSE", decision), /CLOCK_REGRESSION/);
+    await assert.rejects(r.resolveReview(reviewed, "REFUND", decision), /CLOCK_REGRESSION/);
     r.setNow("2026-10-29T09:00:00.000Z");
-    const closed = await r.resolveReview(reviewed, "CLOSE", decision);
+    const closed = await r.resolveReview(reviewed, "REFUND", decision);
     assert.deepEqual([closed.version, closed.financialAssessments.length], [reviewed.version + 1, 1]);
     // Customer confirmation: the proposal stays open and the confirmation reference unused.
     const h = await overdueAfterReview();
@@ -2299,7 +2395,8 @@ test("RS/19,20,28: reviews, closed orders and a backwards clock block restoratio
     await assert.rejects(h.decideRestoration(reviewed, "APPROVE", h.restorationDecision(reviewed, "APPROVE")),
         /REVIEW_IN_PROGRESS/);
     await assert.rejects(h.proposeRestoration(reviewed, "revision-0001"), /REVIEW_IN_PROGRESS/);
-    const closed = await h.resolveReview(reviewed, "CLOSE");
+    await assert.rejects(h.resolveReview(reviewed, "CLOSE"), /FINANCIAL_CASE_REQUIRED/); // Görev 148
+    const closed = await h.resolveReview(reviewed, "REFUND");
     await assert.rejects(h.decideRestoration(closed, "APPROVE", h.restorationDecision(closed, "APPROVE")),
         /INVALID_TRANSITION/);
     assert.deepEqual([closed.revisionsUsed, closed.restorations[0].status], [1, "PENDING_APPROVAL"]);
@@ -2374,4 +2471,1058 @@ test("SYS/24,25: SYSTEM only closes an elapsed proposal inside a person's transa
     await assert.rejects(r.resolveReview(reviewed, "CONTINUE", r.resolution(reviewed, reviewed.reviews[0].reviewId,
         "CONTINUE", { actorId: "system-decider" })), /RESERVED_ACTOR/);
     assert.equal(reviewed.state, STATES.REFUND_REVIEW);
+});
+
+// ---- Görev 147 (142B): versioned close reasons UNAI-CLOSE-REASONS-v1.0 and close evidence (K-05/06/07) ----
+
+async function inReview(type, h = setup()) {
+    const p = await producing("PLUS", {}, h); // no undelivered revision: Görev 148 is tested apart (D3/*)
+    const reviewed = await p.openReview(p.order, type);
+    return { ...p, reviewed, id: reviewed.reviews[0].reviewId };
+}
+
+function closeAs(h, order, code, { role = "finance", record = {}, evidence = {} } = {}) {
+    const reviewId = order.reviews.at(-1).reviewId;
+    const extra = { ...(role === "admin" ? ADMIN : {}), ...h.closeFields(order, reviewId, code, evidence), ...record };
+    return h.resolveReview(order, "CLOSE", h.resolution(order, reviewId, "CLOSE", extra), role);
+}
+
+test("CR/1: the closed list holds exactly the four approved codes with their types, roles and evidence", () => {
+    assert.equal(APPROVED_CLOSE_REASONS.status, "APPROVED");
+    assert.equal(APPROVED_CLOSE_REASONS.reference, CLOSE_POLICY);
+    const table = Object.fromEntries(Object.entries(APPROVED_CLOSE_REASONS.codes).map(([code, rule]) =>
+        [code, [rule.types, rule.roles, rule.evidenceKind, rule.evidenceSource, rule.obligations, rule.legalReview]]));
+    assert.deepEqual(table, {
+        DUPLICATE_ORDER: [["CANCELLATION", "REFUND"], ["finance"], "DUPLICATE_PAYMENT_RECONCILIATION",
+            "payment_provider_reconciliation", ["NONE", "RESOLVED"], "NOT_REQUIRED"],
+        CUSTOMER_WITHDREW_AFTER_SETTLEMENT: [["CANCELLATION", "REFUND", "DISPUTE"], ["finance", "admin"],
+            "CUSTOMER_CLOSURE_CONFIRMATION", "customer_confirmation_service", ["NONE"], "PENDING"],
+        DISPUTE_RESOLVED_BY_PROVIDER: [["DISPUTE"], ["finance", "admin"], "PROVIDER_DISPUTE_OUTCOME",
+            "payment_provider_reconciliation", ["NONE"], "NOT_REQUIRED"],
+        FRAUD_CONFIRMED: [["CANCELLATION", "REFUND", "DISPUTE"], ["finance"], "RISK_REVIEW_RECORD", "risk_review_console",
+            ["NONE"], "PENDING"]
+    });
+    assert.equal(APPROVED_CLOSE_REASONS.codes.FRAUD_CONFIRMED.finding, "CONFIRMED");
+    assert.ok(Object.isFrozen(APPROVED_CLOSE_REASONS.codes.DUPLICATE_ORDER.roles));
+    assert.throws(() => { APPROVED_CLOSE_REASONS.codes.DUPLICATE_ORDER.roles.push("admin"); }, TypeError);
+});
+
+test("CR/2,3: removed, unknown and look-alike codes and a wrong policy version are refused", async () => {
+    const h = await inReview("CANCELLATION");
+    for (const code of ["TERMS_VIOLATION", "CUSTOMER_UNREACHABLE", "SYNTHETIC_ANY_CODE", "FRAUD_SUSPECTED", "OTHER"]) {
+        await assert.rejects(closeAs(h, h.reviewed, "DUPLICATE_ORDER", { record: { reasonCode: code } }),
+            /CLOSE_REASON_UNKNOWN/, code);
+    }
+    for (const version of ["UNAI-CLOSE-REASONS-v0.9", "UNAI-CLOSE-REASONS-v1.1", undefined]) {
+        await assert.rejects(closeAs(h, h.reviewed, "DUPLICATE_ORDER", { record: { closeReasonPolicy: version } }),
+            /CLOSE_REASON_POLICY_MISMATCH/);
+    }
+    await assertCanonicalUnchanged(h, h.reviewed);
+});
+
+test("CR/4: a code is refused for a review type it does not cover", async () => {
+    const c = await inReview("CANCELLATION");
+    await assert.rejects(closeAs(c, c.reviewed, "DISPUTE_RESOLVED_BY_PROVIDER"), /CLOSE_REASON_NOT_FOR_TYPE/);
+    const r = await inReview("REFUND");
+    await assert.rejects(closeAs(r, r.reviewed, "DISPUTE_RESOLVED_BY_PROVIDER"), /CLOSE_REASON_NOT_FOR_TYPE/);
+    const d = await inReview("DISPUTE");
+    await assert.rejects(closeAs(d, d.reviewed, "DUPLICATE_ORDER"), /CLOSE_REASON_NOT_FOR_TYPE/);
+    for (const x of [c, r, d]) await assertCanonicalUnchanged(x, x.reviewed);
+});
+
+test("CR/5,6: finance-only codes are refused to admin, including FRAUD_CONFIRMED (K-07)", async () => {
+    for (const type of ["CANCELLATION", "REFUND"]) {
+        const h = await inReview(type);
+        await assert.rejects(closeAs(h, h.reviewed, "DUPLICATE_ORDER", { role: "admin" }), /CLOSE_REASON_ROLE_NOT_PERMITTED/);
+        await assertCanonicalUnchanged(h, h.reviewed);
+    }
+    for (const type of ["CANCELLATION", "REFUND", "DISPUTE"]) {
+        const h = await inReview(type);
+        await assert.rejects(closeAs(h, h.reviewed, "FRAUD_CONFIRMED", { role: "admin" }), /CLOSE_REASON_ROLE_NOT_PERMITTED/);
+        await assertCanonicalUnchanged(h, h.reviewed);
+    }
+    // Other roles never reach the close reasons at all.
+    const h = await inReview("DISPUTE");
+    for (const role of ["creative", "customer", "scheduler"]) {
+        await assert.rejects(closeAs(h, h.reviewed, "DISPUTE_RESOLVED_BY_PROVIDER", { role }), /UNAUTHORIZED/);
+    }
+    await assertCanonicalUnchanged(h, h.reviewed);
+});
+
+test("CR/9,10,11: missing, foreign, malformed or wrongly typed evidence is refused", async () => {
+    const shared = setup();
+    const a = await inReview("CANCELLATION", shared);
+    const b = await inReview("CANCELLATION", shared);
+    const cases = [
+        [{ record: { evidence: undefined } }, /EVIDENCE_REQUIRED/],
+        [{ record: { evidence: null } }, /EVIDENCE_REQUIRED/],
+        [{ evidence: { orderId: b.reviewed.id } }, /EVIDENCE_MISMATCH/], // another order's evidence
+        [{ evidence: { reviewId: "review-0002" } }, /EVIDENCE_MISMATCH/], // another review's evidence
+        [{ evidence: { digest: "not-a-digest" } }, /EVIDENCE_MISMATCH/],
+        [{ evidence: { createdAt: "2026-10-28T09:00:00" } }, /EVIDENCE_MISMATCH/], // zone-less time
+        [{ evidence: { financialObligation: "PAID" } }, /EVIDENCE_MISMATCH/],
+        [{ evidence: { linkedOrderId: undefined } }, /EVIDENCE_MISMATCH/],
+        [{ evidence: { linkedOrderId: a.reviewed.id } }, /EVIDENCE_MISMATCH/], // an order is no duplicate of itself
+        [{ evidence: { finding: "CONFIRMED" } }, /EVIDENCE_MISMATCH/],
+        [{ evidence: { content: "synthetic free text" } }, /EVIDENCE_MISMATCH/],
+        [{ evidence: { evidenceKind: "CUSTOMER_CLOSURE_CONFIRMATION" } }, /EVIDENCE_KIND_NOT_ALLOWED/],
+        [{ evidence: { source: "admin_console" } }, /EVIDENCE_KIND_NOT_ALLOWED/]
+    ];
+    for (const [options, error] of cases) {
+        await assert.rejects(closeAs(a, a.reviewed, "DUPLICATE_ORDER", options), error);
+    }
+    // Evidence of an earlier review of the same order: a resumed and reopened review has a new id.
+    const resumed = await a.resolveReview(a.reviewed, "CONTINUE");
+    const again = await a.openReview(resumed, "REFUND");
+    const stale = a.evidence(again, a.id, "DUPLICATE_ORDER");
+    await assert.rejects(closeAs(a, again, "DUPLICATE_ORDER", { record: { evidence: stale } }), /EVIDENCE_MISMATCH/);
+    await assertCanonicalUnchanged(a, again);
+});
+
+test("CR/12: authorizations and evidence references are single-use, across orders too", async () => {
+    const shared = setup();
+    const a = await inReview("REFUND", shared);
+    const b = await inReview("REFUND", shared);
+    const first = shared.resolution(a.reviewed, a.id, "CLOSE");
+    await shared.resolveReview(a.reviewed, "CLOSE", first);
+    await assert.rejects(shared.resolveReview(b.reviewed, "CLOSE", shared.resolution(b.reviewed, b.id, "CLOSE",
+        { authorizationRef: first.authorizationRef })), /REVIEW_REFERENCE_USED/);
+    // The same evidence id, re-bound to the other order by the evidence service, is still used up.
+    await assert.rejects(closeAs(shared, b.reviewed, "DUPLICATE_ORDER",
+        { evidence: { evidenceId: first.evidence.evidenceId } }), /EVIDENCE_REFERENCE_USED/);
+    assert.equal((await closeAs(shared, b.reviewed, "DUPLICATE_ORDER")).state, STATES.CLOSED);
+});
+
+test("CR/13: the person who opened the review cannot close it, whatever role or code they use", async () => {
+    const h = await inReview("DISPUTE");
+    await assert.rejects(closeAs(h, h.reviewed, "DISPUTE_RESOLVED_BY_PROVIDER",
+        { record: { actorId: "synthetic-finance-opener" } }), /FOUR_EYES_VIOLATION/);
+    await assert.rejects(h.resolveReview(h.reviewed, "CLOSE", h.resolution(h.reviewed, h.id, "CLOSE",
+        { ...ADMIN, actorId: "synthetic-finance-opener" }), "admin",
+    { session: session("synthetic-finance-opener", "admin") }), /FOUR_EYES_VIOLATION/);
+    await assertCanonicalUnchanged(h, h.reviewed);
+});
+
+test("CR/14: a suspicion of fraud never closes; confirmed fraud and customer withdrawal await legal review", async () => {
+    for (const type of ["CANCELLATION", "REFUND", "DISPUTE"]) {
+        const h = await inReview(type);
+        await assert.rejects(closeAs(h, h.reviewed, "FRAUD_CONFIRMED", { evidence: { finding: "SUSPECTED" } }),
+            /CLOSE_FINDING_NOT_CONFIRMED/);
+        await assert.rejects(closeAs(h, h.reviewed, "FRAUD_CONFIRMED", { evidence: { finding: undefined } }),
+            /EVIDENCE_MISMATCH/);
+        // Even a confirmed, genuine finding is not usable live until legal review clears the code.
+        await assert.rejects(closeAs(h, h.reviewed, "FRAUD_CONFIRMED"), /CLOSE_REASON_PENDING_LEGAL_REVIEW/);
+        for (const role of ["finance", "admin"]) {
+            await assert.rejects(closeAs(h, h.reviewed, "CUSTOMER_WITHDREW_AFTER_SETTLEMENT", { role }),
+                /CLOSE_REASON_PENDING_LEGAL_REVIEW/);
+        }
+        await assertCanonicalUnchanged(h, h.reviewed);
+    }
+});
+
+test("CR/15: unverified evidence is refused; without an evidence service every CLOSE is blocked", async () => {
+    const h = await inReview("DISPUTE");
+    const forged = h.closeFields(h.reviewed, h.id, "DISPUTE_RESOLVED_BY_PROVIDER");
+    forged.evidence = { ...forged.evidence, signature: "0".repeat(64) };
+    await assert.rejects(h.resolveReview(h.reviewed, "CLOSE", h.resolution(h.reviewed, h.id, "CLOSE", forged)),
+        /UNTRUSTED_EVIDENCE/);
+    const altered = h.closeFields(h.reviewed, h.id, "DISPUTE_RESOLVED_BY_PROVIDER");
+    altered.evidence = { ...altered.evidence, digest: "a".repeat(64) }; // content changed after it was vouched for
+    await assert.rejects(h.resolveReview(h.reviewed, "CLOSE", h.resolution(h.reviewed, h.id, "CLOSE", altered)),
+        /UNTRUSTED_EVIDENCE/);
+    for (const verifyEvidence of [undefined, null, "true"]) {
+        const b = await inReview("DISPUTE", setup({ verifyEvidence }));
+        await assert.rejects(closeAs(b, b.reviewed, "DISPUTE_RESOLVED_BY_PROVIDER"), /CLOSE_EVIDENCE_UNVERIFIABLE/);
+        // CONTINUE and REFUND need no close evidence and are unaffected.
+        assert.equal((await b.resolveReview(b.reviewed, "CONTINUE")).state, STATES.IN_PRODUCTION);
+    }
+    // A service that answers anything but true is a refusal.
+    const loose = await inReview("DISPUTE", setup({ verifyEvidence: () => "yes" }));
+    await assert.rejects(closeAs(loose, loose.reviewed, "DISPUTE_RESOLVED_BY_PROVIDER"), /UNTRUSTED_EVIDENCE/);
+});
+
+test("CR/16: a CLOSE that leaves money owed to or returned to the customer waits for the financial case process", async () => {
+    const c = await inReview("CANCELLATION");
+    await assert.rejects(closeAs(c, c.reviewed, "DUPLICATE_ORDER", { evidence: { financialObligation: "OPEN" } }),
+        /FINANCIAL_CASE_REQUIRED/);
+    const d = await inReview("DISPUTE");
+    for (const financialObligation of ["OPEN", "RESOLVED"]) {
+        for (const role of ["finance", "admin"]) {
+            await assert.rejects(closeAs(d, d.reviewed, "DISPUTE_RESOLVED_BY_PROVIDER",
+                { role, evidence: { financialObligation } }), /FINANCIAL_CASE_REQUIRED/);
+        }
+        await assert.rejects(closeAs(d, d.reviewed, "CUSTOMER_WITHDREW_AFTER_SETTLEMENT",
+            { evidence: { financialObligation } }), /FINANCIAL_CASE_REQUIRED/);
+    }
+    // A reconciled duplicate payment, or a duplicate without a second payment, may close; no money moves here.
+    for (const financialObligation of ["RESOLVED", "NONE"]) {
+        const h = await inReview("REFUND");
+        const closed = await closeAs(h, h.reviewed, "DUPLICATE_ORDER", { evidence: { financialObligation } });
+        assert.deepEqual([closed.state, closed.reviews[0].resolution.evidence.financialObligation,
+            closed.reviews[0].resolution.moneyMovement, closed.paymentReference],
+        [STATES.CLOSED, financialObligation, "NONE", h.order.paymentReference]);
+        assert.equal(closed.reviews[0].resolution.evidence.linkedOrderId, h.twin());
+    }
+    for (const x of [c, d]) await assertCanonicalUnchanged(x, x.reviewed);
+    // An undelivered revision right blocks a CLOSE as well: Görev 148, D3/*.
+});
+
+test("CR/17: a retried CLOSE is idempotent and consumes its references once", async () => {
+    const h = await inReview("REFUND");
+    const record = h.resolution(h.reviewed, h.id, "CLOSE");
+    const options = { requestId: "synthetic-close-retry", actorId: record.actorId };
+    const closed = await h.send(h.reviewed, "resolve_review", "finance", { resolution: record }, options);
+    const retried = await h.send(h.reviewed, "resolve_review", "finance", { resolution: record }, options);
+    assert.strictEqual(retried, closed);
+    assert.equal(closed.events.filter(event => event.kind === "resolve_review").length, 1);
+    // The same request id with different evidence is a conflict, not a second close.
+    const other = { ...record, ...h.closeFields(h.reviewed, h.id, "DUPLICATE_ORDER") };
+    await assert.rejects(h.send(closed, "resolve_review", "finance",
+        { resolution: { ...other, signature: signReview(other) } }, options), /IDEMPOTENCY_CONFLICT/);
+});
+
+test("CR/18: refused CLOSE attempts change nothing and consume no authorization or evidence", async () => {
+    const h = await inReview("CANCELLATION");
+    const good = h.closeFields(h.reviewed, h.id, "DUPLICATE_ORDER");
+    const authorizationRef = "synthetic-close-kept-authorization";
+    const attempts = [
+        [{ ...good, reasonCode: "TERMS_VIOLATION" }, /CLOSE_REASON_UNKNOWN/],
+        [{ ...good, evidence: { ...good.evidence, financialObligation: "OPEN" } }, /FINANCIAL_CASE_REQUIRED/],
+        [{ ...good, evidence: { ...good.evidence, signature: "0".repeat(64) } }, /UNTRUSTED_EVIDENCE/],
+        [{ ...good, actorId: "synthetic-finance-opener" }, /FOUR_EYES_VIOLATION/]
+    ];
+    for (const [extra, error] of attempts) {
+        await assert.rejects(h.resolveReview(h.reviewed, "CLOSE",
+            h.resolution(h.reviewed, h.id, "CLOSE", { ...extra, authorizationRef })), error);
+    }
+    // Evidence from before the order existed, or from the future, is refused before anything is consumed.
+    for (const createdAt of ["2026-10-27T09:00:00Z", "2026-10-28T09:00:01Z"]) {
+        await assert.rejects(h.resolveReview(h.reviewed, "CLOSE", h.resolution(h.reviewed, h.id, "CLOSE",
+            { ...h.closeFields(h.reviewed, h.id, "DUPLICATE_ORDER", { createdAt, evidenceId: good.evidence.evidenceId }),
+                authorizationRef })), /EVIDENCE_TIME_INVALID/);
+    }
+    // Evidence passed into a CONTINUE or REFUND is refused, not silently ignored.
+    await assert.rejects(h.resolveReview(h.reviewed, "REFUND", h.resolution(h.reviewed, h.id, "REFUND",
+        { ...good, reasonCode: undefined, authorizationRef })), /INVALID_REVIEW/);
+    // The same authorization and evidence still work once, at the same version, on the same event history.
+    const closed = await h.resolveReview(h.reviewed, "CLOSE",
+        h.resolution(h.reviewed, h.id, "CLOSE", { ...good, authorizationRef }));
+    assert.deepEqual([closed.version, closed.reviews[0].resolution.evidence.evidenceId, closed.revisionsUsed,
+        closed.financialAssessments], [h.reviewed.version + 1, good.evidence.evidenceId, 0, []]);
+    assert.deepEqual(closed.events.slice(0, -1), h.reviewed.events);
+});
+
+test("CR/19: evidence from before the review is admitted for external records; times are normalized and checked", async () => {
+    const h = setup();
+    const p = await producing("PLUS", {}, h);
+    h.setNow("2026-10-29T09:00:00.000Z");
+    const reviewed = await p.openReview(p.order, "DISPUTE");
+    // A provider outcome recorded before the review opened, but after the order existed, is admitted.
+    const closed = await closeAs(p, reviewed, "DISPUTE_RESOLVED_BY_PROVIDER",
+        { evidence: { createdAt: "2026-10-28T12:00:00+03:00" } });
+    assert.equal(closed.reviews[0].resolution.evidence.createdAt, FIXED_TIME); // normalized to UTC
+    // A backwards clock is reported as such, before the evidence time is judged.
+    const r = await inReview("REFUND");
+    const decision = r.resolution(r.reviewed, r.id, "CLOSE");
+    r.setNow("2026-10-28T08:00:00.000Z");
+    await assert.rejects(r.resolveReview(r.reviewed, "CLOSE", decision), /CLOCK_REGRESSION/);
+});
+
+// ---- Görev 148 (D-3): no CLOSE while an undelivered revision right awaits a financial assessment ----
+
+const CLOSE_CODE = { CANCELLATION: "DUPLICATE_ORDER", REFUND: "DUPLICATE_ORDER", DISPUTE: "DISPUTE_RESOLVED_BY_PROVIDER" };
+
+test("D3/1,2: finance and admin CLOSE are refused while an accepted revision is undelivered", async () => {
+    for (const [type, state] of REVIEW_TYPES) {
+        const h = await pendingRevision("PLUS");
+        const reviewed = await h.openReview(h.order, type);
+        await assert.rejects(closeAs(h, reviewed, CLOSE_CODE[type]), /FINANCIAL_CASE_REQUIRED/);
+        // Admin is refused for the pending revision before any close-reason rule is even looked at.
+        for (const code of Object.keys(APPROVED_CLOSE_REASONS.codes)) {
+            await assert.rejects(closeAs(h, reviewed, code, { role: "admin" }), /FINANCIAL_CASE_REQUIRED/);
+        }
+        const resumed = await assertCanonicalUnchanged(h, reviewed);
+        assert.deepEqual([resumed.events.at(-1).from, resumed.state], [state, STATES.REVISION_PENDING]);
+    }
+});
+
+test("D3/3: any undelivered revision blocks, also beside settled ones and with a restoration pending", async () => {
+    const h = await pendingRevision("PLUS");
+    let order = await h.restore(h.order, "revision-0001"); // RESTORED
+    order = await h.send(order, "request_revision", "customer"); // revision-0002
+    order = await h.send(order, "revision_options", "creative", { options: ["synthetic-b1", "synthetic-b2"] }); // DELIVERED
+    order = await h.send(order, "request_revision", "customer"); // revision-0003 ACCEPTED
+    const reviewed = await h.openReview(order, "CANCELLATION");
+    assert.deepEqual(reviewed.revisions.map(revision => revision.status), ["RESTORED", "DELIVERED", "ACCEPTED"]);
+    await assert.rejects(closeAs(h, reviewed, "DUPLICATE_ORDER"), /FINANCIAL_CASE_REQUIRED/);
+    // A REFUND flags exactly the undelivered one, as before.
+    const refunded = await h.resolveReview(reviewed, "REFUND");
+    assert.deepEqual(refunded.financialAssessments.map(item => item.revisionId), ["revision-0003"]);
+    // A restoration that is only proposed settles nothing: the revision is still accepted and undelivered.
+    const p = await proposedRestoration();
+    const disputed = await p.openReview(p.order, "DISPUTE");
+    assert.equal(disputed.restorations[0].status, "PENDING_APPROVAL");
+    await assert.rejects(closeAs(p, disputed, "DISPUTE_RESOLVED_BY_PROVIDER"), /FINANCIAL_CASE_REQUIRED/);
+});
+
+test("D3/4,5: settled revisions and orders without revisions can still be closed", async () => {
+    // Restored and delivered revisions need no financial assessment.
+    const h = await pendingRevision("PLUS");
+    let order = await h.restore(h.order, "revision-0001");
+    order = await h.send(order, "request_revision", "customer");
+    order = await h.send(order, "revision_options", "creative", { options: ["synthetic-b1", "synthetic-b2"] });
+    const reviewed = await h.openReview(order, "CANCELLATION");
+    const closed = await closeAs(h, reviewed, "DUPLICATE_ORDER");
+    assert.deepEqual([closed.state, closed.revisions.map(revision => revision.status), closed.financialAssessments,
+        closed.revisionsUsed], [STATES.CLOSED, ["RESTORED", "DELIVERED"], [], 1]);
+    // A normal order in production, and a completed order, close as in Görev 147.
+    for (const type of ["CANCELLATION", "DISPUTE"]) {
+        const n = await producing("PLUS");
+        assert.equal((await closeAs(n, await n.openReview(n.order, type), CLOSE_CODE[type])).state, STATES.CLOSED);
+    }
+    const c = await producing("PLUS");
+    let done = await c.send(c.order, "select_final", "customer", { selectedOption: "synthetic-a1" });
+    done = await c.send(done, "complete", "creative", { mp3Ref: "synthetic-mp3-final", wavFeasible: false });
+    const completed = await closeAs(c, await c.openReview(done, "DISPUTE"), "DISPUTE_RESOLVED_BY_PROVIDER");
+    assert.deepEqual([completed.state, completed.delivery.mp3Ref], [STATES.CLOSED, "synthetic-mp3-final"]);
+});
+
+test("D3/6,7,8,9,10: a refused CLOSE keeps the review open and consumes no right, authorization or evidence", async () => {
+    const shared = setup();
+    const h = await pendingRevision("PLUS", shared);
+    const reviewed = await h.openReview(h.order, "REFUND");
+    const id = reviewed.reviews[0].reviewId;
+    const record = h.resolution(reviewed, id, "CLOSE");
+    await assert.rejects(h.resolveReview(reviewed, "CLOSE", record), /FINANCIAL_CASE_REQUIRED/);
+    // The canonical order did not move: a decision from the same snapshot is accepted at the same version, the review
+    // was still open, the right untouched, and the only assessment is the REFUND's own. The refused CLOSE's
+    // authorization is still unused.
+    const refunded = await h.resolveReview(reviewed, "REFUND",
+        h.resolution(reviewed, id, "REFUND", { authorizationRef: record.authorizationRef }));
+    assert.deepEqual([refunded.version, refunded.state, refunded.reviews[0].resolution.authorizationRef,
+        refunded.revisionsUsed, refunded.revisions[0].status, refunded.events.length],
+    [reviewed.version + 1, STATES.CLOSED, record.authorizationRef, 1, "ACCEPTED", reviewed.events.length + 1]);
+    assert.deepEqual(refunded.financialAssessments.map(item => [item.reviewId, item.revisionId]),
+        [[id, "revision-0001"]]);
+    // The evidence of the refused CLOSE is still unused: the evidence service may bind it to another order.
+    const other = await producing("PLUS", {}, shared);
+    const open = await other.openReview(other.order, "REFUND");
+    const closed = await closeAs(other, open, "DUPLICATE_ORDER", { evidence: { evidenceId: record.evidence.evidenceId } });
+    assert.equal(closed.reviews[0].resolution.evidence.evidenceId, record.evidence.evidenceId);
+});
+
+test("D3/11: a repeated refused request gets the same answer and still changes nothing", async () => {
+    const h = await pendingRevision("PLUS");
+    const reviewed = await h.openReview(h.order, "DISPUTE");
+    const record = h.resolution(reviewed, reviewed.reviews[0].reviewId, "CLOSE");
+    const options = { requestId: "synthetic-refused-close", actorId: record.actorId };
+    for (let attempt = 0; attempt < 3; attempt++) {
+        await assert.rejects(h.send(reviewed, "resolve_review", "finance", { resolution: record }, options),
+            /FINANCIAL_CASE_REQUIRED/);
+    }
+    // The refused request id was never recorded: it is free for a permitted decision.
+    const resumed = await h.send(reviewed, "resolve_review", "finance",
+        { resolution: h.resolution(reviewed, reviewed.reviews[0].reviewId, "CONTINUE") }, options);
+    assert.deepEqual([resumed.state, resumed.events.at(-1).requestId], [STATES.REVISION_PENDING, options.requestId]);
+});
+
+test("D3/12: only the order's own server-side revisions count, never another order or a client snapshot", async () => {
+    const shared = setup();
+    const pending = await pendingRevision("PLUS", shared);
+    const clean = await producing("PLUS", {}, shared);
+    const pendingReview = await pending.openReview(pending.order, "DISPUTE");
+    const cleanReview = await clean.openReview(clean.order, "DISPUTE");
+    // A snapshot that hides the undelivered revision does not lift the block.
+    await assert.rejects(closeAs(pending, { ...pendingReview, revisions: [], revisionsUsed: 0 },
+        "DISPUTE_RESOLVED_BY_PROVIDER"), /FINANCIAL_CASE_REQUIRED/);
+    // Another order's pending revision, also shown in a forged snapshot, does not block this order.
+    const closed = await closeAs(clean, { ...cleanReview, revisions: pendingReview.revisions },
+        "DISPUTE_RESOLVED_BY_PROVIDER");
+    assert.deepEqual([closed.state, closed.revisions, closed.financialAssessments], [STATES.CLOSED, [], []]);
+    await assert.rejects(closeAs(pending, pendingReview, "DISPUTE_RESOLVED_BY_PROVIDER"), /FINANCIAL_CASE_REQUIRED/);
+});
+
+test("D3/13: CONTINUE and REFUND on an order with an undelivered revision work as before", async () => {
+    for (const [type] of REVIEW_TYPES) {
+        const c = await pendingRevision("PLUS");
+        const resumed = await c.resolveReview(await c.openReview(c.order, type), "CONTINUE");
+        assert.deepEqual([resumed.state, resumed.revisionsUsed, resumed.financialAssessments],
+            [STATES.REVISION_PENDING, 1, []]);
+        const r = await pendingRevision("PLUS");
+        const refunded = await r.resolveReview(await r.openReview(r.order, type), "REFUND");
+        assert.deepEqual([refunded.state, refunded.revisionsUsed, refunded.revisions[0].status,
+            refunded.reviews[0].resolution.moneyMovement, refunded.financialAssessments[0].status],
+        [STATES.CLOSED, 1, "ACCEPTED", "NONE", "PENDING_FINANCIAL_REVIEW"]);
+    }
+});
+
+// ---- Görev 150: F-01 evidence attestation, F-02 linked order, F-03 decision binding, F-04/F-05 test gaps ----
+
+/** F-05: proof from the canonical order, never from the frozen input snapshot. A decision at the snapshot's version
+ * is accepted only if nothing was committed since, and its result is built from the canonical record: the review was
+ * still open in the snapshot's state, with the same events, rights, restorations and assessments. */
+async function assertCanonicalUnchanged(h, snapshot) {
+    const review = snapshot.reviews.at(-1);
+    const resumed = await h.resolveReview(snapshot, "CONTINUE", h.resolution(snapshot, review.reviewId, "CONTINUE"));
+    assert.equal(resumed.version, snapshot.version + 1);
+    assert.equal(resumed.events.at(-1).from, snapshot.state);
+    assert.deepEqual(resumed.events.slice(0, -1), snapshot.events);
+    assert.deepEqual([resumed.reviews.at(-1).opening, resumed.revisions, resumed.revisionsUsed, resumed.restorations,
+        resumed.financialAssessments, resumed.paymentReference],
+    [review.opening, snapshot.revisions, snapshot.revisionsUsed, snapshot.restorations, snapshot.financialAssessments,
+        snapshot.paymentReference]);
+    return resumed;
+}
+
+// A synthetic stand-in that reports itself as a production service, to exercise a core without the test flag.
+function productionShaped(evidence, request) {
+    const attestation = syntheticAttestation(evidence, request);
+    return attestation && { ...attestation, verifier: { kind: "PRODUCTION", id: "synthetic-production-shaped" } };
+}
+
+test("LO/1: a DUPLICATE_ORDER naming an order the core does not know is refused (Görev 149 PROBE-4)", async () => {
+    const h = await inReview("REFUND");
+    const record = h.resolution(h.reviewed, h.id, "CLOSE", h.closeFields(h.reviewed, h.id, "DUPLICATE_ORDER",
+        { linkedOrderId: "ffffffff-ffff-4fff-8fff-ffffffffffff" }));
+    await assert.rejects(h.resolveReview(h.reviewed, "CLOSE", record), /LINKED_ORDER_NOT_FOUND/);
+    await assertCanonicalUnchanged(h, h.reviewed);
+});
+
+test("LO/2,3: self links, unpaid orders and an order already closed as the duplicate are refused", async () => {
+    const h = await inReview("CANCELLATION");
+    await assert.rejects(closeAs(h, h.reviewed, "DUPLICATE_ORDER", { evidence: { linkedOrderId: h.reviewed.id } }),
+        /EVIDENCE_MISMATCH/);
+    const unpaid = await h.send(h.core.createOrder("START"), "submit", "customer");
+    await assert.rejects(closeAs(h, h.reviewed, "DUPLICATE_ORDER", { evidence: { linkedOrderId: unpaid.id } }),
+        /LINKED_ORDER_INVALID/);
+    // Two orders cannot close each other: once A is closed as the duplicate of B, B cannot be closed as A's.
+    // (Görev 152: B must be a standing order when A closes, so B opens its own review only afterwards.)
+    const shared = setup();
+    const a = await inReview("REFUND", shared);
+    const b = await producing("PLUS", {}, shared);
+    await closeAs(shared, a.reviewed, "DUPLICATE_ORDER", { evidence: { linkedOrderId: b.order.id } });
+    const bReviewed = await shared.openReview(b.order, "REFUND");
+    await assert.rejects(closeAs(shared, bReviewed, "DUPLICATE_ORDER", { evidence: { linkedOrderId: a.reviewed.id } }),
+        /LINKED_ORDER_INVALID/);
+    await assertCanonicalUnchanged(h, h.reviewed);
+    await assertCanonicalUnchanged(shared, bReviewed);
+});
+
+test("LO/3: the evidence service must name the same linked order as the decision", async () => {
+    const other = { id: null };
+    const h = await inReview("REFUND", setup({
+        verifyEvidence: (evidence, request) => ({ ...syntheticAttestation(evidence, request), linkedOrderId: other.id })
+    }));
+    other.id = (await paidOrder(h, "START", "other")).id; // genuine and paid, but not the order in the decision
+    await assert.rejects(closeAs(h, h.reviewed, "DUPLICATE_ORDER"), /UNTRUSTED_EVIDENCE/);
+    await assertCanonicalUnchanged(h, h.reviewed);
+});
+
+test("EV/4,5: a missing service, a bare true or an incomplete attestation is refused", async () => {
+    for (const verifyEvidence of [undefined, () => true, () => ({ status: "VERIFIED" }), () => null]) {
+        const h = await inReview("DISPUTE", setup({ verifyEvidence }));
+        await assert.rejects(closeAs(h, h.reviewed, "DISPUTE_RESOLVED_BY_PROVIDER"),
+            verifyEvidence === undefined ? /CLOSE_EVIDENCE_UNVERIFIABLE/ : /UNTRUSTED_EVIDENCE/);
+        await assertCanonicalUnchanged(h, h.reviewed);
+    }
+    // Every attested field is required, and so are the status and the verifier.
+    const omitted = ["evidenceId", "evidenceKind", "source", "orderId", "reviewId", "createdAt", "digest",
+        "financialObligation", "linkedOrderId", "finding", "closeReasonPolicy", "reasonCode", "decision",
+        "decisionBinding", "status", "verifier"];
+    for (const field of omitted) {
+        const h = await inReview("DISPUTE", setup({
+            verifyEvidence: (evidence, request) => {
+                const attestation = { ...syntheticAttestation(evidence, request) };
+                delete attestation[field];
+                return attestation;
+            }
+        }));
+        await assert.rejects(closeAs(h, h.reviewed, "DISPUTE_RESOLVED_BY_PROVIDER"), /UNTRUSTED_EVIDENCE/, field);
+    }
+    for (const verifier of [{ kind: "TEST" }, { kind: "TEST", id: "synthetic-unknown-kind" }, { kind: "PRODUCTION" },
+        { kind: "PRODUCTION", id: "x" }, "PRODUCTION"]) {
+        const h = await inReview("DISPUTE", setup({
+            verifyEvidence: (evidence, request) => ({ ...syntheticAttestation(evidence, request), verifier })
+        }));
+        await assert.rejects(closeAs(h, h.reviewed, "DISPUTE_RESOLVED_BY_PROVIDER"), /UNTRUSTED_EVIDENCE/);
+    }
+});
+
+test("EV/6,7,8,9: an attestation for another order, review, kind, time, outcome or finding is refused", async () => {
+    const shared = setup();
+    const other = await inReview("DISPUTE", shared);
+    const wrong = {
+        orderId: other.reviewed.id, reviewId: "review-0002", evidenceKind: "PROVIDER_DISPUTE_OUTCOME_V2",
+        source: "risk_review_console", createdAt: "2026-10-28T08:00:00.000Z", digest: "c".repeat(64),
+        financialObligation: "RESOLVED", finding: "CONFIRMED", linkedOrderId: other.reviewed.id,
+        closeReasonPolicy: "UNAI-CLOSE-REASONS-v1.1", reasonCode: "FRAUD_CONFIRMED", decision: "CONTINUE",
+        decisionBinding: "[]", evidenceId: "synthetic-some-other-evidence", status: "PENDING"
+    };
+    for (const [field, value] of Object.entries(wrong)) {
+        const h = await inReview("DISPUTE", setup({
+            verifyEvidence: (evidence, request) => ({ ...syntheticAttestation(evidence, request), [field]: value })
+        }));
+        await assert.rejects(closeAs(h, h.reviewed, "DISPUTE_RESOLVED_BY_PROVIDER"), /UNTRUSTED_EVIDENCE/, field);
+        if (field === "finding") await assertCanonicalUnchanged(h, h.reviewed);
+    }
+    // The fraud path itself stays behind the legal gate: a suspicion never reaches the evidence service at all.
+    let calls = 0;
+    const f = await inReview("REFUND", setup({ verifyEvidence: (e, r) => { calls += 1; return syntheticAttestation(e, r); } }));
+    await assert.rejects(closeAs(f, f.reviewed, "FRAUD_CONFIRMED", { evidence: { finding: "SUSPECTED" } }),
+        /CLOSE_FINDING_NOT_CONFIRMED/);
+    await assert.rejects(closeAs(f, f.reviewed, "FRAUD_CONFIRMED"), /CLOSE_REASON_PENDING_LEGAL_REVIEW/);
+    assert.equal(calls, 0);
+});
+
+test("EV/16: a production verifier closes on a core without the test flag; a synthetic one never does", async () => {
+    const prod = await inReview("DISPUTE", setup({ allowSyntheticEvidence: false, verifyEvidence: productionShaped }));
+    const closed = await closeAs(prod, prod.reviewed, "DISPUTE_RESOLVED_BY_PROVIDER");
+    assert.deepEqual([closed.state, closed.reviews[0].resolution.evidence.verifier],
+        [STATES.CLOSED, { kind: "PRODUCTION", id: "synthetic-production-shaped" }]);
+    for (const allowSyntheticEvidence of [false, undefined, "true", 1]) {
+        const h = await inReview("DISPUTE", setup({ allowSyntheticEvidence }));
+        const record = h.resolution(h.reviewed, h.id, "CLOSE");
+        await assert.rejects(h.resolveReview(h.reviewed, "CLOSE", record), /SYNTHETIC_VERIFIER_NOT_ALLOWED/);
+        await assertCanonicalUnchanged(h, h.reviewed);
+    }
+    // A DUPLICATE_ORDER with a genuine paid twin closes with a production verifier as well.
+    const dup = await inReview("REFUND", setup({ allowSyntheticEvidence: false, verifyEvidence: productionShaped }));
+    const dupClosed = await closeAs(dup, dup.reviewed, "DUPLICATE_ORDER");
+    assert.deepEqual([dupClosed.state, dupClosed.reviews[0].resolution.evidence.linkedOrderId], [STATES.CLOSED, dup.twin()]);
+});
+
+test("SB/10,11: any signed decision field changed after signing is refused, the evidence still being genuine", async () => {
+    const shared = setup();
+    const h = await inReview("REFUND", shared);
+    const otherTwin = await paidOrder(shared, "START", "second-twin");
+    const signed = h.resolution(h.reviewed, h.id, "CLOSE");
+    const resign = evidence => ({ ...evidence, signature: signEvidence(evidence) });
+    const changes = {
+        evidenceId: resign({ ...signed.evidence, evidenceId: "synthetic-swapped-evidence" }),
+        createdAt: resign({ ...signed.evidence, createdAt: "2026-10-28T12:00:00+03:00" }),
+        digest: resign({ ...signed.evidence, digest: "d".repeat(64) }),
+        financialObligation: resign({ ...signed.evidence, financialObligation: "NONE" }),
+        linkedOrderId: resign({ ...signed.evidence, linkedOrderId: otherTwin.id })
+    };
+    for (const [field, evidence] of Object.entries(changes)) {
+        await assert.rejects(h.resolveReview(h.reviewed, "CLOSE", { ...signed, evidence }), /UNTRUSTED_REVIEW/, field);
+    }
+    await assert.rejects(h.resolveReview(h.reviewed, "CLOSE",
+        { ...signed, authorizationRef: "synthetic-swapped-authorization" }), /UNTRUSTED_REVIEW/);
+    // Unchanged, the same decision closes once: nothing above consumed its authorization or evidence.
+    const closed = await h.resolveReview(h.reviewed, "CLOSE", signed);
+    assert.deepEqual([closed.version, closed.reviews[0].resolution.authorizationRef,
+        closed.reviews[0].resolution.evidence.evidenceId, closed.reviews[0].resolution.evidence.linkedOrderId],
+    [h.reviewed.version + 1, signed.authorizationRef, signed.evidence.evidenceId, h.twin()]);
+});
+
+test("SB/10: the review adapter must confirm the exact binding; signature and evidence stay separate checks", async () => {
+    const adapters = [
+        () => true,
+        (record, order, context) => ({ verified: true, binding: context ? `${context.binding} ` : undefined }),
+        (record, order, context) => ({ verified: "true", binding: context?.binding }),
+        (record, order, context) => (context ? { binding: context.binding } : signatureMatches(record.signature,
+            signReview(record)))
+    ];
+    for (const verifyReview of adapters) {
+        const h = await inReview("DISPUTE", setup({
+            verifyReview: (record, order, context) => (context === undefined
+                ? signatureMatches(record.signature, signReview(record)) : verifyReview(record, order, context))
+        }));
+        await assert.rejects(closeAs(h, h.reviewed, "DISPUTE_RESOLVED_BY_PROVIDER"), /UNTRUSTED_REVIEW/);
+        await assertCanonicalUnchanged(h, h.reviewed);
+    }
+    assert.equal(closeDecisionBinding({ outcome: "CLOSE" }), closeDecisionBinding({ outcome: "CLOSE", extra: 1 }));
+    // A genuine signature does not vouch for the evidence, and genuine evidence does not vouch for the signature.
+    const h = await inReview("DISPUTE");
+    const forged = h.closeFields(h.reviewed, h.id, "DISPUTE_RESOLVED_BY_PROVIDER");
+    forged.evidence = { ...forged.evidence, signature: "0".repeat(64) };
+    await assert.rejects(h.resolveReview(h.reviewed, "CLOSE", h.resolution(h.reviewed, h.id, "CLOSE", forged)),
+        /UNTRUSTED_EVIDENCE/);
+    await assert.rejects(h.resolveReview(h.reviewed, "CLOSE",
+        { ...h.resolution(h.reviewed, h.id, "CLOSE"), signature: "0".repeat(64) }), /UNTRUSTED_REVIEW/);
+    await assertCanonicalUnchanged(h, h.reviewed);
+});
+
+test("CC/12,13,14,15: a linked order or the order itself changing during verification refuses the CLOSE safely", async () => {
+    // The twin changes while the evidence service is being asked.
+    let hook = null;
+    const shared = setup({
+        verifyEvidence: async (evidence, request) => {
+            if (hook) { const run = hook; hook = null; await run(); }
+            return syntheticAttestation(evidence, request);
+        }
+    });
+    const h = await inReview("REFUND", shared);
+    const twinBefore = await shared.send(await paidOrder(shared, "START", "racing-twin"), "request_email", "customer");
+    const record = h.resolution(h.reviewed, h.id, "CLOSE",
+        h.closeFields(h.reviewed, h.id, "DUPLICATE_ORDER", { linkedOrderId: twinBefore.id }));
+    hook = async () => { await shared.send(twinBefore, "verify_email", "customer",
+        { proof: { orderId: twinBefore.id, code: "SYNTHETIC-ONE-USE-CODE" } }); };
+    await assert.rejects(h.resolveReview(h.reviewed, "CLOSE", record), /LINKED_ORDER_CHANGED/);
+    // Nothing was consumed: the very same decision closes once the twin is stable.
+    const closed = await h.resolveReview(h.reviewed, "CLOSE", record);
+    assert.deepEqual([closed.version, closed.reviews[0].resolution.authorizationRef,
+        closed.reviews[0].resolution.evidence.evidenceId], [h.reviewed.version + 1, record.authorizationRef,
+        record.evidence.evidenceId]);
+    assert.deepEqual(closed.events.slice(0, -1), h.reviewed.events);
+    // The order itself is resolved by someone else while the evidence is checked: the CLOSE loses, consuming nothing.
+    const o = await inReview("DISPUTE", shared);
+    let resumed = null;
+    hook = async () => { resumed = await o.resolveReview(o.reviewed, "CONTINUE"); };
+    const close = o.resolution(o.reviewed, o.id, "CLOSE");
+    await assert.rejects(o.resolveReview(o.reviewed, "CLOSE", close), /VERSION_CONFLICT/);
+    const again = await o.openReview(resumed, "DISPUTE");
+    const reclosed = await closeAs(o, again, "DISPUTE_RESOLVED_BY_PROVIDER",
+        { evidence: { evidenceId: close.evidence.evidenceId } });
+    assert.equal(reclosed.state, STATES.CLOSED);
+    // Two CLOSEs racing with one evidence id: exactly one wins.
+    const p = await inReview("DISPUTE", shared);
+    const q = await inReview("DISPUTE", shared);
+    const evidenceId = "synthetic-racing-evidence";
+    const results = await Promise.allSettled([
+        closeAs(shared, p.reviewed, "DISPUTE_RESOLVED_BY_PROVIDER", { evidence: { evidenceId } }),
+        closeAs(shared, q.reviewed, "DISPUTE_RESOLVED_BY_PROVIDER", { evidence: { evidenceId } })]);
+    assert.deepEqual(results.map(r => r.status === "fulfilled" ? "CLOSED" : r.reason.code).sort(),
+        ["CLOSED", "EVIDENCE_REFERENCE_USED"]);
+});
+
+test("ST/F-04: evidence from before the review is stale for codes that need fresh records; the legal gate stays shut", async () => {
+    const h = setup();
+    const p = await producing("PLUS", {}, h);
+    h.setNow("2026-10-29T09:00:00.000Z");
+    const reviewed = await p.openReview(p.order, "REFUND");
+    for (const code of ["CUSTOMER_WITHDREW_AFTER_SETTLEMENT", "FRAUD_CONFIRMED"]) {
+        // Recorded the day before the review opened: refused as stale, whatever the legal state.
+        await assert.rejects(closeAs(p, reviewed, code, { evidence: { createdAt: FIXED_TIME } }), /EVIDENCE_STALE/);
+        // Recorded after the review opened: still stopped by the legal gate, which this task does not open.
+        await assert.rejects(closeAs(p, reviewed, code), /CLOSE_REASON_PENDING_LEGAL_REVIEW/);
+    }
+    // At the opening instant itself the evidence is fresh.
+    await assert.rejects(closeAs(p, reviewed, "FRAUD_CONFIRMED", { evidence: { createdAt: "2026-10-29T12:00:00+03:00" } }),
+        /CLOSE_REASON_PENDING_LEGAL_REVIEW/);
+    // External records may predate the review (D-1).
+    assert.equal((await closeAs(p, reviewed, "DUPLICATE_ORDER", { evidence: { createdAt: FIXED_TIME } })).state,
+        STATES.CLOSED);
+});
+
+// ---- Görev 152: F151-01 cancelled linked order, F151-02 decision immutability, F151-07 full binding coverage,
+// ---- F151-04 synthetic evidence only in a declared TEST environment ----
+
+test("LS/1: a cancelled, closed or reviewed order is no standing original, even though it was paid (F151-01)", async () => {
+    const shared = setup();
+    const h = await inReview("REFUND", shared);
+    // Paid, then cancelled before production: the payment reference survives, the order does not stand.
+    const cancelled = await shared.send(await paidOrder(shared, "START", "cancelled-twin"), "cancel", "finance");
+    assert.deepEqual([cancelled.state, cancelled.paymentReference !== null], [STATES.CANCELLED, true]);
+    const record = h.resolution(h.reviewed, h.id, "CLOSE",
+        h.closeFields(h.reviewed, h.id, "DUPLICATE_ORDER", { linkedOrderId: cancelled.id }));
+    await assert.rejects(h.resolveReview(h.reviewed, "CLOSE", record), /LINKED_ORDER_INVALID/);
+    // Closed by a review, under a review of its own, or never paid: refused as well.
+    const closedOther = await inReview("REFUND", shared);
+    const refunded = await shared.resolveReview(closedOther.reviewed, "REFUND");
+    const underReview = (await inReview("DISPUTE", shared)).reviewed;
+    const unpaid = await shared.send(shared.core.createOrder("START"), "submit", "customer");
+    for (const linked of [refunded, underReview, unpaid]) {
+        await assert.rejects(closeAs(shared, h.reviewed, "DUPLICATE_ORDER", { evidence: { linkedOrderId: linked.id } }),
+            /LINKED_ORDER_INVALID/, linked.state);
+    }
+    // Nothing was consumed: the same authorization, with evidence naming a standing order, closes once.
+    const standing = h.twin();
+    const valid = h.resolution(h.reviewed, h.id, "CLOSE", {
+        ...h.closeFields(h.reviewed, h.id, "DUPLICATE_ORDER", { evidenceId: record.evidence.evidenceId }),
+        authorizationRef: record.authorizationRef
+    });
+    const closed = await h.resolveReview(h.reviewed, "CLOSE", valid);
+    assert.deepEqual([closed.version, closed.reviews[0].resolution.evidence.linkedOrderId,
+        closed.reviews[0].resolution.authorizationRef], [h.reviewed.version + 1, standing, record.authorizationRef]);
+    assert.deepEqual(closed.events.slice(0, -1), h.reviewed.events);
+});
+
+test("LS/2: standing originals in production or completed are accepted; a cancellation mid-check is refused", async () => {
+    const shared = setup();
+    for (const make of [
+        async () => (await producing("PLUS", {}, shared)).order,
+        async () => {
+            const c = await producing("PLUS", {}, shared);
+            const chosen = await shared.send(c.order, "select_final", "customer", { selectedOption: "synthetic-a1" });
+            return shared.send(chosen, "complete", "creative", { mp3Ref: "synthetic-mp3-original", wavFeasible: false });
+        }]) {
+        const original = await make();
+        const h = await inReview("CANCELLATION", shared);
+        const closed = await closeAs(shared, h.reviewed, "DUPLICATE_ORDER", { evidence: { linkedOrderId: original.id } });
+        assert.deepEqual([closed.state, closed.reviews[0].resolution.evidence.linkedOrderId], [STATES.CLOSED, original.id]);
+    }
+    // The original is cancelled while the evidence service is being asked: the CLOSE does not commit.
+    let hook = null;
+    const racing = setup({
+        verifyEvidence: async (evidence, request) => {
+            if (hook) { const run = hook; hook = null; await run(); }
+            return syntheticAttestation(evidence, request);
+        }
+    });
+    const h = await inReview("REFUND", racing);
+    const twin = await paidOrder(racing, "START", "cancelled-midway");
+    const record = h.resolution(h.reviewed, h.id, "CLOSE",
+        h.closeFields(h.reviewed, h.id, "DUPLICATE_ORDER", { linkedOrderId: twin.id }));
+    hook = async () => { await racing.send(twin, "cancel", "finance"); };
+    await assert.rejects(h.resolveReview(h.reviewed, "CLOSE", record), /LINKED_ORDER_CHANGED/);
+    // On a retry the cancelled original is now seen as such.
+    await assert.rejects(h.resolveReview(h.reviewed, "CLOSE", record), /LINKED_ORDER_INVALID/);
+    await assertCanonicalUnchanged(h, h.reviewed);
+});
+
+test("IM/1: verifiers get a deep-frozen copy; no decision or evidence field can be changed through them (F151-02)", async () => {
+    const attempts = [];
+    const tryChange = (target, key, value) => {
+        try { target[key] = value; attempts.push("changed"); } catch { attempts.push("refused"); }
+    };
+    const h = await inReview("REFUND", setup({
+        verifyReview: (record, order, context) => {
+            if (context !== undefined) {
+                tryChange(record, "reasonCode", "FRAUD_CONFIRMED");
+                tryChange(record, "orderId", "synthetic-other-order");
+                tryChange(record, "reviewId", "review-0009");
+                tryChange(record.evidence, "evidenceId", "synthetic-swapped-in-review");
+                tryChange(record.evidence, "linkedOrderId", "ffffffff-ffff-4fff-8fff-ffffffffffff");
+                return { verified: signatureMatches(record.signature, hmac(["close-decision", context.binding])),
+                    binding: context.binding };
+            }
+            return signatureMatches(record.signature, signReview(record));
+        },
+        verifyEvidence: (evidence, request) => {
+            tryChange(evidence, "evidenceId", "synthetic-swapped-in-evidence");
+            tryChange(evidence, "digest", "e".repeat(64));
+            tryChange(request, "evidenceId", "synthetic-swapped-request");
+            return syntheticAttestation(evidence, request);
+        }
+    }));
+    const record = h.resolution(h.reviewed, h.id, "CLOSE");
+    const closed = await h.resolveReview(h.reviewed, "CLOSE", record);
+    assert.ok(attempts.length === 8 && attempts.every(result => result === "refused"), attempts.join(","));
+    // The audit holds exactly the values that were signed and attested.
+    const resolution = closed.reviews[0].resolution;
+    assert.deepEqual([resolution.orderId, resolution.reviewId, resolution.reasonCode, resolution.evidence.evidenceId,
+        resolution.evidence.digest, resolution.evidence.linkedOrderId],
+    [h.reviewed.id, h.id, "DUPLICATE_ORDER", record.evidence.evidenceId, record.evidence.digest, h.twin()]);
+});
+
+test("IM/2: the caller changing its own objects during verification changes nothing; non-data is refused", async () => {
+    let hook = null;
+    const shared = setup({
+        verifyEvidence: async (evidence, request) => {
+            if (hook) { const run = hook; hook = null; await run(); }
+            return syntheticAttestation(evidence, request);
+        }
+    });
+    const h = await inReview("REFUND", shared);
+    const record = h.resolution(h.reviewed, h.id, "CLOSE");
+    const original = structuredClone(record);
+    hook = async () => {
+        record.reasonCode = "FRAUD_CONFIRMED";
+        record.orderId = "synthetic-other-order";
+        record.evidence.evidenceId = "synthetic-swapped-by-caller";
+        record.evidence.linkedOrderId = "ffffffff-ffff-4fff-8fff-ffffffffffff";
+        record.evidence.financialObligation = "OPEN";
+    };
+    const closed = await h.resolveReview(h.reviewed, "CLOSE", record);
+    const resolution = closed.reviews[0].resolution;
+    assert.deepEqual([resolution.orderId, resolution.reasonCode, resolution.evidence.evidenceId,
+        resolution.evidence.linkedOrderId, resolution.evidence.financialObligation],
+    [original.orderId, original.reasonCode, original.evidence.evidenceId, original.evidence.linkedOrderId,
+        original.evidence.financialObligation]);
+    // Only the attested evidence id was consumed; the id the caller swapped in is still free.
+    await assert.rejects(closeAs(shared, (await inReview("REFUND", shared)).reviewed, "DUPLICATE_ORDER",
+        { evidence: { evidenceId: original.evidence.evidenceId } }), /EVIDENCE_REFERENCE_USED/);
+    const later = await inReview("REFUND", shared);
+    assert.equal((await closeAs(shared, later.reviewed, "DUPLICATE_ORDER",
+        { evidence: { evidenceId: "synthetic-swapped-by-caller" } })).state, STATES.CLOSED);
+    // Functions, getters that throw, and other non-data never reach a check.
+    const n = await inReview("DISPUTE");
+    const good = n.resolution(n.reviewed, n.id, "CLOSE");
+    const throwing = { ...good };
+    Object.defineProperty(throwing, "reasonCode", { enumerable: true, get() { throw new Error("synthetic getter"); } });
+    for (const resolution of [{ ...good, reasonCode: () => "DISPUTE_RESOLVED_BY_PROVIDER" }, throwing,
+        { ...good, evidence: { ...good.evidence, digest: Symbol("digest") } }]) {
+        await assert.rejects(n.send(n.reviewed, "resolve_review", "finance", { resolution }, { actorId: good.actorId }),
+            /INVALID_COMMAND/);
+    }
+    // A getter is read once into the core's copy: the decision is judged and recorded on that single value.
+    let reads = 0;
+    const flipping = { ...good };
+    Object.defineProperty(flipping, "reasonCode", {
+        enumerable: true, get() { reads += 1; return reads === 1 ? "DISPUTE_RESOLVED_BY_PROVIDER" : "FRAUD_CONFIRMED"; }
+    });
+    const settled = await n.send(n.reviewed, "resolve_review", "finance", { resolution: flipping }, { actorId: good.actorId });
+    assert.deepEqual([reads, settled.reviews[0].resolution.reasonCode], [1, "DISPUTE_RESOLVED_BY_PROVIDER"]);
+});
+
+test("BC/1: the decision binding covers every decision and evidence field, derived from the code (F151-07)", async () => {
+    const h = await inReview("REFUND");
+    const record = h.resolution(h.reviewed, h.id, "CLOSE");
+    const bound = new Set(CLOSE_DECISION_FIELDS);
+    assert.equal(bound.size, CLOSE_DECISION_FIELDS.length); // no field listed twice
+    // Every field of a real CLOSE decision, and every field an evidence reference may carry, is bound;
+    // only the signatures themselves are outside the binding they sign.
+    for (const key of Object.keys(record).filter(key => key !== "signature" && key !== "evidence")) {
+        assert.ok(bound.has(key), `decision field ${key} is not bound`);
+    }
+    for (const key of CLOSE_EVIDENCE_FIELDS.filter(key => key !== "signature")) {
+        assert.ok(bound.has(`evidence.${key}`), `evidence field ${key} is not bound`);
+    }
+    assert.ok([...bound].every(path => path.split(".").length <= 2 &&
+        (!path.includes(".") || path.startsWith("evidence."))));
+    // Each listed field changes the binding when changed or removed, one at a time.
+    const full = { ...record, evidence: { ...record.evidence, finding: "CONFIRMED" } };
+    const base = closeDecisionBinding(full);
+    assert.equal(JSON.parse(base).length, CLOSE_DECISION_FIELDS.length + 1);
+    for (const path of CLOSE_DECISION_FIELDS) {
+        const [head, tail] = path.split(".");
+        for (const change of ["tampered", "removed"]) {
+            const copy = structuredClone(full);
+            const target = tail ? copy[head] : copy;
+            const key = tail ?? head;
+            if (change === "removed") delete target[key];
+            else target[key] = `${target[key]}-tampered`;
+            assert.notEqual(closeDecisionBinding(copy), base, `${path} ${change}`);
+        }
+    }
+});
+
+test("BC/2: changing or removing any single bound field after signing is refused and consumes nothing", async () => {
+    const h = await inReview("REFUND");
+    const signed = h.resolution(h.reviewed, h.id, "CLOSE");
+    const resign = evidence => ({ ...evidence, signature: signEvidence(evidence) });
+    const codes = {};
+    for (const path of CLOSE_DECISION_FIELDS) {
+        const [head, tail] = path.split(".");
+        for (const change of ["tampered", "removed"]) {
+            const copy = structuredClone(signed);
+            const target = tail ? copy[head] : copy;
+            const key = tail ?? head;
+            if (change === "removed") delete target[key];
+            else target[key] = key === "finding" ? "CONFIRMED" : `${target[key]}-tampered`;
+            // The evidence is re-signed by the evidence service each time, so only the decision signature binds it.
+            if (tail) copy.evidence = resign(copy.evidence);
+            // Removing a field this decision does not carry (finding on a DUPLICATE_ORDER) is no change at all.
+            if (closeDecisionBinding(copy) === closeDecisionBinding(signed)) continue;
+            const error = await h.resolveReview(h.reviewed, "CLOSE", copy).then(() => null, e => e);
+            assert.ok(error instanceof OrderError, `${path} ${change} was accepted or failed oddly: ${error}`);
+            codes[`${path} ${change}`] = error.code;
+        }
+    }
+    // Every bound field was changed at least once; only absent-field removals were skipped.
+    assert.deepEqual(new Set(Object.keys(codes).map(entry => entry.split(' ')[0])), new Set(CLOSE_DECISION_FIELDS));
+    assert.ok(Object.keys(codes).length >= CLOSE_DECISION_FIELDS.length * 2 - 1);
+    // The untouched decision then closes once, on the same history: no audit, right or reference was consumed.
+    const closed = await h.resolveReview(h.reviewed, "CLOSE", signed);
+    assert.deepEqual([closed.version, closed.revisionsUsed, closed.financialAssessments,
+        closed.reviews[0].resolution.authorizationRef, closed.reviews[0].resolution.evidence.evidenceId],
+    [h.reviewed.version + 1, h.reviewed.revisionsUsed, [], signed.authorizationRef, signed.evidence.evidenceId]);
+    assert.deepEqual(closed.events.slice(0, -1), h.reviewed.events);
+});
+
+test("SE/1: synthetic evidence is accepted only in a declared TEST core; bad or missing settings fail safe (F151-04)", async () => {
+    // The flag outside TEST, or with no environment at all (production by default), stops the core at creation.
+    for (const environment of [undefined, "PRODUCTION", "STAGING"]) {
+        assert.throws(() => createCore({ allowSyntheticEvidence: true, environment }), /SYNTHETIC_EVIDENCE_NOT_ALLOWED/);
+    }
+    for (const environment of ["prod", "test", "", null, 1, { name: "TEST" }]) {
+        assert.throws(() => createCore({ environment }), /INVALID_ENVIRONMENT/);
+    }
+    assert.doesNotThrow(() => createCore({ environment: "PRODUCTION" }));
+    // A TEST core without the flag, and a production core, refuse the synthetic verifier at the decision.
+    for (const overrides of [{ allowSyntheticEvidence: false }, { allowSyntheticEvidence: false, environment: "PRODUCTION" },
+        { allowSyntheticEvidence: false, environment: "STAGING" }]) {
+        const h = await inReview("DISPUTE", setup(overrides));
+        await assert.rejects(closeAs(h, h.reviewed, "DISPUTE_RESOLVED_BY_PROVIDER"), /SYNTHETIC_VERIFIER_NOT_ALLOWED/);
+        await assertCanonicalUnchanged(h, h.reviewed);
+    }
+    // The client cannot switch it on: flags in the command data or on the principal are not configuration.
+    const p = await inReview("DISPUTE", setup({ allowSyntheticEvidence: false, environment: "PRODUCTION" }));
+    const record = p.resolution(p.reviewed, p.id, "CLOSE");
+    await assert.rejects(p.send(p.reviewed, "resolve_review", "finance",
+        { resolution: record, allowSyntheticEvidence: true, environment: "TEST" }, { actorId: record.actorId }),
+    /SYNTHETIC_VERIFIER_NOT_ALLOWED/);
+    const principal = { ...p.actor("finance", p.reviewed, SERVER, record.actorId), allowSyntheticEvidence: true,
+        environment: "TEST" };
+    await assert.rejects(p.core.dispatch(p.reviewed, { kind: "resolve_review", requestId: "synthetic-client-flag",
+        expectedVersion: p.reviewed.version, data: { resolution: record }, allowSyntheticEvidence: true,
+        environment: "TEST" }, principal), /SYNTHETIC_VERIFIER_NOT_ALLOWED/);
+    await assertCanonicalUnchanged(p, p.reviewed);
+    // A production verifier works in a production core; its kind is what the audit records.
+    const prod = await inReview("DISPUTE", setup({ allowSyntheticEvidence: false, environment: "PRODUCTION",
+        verifyEvidence: productionShaped }));
+    const closed = await closeAs(prod, prod.reviewed, "DISPUTE_RESOLVED_BY_PROVIDER");
+    assert.equal(closed.reviews[0].resolution.evidence.verifier.kind, "PRODUCTION");
+});
+
+test("BC/3: only DUPLICATE_ORDER may name a linked order; any other code carrying one is refused (F151-07)", async () => {
+    const h = await inReview("DISPUTE");
+    const twin = h.twin();
+    await assert.rejects(closeAs(h, h.reviewed, "DISPUTE_RESOLVED_BY_PROVIDER", { evidence: { linkedOrderId: twin } }),
+        /EVIDENCE_MISMATCH/);
+    for (const code of ["CUSTOMER_WITHDREW_AFTER_SETTLEMENT", "FRAUD_CONFIRMED"]) {
+        await assert.rejects(closeAs(h, h.reviewed, code, { evidence: { linkedOrderId: twin } }), /EVIDENCE_MISMATCH/);
+    }
+    await assertCanonicalUnchanged(h, h.reviewed);
+});
+
+// ---- Görev 154 (F153-01): one trusted command and principal snapshot per dispatch ----
+
+const serverAuthorize = principal => principal.auth === SERVER && (principal.actorId === undefined ||
+    signatureMatches(principal.session, session(principal.actorId, principal.role)));
+
+// A core whose authorize and evidence verifier can run a hook while the dispatch awaits them.
+function hookedSetup() {
+    const hooks = { authorize: null, evidence: null, seen: [] };
+    const take = name => { const run = hooks[name]; hooks[name] = null; return run; };
+    const h = setup({
+        authorize: async principal => {
+            hooks.seen.push(principal);
+            const run = take("authorize");
+            if (run) await run();
+            return serverAuthorize(principal);
+        },
+        verifyEvidence: async (evidence, request) => {
+            const run = take("evidence");
+            if (run) await run();
+            return syntheticAttestation(evidence, request);
+        }
+    });
+    return { h, hooks };
+}
+
+test("FA/1: the Görev 153 F153-01 attempt: a changed command or principal changes no event, audit or key", async () => {
+    const { h: base, hooks } = hookedSetup();
+    const h = await inReview("REFUND", base);
+    const record = h.resolution(h.reviewed, h.id, "CLOSE");
+    const command = { kind: "resolve_review", requestId: "synthetic-f153-close", expectedVersion: h.reviewed.version,
+        data: { resolution: record } };
+    const principal = { ...h.actor("finance", h.reviewed, SERVER, record.actorId), claims: { team: "finance", level: 1 } };
+    hooks.evidence = async () => {
+        command.kind = "cancel";
+        command.requestId = "synthetic-f153-other";
+        command.expectedVersion = 999;
+        principal.role = "admin";
+        principal.actorId = "synthetic-finance-opener";
+        principal.orderId = "synthetic-other-order";
+        principal.claims.team = "admin";
+        principal.claims.level = 9;
+    };
+    const closed = await h.core.dispatch(h.reviewed, command, principal);
+    assert.deepEqual([command.kind, principal.role, principal.claims.team], ["cancel", "admin", "admin"]); // really changed
+    // The event and the audit hold the values that were checked when the dispatch began.
+    const event = closed.events.at(-1);
+    assert.deepEqual([event.kind, event.requestId, event.role, event.from, event.to, event.sequence],
+        ["resolve_review", "synthetic-f153-close", "finance", STATES.REFUND_REVIEW, STATES.CLOSED, h.reviewed.version + 1]);
+    assert.deepEqual([event.audit.actorId, event.audit.role, event.audit.actorType, event.audit.idempotencyKey],
+        ["synthetic-finance-decider", "finance", "HUMAN", "synthetic-f153-close"]);
+    assert.deepEqual(closed.reviews[0].resolution, { ...event.audit, moneyMovement: "NONE" });
+    // Four eyes holds in the record: the decider is not the opener.
+    assert.notEqual(event.audit.actorId, closed.reviews[0].opening.actorId);
+    // Idempotency used the checked request id: it replays, and the swapped-in id was never recorded.
+    const replay = await h.core.dispatch(h.reviewed, { kind: "resolve_review", requestId: "synthetic-f153-close",
+        expectedVersion: h.reviewed.version, data: { resolution: record } }, h.actor("finance", h.reviewed, SERVER,
+        record.actorId));
+    assert.strictEqual(replay, closed);
+    assert.equal(closed.events.some(item => item.requestId === "synthetic-f153-other"), false);
+});
+
+test("FA/2: authorization, roles, four eyes and order binding use the snapshot; changing the caller's objects cannot help", async () => {
+    const { h: base, hooks } = hookedSetup();
+    const h = await inReview("REFUND", base);
+    // The opener tries to decide and swaps in a colleague's id while authorized: still four eyes.
+    const byOpener = h.resolution(h.reviewed, h.id, "CONTINUE", { actorId: "synthetic-finance-opener" });
+    const opener = h.actor("finance", h.reviewed, SERVER, "synthetic-finance-opener");
+    hooks.authorize = async () => { opener.actorId = "synthetic-finance-decider"; };
+    await assert.rejects(h.core.dispatch(h.reviewed, { kind: "resolve_review", requestId: "synthetic-f154-four-eyes",
+        expectedVersion: h.reviewed.version, data: { resolution: byOpener } }, opener), /FOUR_EYES_VIOLATION/);
+    // An admin tries a REFUND (finance only) and switches to finance while authorized: no escalation.
+    const adminRecord = h.resolution(h.reviewed, h.id, "REFUND", ADMIN);
+    const admin = h.actor("admin", h.reviewed, SERVER, adminRecord.actorId);
+    hooks.authorize = async () => { admin.role = "finance"; };
+    await assert.rejects(h.core.dispatch(h.reviewed, { kind: "resolve_review", requestId: "synthetic-f154-escalate",
+        expectedVersion: h.reviewed.version, data: { resolution: adminRecord } }, admin), /REVIEW_OUTCOME_NOT_PERMITTED/);
+    // A stale version made current while authorized is still stale.
+    const stale = { kind: "resolve_review", requestId: "synthetic-f154-stale", expectedVersion: h.reviewed.version - 1,
+        data: { resolution: h.resolution(h.reviewed, h.id, "CONTINUE") } };
+    const staleActor = { ...h.actor("finance", h.reviewed, SERVER, stale.data.resolution.actorId), claims: { team: "x" } };
+    hooks.authorize = async () => { stale.expectedVersion = h.reviewed.version; };
+    await assert.rejects(h.core.dispatch(h.reviewed, stale, staleActor), /VERSION_CONFLICT/);
+    // authorize itself receives the deep-frozen snapshot, never the caller's object.
+    const seen = hooks.seen.at(-1);
+    assert.ok(seen !== staleActor && Object.isFrozen(seen) && Object.isFrozen(seen.claims) && seen.claims !== staleActor.claims);
+    assert.deepEqual(seen, staleActor);
+    // None of the refused attempts left a trace on the canonical order.
+    await assertCanonicalUnchanged(h, h.reviewed);
+    // A customer's order binding is checked on the snapshot too: retargeting while authorized changes nothing.
+    const c = await producing("PLUS", {}, base);
+    const customer = h.actor("customer", c.order);
+    hooks.authorize = async () => { customer.orderId = "synthetic-other-order"; customer.role = "finance"; };
+    const requested = await h.core.dispatch(c.order, { kind: "request_revision", requestId: "synthetic-f154-customer",
+        expectedVersion: c.order.version, data: {} }, customer);
+    assert.deepEqual([requested.state, requested.events.at(-1).role, requested.revisionsUsed],
+        [STATES.REVISION_PENDING, "customer", 1]);
+});
+
+test("FA/3: a version made stale or current while authorized, and each field read only once", async () => {
+    const { h: base, hooks } = hookedSetup();
+    const h = await inReview("DISPUTE", base);
+    // A current version later overwritten by the caller still counts as current.
+    const current = { kind: "resolve_review", requestId: "synthetic-f154-current", expectedVersion: h.reviewed.version,
+        data: { resolution: h.resolution(h.reviewed, h.id, "CONTINUE") } };
+    hooks.authorize = async () => { current.expectedVersion = 0; current.data.resolution.outcome = "REFUND"; };
+    const resumed = await h.core.dispatch(h.reviewed, current, h.actor("finance", h.reviewed, SERVER,
+        current.data.resolution.actorId));
+    assert.deepEqual([resumed.version, resumed.reviews[0].resolution.outcome, resumed.events.at(-1).requestId],
+        [h.reviewed.version + 1, "CONTINUE", "synthetic-f154-current"]);
+    // Getters on the command and the principal are read once into the snapshot.
+    const g = await inReview("DISPUTE", base);
+    const record = g.resolution(g.reviewed, g.id, "CONTINUE");
+    let kindReads = 0;
+    let roleReads = 0;
+    const command = { requestId: "synthetic-f154-getters", expectedVersion: g.reviewed.version, data: { resolution: record } };
+    Object.defineProperty(command, "kind", { enumerable: true, get() { kindReads += 1; return kindReads === 1 ? "resolve_review" : "cancel"; } });
+    const principal = { ...g.actor("finance", g.reviewed, SERVER, record.actorId) };
+    delete principal.role;
+    Object.defineProperty(principal, "role", { enumerable: true, get() { roleReads += 1; return roleReads === 1 ? "finance" : "admin"; } });
+    const done = await g.core.dispatch(g.reviewed, command, principal);
+    assert.deepEqual([kindReads, roleReads, done.events.at(-1).kind, done.events.at(-1).role],
+        [1, 1, "resolve_review", "finance"]);
+});
+
+test("FA/4: commands and principals that cannot be copied are refused safely and leave no trace", async () => {
+    const h = await inReview("DISPUTE");
+    const record = h.resolution(h.reviewed, h.id, "CONTINUE");
+    const base = { kind: "resolve_review", requestId: "synthetic-f154-bad", expectedVersion: h.reviewed.version,
+        data: { resolution: record } };
+    const actor = h.actor("finance", h.reviewed, SERVER, record.actorId);
+    for (const command of [null, "resolve_review", 7, { ...base, kind: () => "resolve_review" },
+        { ...base, requestId: Symbol("id") }, { ...base, data: { resolution: record, extra: () => 1 } }]) {
+        await assert.rejects(h.core.dispatch(h.reviewed, command, actor), /INVALID_COMMAND/);
+    }
+    const throwing = { ...base };
+    Object.defineProperty(throwing, "expectedVersion", { enumerable: true, get() { throw new Error("synthetic"); } });
+    await assert.rejects(h.core.dispatch(h.reviewed, throwing, actor), /INVALID_COMMAND/);
+    for (const principal of [{ ...actor, hook: () => true }, { ...actor, nested: { fn: () => 1 } }, null, "finance"]) {
+        await assert.rejects(h.core.dispatch(h.reviewed, base, principal), /UNAUTHORIZED/);
+    }
+    await assertCanonicalUnchanged(h, h.reviewed);
+});
+
+test("FA/5: concurrent CLOSEs sharing one principal object each keep their own snapshot", async () => {
+    const { h: base, hooks } = hookedSetup();
+    const p = await inReview("DISPUTE", base);
+    const record = p.resolution(p.reviewed, p.id, "CLOSE");
+    const shared = p.actor("finance", p.reviewed, SERVER, record.actorId);
+    hooks.evidence = async () => { shared.role = "admin"; shared.actorId = "synthetic-finance-opener"; };
+    const send = requestId => p.core.dispatch(p.reviewed, { kind: "resolve_review", requestId,
+        expectedVersion: p.reviewed.version, data: { resolution: record } }, shared);
+    const results = await Promise.allSettled([send("synthetic-f154-race-a"), send("synthetic-f154-race-b")]);
+    const outcome = results.map(result => (result.status === "fulfilled" ? "CLOSED" : result.reason.code)).sort();
+    assert.deepEqual(outcome, ["CLOSED", "VERSION_CONFLICT"]);
+    const winner = results.find(result => result.status === "fulfilled").value;
+    assert.deepEqual([winner.events.at(-1).role, winner.events.at(-1).audit.actorId],
+        ["finance", "synthetic-finance-decider"]);
 });

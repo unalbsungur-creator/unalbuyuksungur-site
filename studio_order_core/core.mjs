@@ -28,6 +28,8 @@ export const REVIEW_OUTCOMES = Object.freeze({ CONTINUE: "CONTINUE", REFUND: "RE
 const ACTIVE_STATES = Object.freeze([STATES.PAYMENT_VERIFIED, STATES.EMAIL_PENDING, STATES.EMAIL_VERIFIED,
     STATES.BOOKING_PENDING, STATES.START_APPROVED, STATES.IN_PRODUCTION, STATES.REVISION_PENDING,
     STATES.FINAL_SELECTED]);
+// Görev 152 (F151-01): states in which an order can be the surviving original of a duplicate pair.
+const LINKED_ORDER_STATES = Object.freeze([...ACTIVE_STATES, STATES.COMPLETED]);
 
 export class OrderError extends Error {
     constructor(code) { super(code); this.name = "OrderError"; this.code = code; }
@@ -47,6 +49,31 @@ function freezeDeep(value) {
 
 function opaque(value) {
     return typeof value === "string" && /^[A-Za-z0-9_-]{8,80}$/.test(value);
+}
+
+/** Görev 154 (F153-01): a deep, frozen snapshot of the command and the principal. Every field is read exactly once
+ * and copied, nested objects included, so neither the caller nor a verifier can change it later. Only plain data is
+ * accepted; a principal's symbol values (a server session marker) are kept as they are, since symbols are immutable.
+ * A command that cannot be copied is INVALID_COMMAND; a principal that cannot be copied is UNAUTHORIZED. */
+function requestContext(command, principal) {
+    requireThat(command !== null && typeof command === "object", "INVALID_COMMAND");
+    let snapshotCommand;
+    try {
+        snapshotCommand = structuredClone({ kind: command.kind, requestId: command.requestId,
+            expectedVersion: command.expectedVersion, data: command.data || {} });
+    } catch {
+        throw new OrderError("INVALID_COMMAND");
+    }
+    let snapshotPrincipal = null;
+    if (principal !== null && typeof principal === "object") {
+        try {
+            snapshotPrincipal = Object.fromEntries(Object.entries(principal).map(([key, value]) =>
+                [key, typeof value === "symbol" ? value : structuredClone(value)]));
+        } catch {
+            throw new OrderError("UNAUTHORIZED");
+        }
+    }
+    return freezeDeep({ command: snapshotCommand, principal: snapshotPrincipal });
 }
 
 function pair(value, prior) {
@@ -162,7 +189,8 @@ const REVIEW_SOURCES = Object.freeze({ finance: "finance_console", admin: "admin
 const CONFIRMATION_SOURCE = "customer_confirmation_service";
 
 /** Decision 135: owner-approved review outcome policy UNAI-REVIEW-POLICY-v1.0, 15 type × role × outcome
- * combinations. REFUND is finance-only; an admin CLOSE needs a verified reason code. Combinations missing
+ * combinations. REFUND is finance-only; every CLOSE needs an approved reason and evidence (Görev 147,
+ * APPROVED_CLOSE_REASONS), which may narrow the CLOSE combinations further. Combinations missing
  * from the active policy fail closed. */
 export const APPROVED_REVIEW_POLICY = freezeDeep({
     status: "APPROVED", reference: "UNAI-REVIEW-POLICY-v1.0",
@@ -192,6 +220,90 @@ function loadReviewPolicy(policy) {
     return freezeDeep({ status: policy.status, reference: policy.reference, matrix });
 }
 
+/** Görev 147 (142B, K-05/06/07): owner-approved close reasons UNAI-CLOSE-REASONS-v1.0. Every CLOSE, by finance or
+ * admin, names one of these codes and carries evidence of the code's kind. TERMS_VIOLATION and CUSTOMER_UNREACHABLE
+ * were removed. A code pending legal review is listed but not usable live; enabling it takes a new policy version.
+ * `obligations` are the customer money outcomes a code may close with: any other outcome needs the financial case
+ * process (K-01), which does not exist yet, so such a CLOSE is refused. `priorEvidence` admits evidence created
+ * before the review opened (external records only). Nothing here is ever widened at run time. */
+export const APPROVED_CLOSE_REASONS = freezeDeep({
+    status: "APPROVED", reference: "UNAI-CLOSE-REASONS-v1.0",
+    codes: {
+        DUPLICATE_ORDER: {
+            types: ["CANCELLATION", "REFUND"], roles: ["finance"], legalReview: "NOT_REQUIRED",
+            evidenceKind: "DUPLICATE_PAYMENT_RECONCILIATION", evidenceSource: "payment_provider_reconciliation",
+            priorEvidence: true, obligations: ["NONE", "RESOLVED"], linkedOrder: true, finding: null
+        },
+        CUSTOMER_WITHDREW_AFTER_SETTLEMENT: {
+            types: ["CANCELLATION", "REFUND", "DISPUTE"], roles: ["finance", "admin"], legalReview: "PENDING",
+            evidenceKind: "CUSTOMER_CLOSURE_CONFIRMATION", evidenceSource: "customer_confirmation_service",
+            priorEvidence: false, obligations: ["NONE"], linkedOrder: false, finding: null
+        },
+        DISPUTE_RESOLVED_BY_PROVIDER: {
+            types: ["DISPUTE"], roles: ["finance", "admin"], legalReview: "NOT_REQUIRED",
+            evidenceKind: "PROVIDER_DISPUTE_OUTCOME", evidenceSource: "payment_provider_reconciliation",
+            priorEvidence: true, obligations: ["NONE"], linkedOrder: false, finding: null
+        },
+        // K-07: finance only and only a confirmed finding; a suspicion keeps the review open.
+        FRAUD_CONFIRMED: {
+            types: ["CANCELLATION", "REFUND", "DISPUTE"], roles: ["finance"], legalReview: "PENDING",
+            evidenceKind: "RISK_REVIEW_RECORD", evidenceSource: "risk_review_console",
+            priorEvidence: false, obligations: ["NONE"], linkedOrder: false, finding: "CONFIRMED"
+        }
+    }
+});
+
+// The customer money outcome a close evidence states: none, already returned and reconciled, or still owed.
+const FINANCIAL_OBLIGATIONS = Object.freeze(["NONE", "RESOLVED", "OPEN"]);
+const RISK_FINDINGS = Object.freeze(["CONFIRMED", "SUSPECTED"]);
+// The only fields a close evidence reference may carry (`signature` is the evidence service's own, never bound here).
+export const CLOSE_EVIDENCE_FIELDS = Object.freeze(["evidenceId", "orderId", "reviewId", "evidenceKind", "source",
+    "createdAt", "digest", "financialObligation", "linkedOrderId", "finding", "signature"]);
+const EVIDENCE_FIELDS = new Set(CLOSE_EVIDENCE_FIELDS);
+
+/** Shape and binding of a close evidence reference. This is no proof that the evidence is genuine: only the
+ * server's evidence service can tell, through verifyEvidence. The content itself never enters the core. */
+function closeEvidence(evidence, rule, order, review) {
+    requireThat(evidence && typeof evidence === "object", "EVIDENCE_REQUIRED");
+    requireThat(Object.keys(evidence).every(key => EVIDENCE_FIELDS.has(key)) && opaque(evidence.evidenceId) &&
+        evidence.orderId === order.id && evidence.reviewId === review.reviewId &&
+        typeof evidence.digest === "string" && /^[0-9a-f]{64}$/.test(evidence.digest) &&
+        Number.isSafeInteger(zonedInstant(evidence.createdAt)) &&
+        FINANCIAL_OBLIGATIONS.includes(evidence.financialObligation), "EVIDENCE_MISMATCH");
+    requireThat(evidence.evidenceKind === rule.evidenceKind && evidence.source === rule.evidenceSource,
+        "EVIDENCE_KIND_NOT_ALLOWED");
+    // DUPLICATE_ORDER names the other order of the pair; no other code may carry one.
+    requireThat(rule.linkedOrder ? typeof evidence.linkedOrderId === "string" &&
+        opaque(evidence.linkedOrderId.replaceAll("-", "")) && evidence.linkedOrderId !== order.id
+        : evidence.linkedOrderId === undefined, "EVIDENCE_MISMATCH");
+    requireThat(rule.finding ? RISK_FINDINGS.includes(evidence.finding) : evidence.finding === undefined,
+        "EVIDENCE_MISMATCH");
+}
+
+/** Görev 150 (F-03): the exact field set a CLOSE authorization signature must cover, in a fixed order. The core
+ * hands this binding to verifyReview, which must confirm the console signature over exactly this value. Any field
+ * changed after signing changes the binding, so the signature no longer matches. Exported for the server adapter.
+ * Görev 152 (F151-07): the binding is built from CLOSE_DECISION_FIELDS alone, so tests can prove every field of
+ * it, and that no decision or evidence field is left out, from the same list. */
+export const CLOSE_DECISION_FIELDS = Object.freeze(["orderId", "reviewId", "outcome", "reasonCode", "closeReasonPolicy",
+    "authorizationRef", "source", "actorId", "evidence.evidenceId", "evidence.evidenceKind", "evidence.source",
+    "evidence.orderId", "evidence.reviewId", "evidence.createdAt", "evidence.digest", "evidence.financialObligation",
+    "evidence.linkedOrderId", "evidence.finding"]);
+
+export function closeDecisionBinding(record) {
+    return JSON.stringify(["UNAI-CLOSE-DECISION-v1", ...CLOSE_DECISION_FIELDS.map(path =>
+        path.split(".").reduce((value, key) => (value !== null && typeof value === "object" && Object.hasOwn(value, key)
+            ? value[key] : undefined), record) ?? null)]);
+}
+
+// Görev 150 (F-01): every field the evidence service must attest, each equal to the core's request. A bare `true`,
+// a missing field or any differing value is a refusal.
+const ATTESTED_FIELDS = Object.freeze(["evidenceId", "evidenceKind", "source", "orderId", "reviewId", "createdAt",
+    "digest", "financialObligation", "linkedOrderId", "finding", "closeReasonPolicy", "reasonCode", "decision",
+    "decisionBinding"]);
+const EVIDENCE_VERIFIER_KINDS = Object.freeze(["PRODUCTION", "SYNTHETIC"]);
+const DEPLOYMENT_ENVIRONMENTS = Object.freeze(["PRODUCTION", "STAGING", "TEST"]);
+
 const REASON_CODE = /^[A-Z][A-Z0-9_]{2,63}$/;
 // Decision 141: SYSTEM is not a role and no principal can claim it. It only labels the narrow automatic
 // step the core itself performs (closing an elapsed proposal when a new one is made).
@@ -218,8 +330,20 @@ function revisionId(sequence) {
  * producer/admin console record: a RESTORATION_PROPOSAL that the producer failed to deliver an accepted
  * revision, with its evidence, or a RESTORATION_DECISION by another person on that proposal.
  * verifyReview(record, canonicalOrder) must return true only for a finance/admin console record that
- * opens a cancellation, refund or dispute review, or that resolves the open review. A REFUND outcome
- * is a recorded decision only; this core never moves money. `reviewPolicy` is the active review
+ * opens a cancellation, refund or dispute review, or that resolves the open review. For a CLOSE it is called as
+ * verifyReview(record, canonicalOrder, { binding }) and must return { verified: true, binding } only after checking
+ * the console signature over exactly that closeDecisionBinding(record) value; a bare `true` is refused (Görev 150,
+ * F-03). A REFUND outcome is a recorded decision only; this core never moves money.
+ * verifyEvidence(evidence, request, canonicalOrder) is the server's evidence service (Görev 150, F-01). It must
+ * look the evidence up in its own store and return an attestation { status: "VERIFIED", verifier: { kind, id },
+ * ...fields } that states, from its own records, every ATTESTED_FIELDS value of `request`: evidence id, kind,
+ * source, order, review, creation time (UTC), content digest, money outcome, linked order and fraud finding (null
+ * where not applicable), and that it vouches for this evidence under the given close-reason policy, reason code,
+ * decision and decision binding. Anything else, including `true`, is a refusal (UNTRUSTED_EVIDENCE); without the
+ * service every CLOSE is refused (CLOSE_EVIDENCE_UNVERIFIABLE). A verifier of kind SYNTHETIC is refused unless the
+ * core was created with allowSyntheticEvidence: true AND environment: "TEST" (Görev 152, F151-04). Both come from the
+ * server's own configuration, never from a command or principal. A missing environment is PRODUCTION; an unknown one,
+ * or the flag outside TEST, stops the core from being created. `reviewPolicy` is the active review
  * outcome matrix (default APPROVED_REVIEW_POLICY; an injected one may only narrow it). For review,
  * restoration, delivery-proposal and manual expiry commands authorize() must also bind principal.actorId to
  * the authenticated session: that id is the trusted actor identity for the audit and the four-eyes rules,
@@ -233,8 +357,14 @@ function revisionId(sequence) {
  * Never expose this core instance or its callbacks to a client.
  */
 export function createCore({ authorize, verifyPayment, verifyEmail, verifyBooking, verifyRestoration, verifyReview,
-    verifyReplan, reviewPolicy = APPROVED_REVIEW_POLICY, calendar, clock = () => new Date().toISOString() } = {}) {
+    verifyReplan, verifyEvidence, allowSyntheticEvidence = false, environment = "PRODUCTION",
+    reviewPolicy = APPROVED_REVIEW_POLICY, calendar, clock = () => new Date().toISOString() } = {}) {
     requireThat(typeof clock === "function", "INVALID_CLOCK");
+    // Görev 152 (F151-04): synthetic evidence is a test-fixture facility. It is refused at creation anywhere but an
+    // explicitly declared TEST environment, so a production or staging core can never be started with it.
+    requireThat(DEPLOYMENT_ENVIRONMENTS.includes(environment), "INVALID_ENVIRONMENT");
+    requireThat(allowSyntheticEvidence !== true || environment === "TEST", "SYNTHETIC_EVIDENCE_NOT_ALLOWED");
+    const syntheticEvidence = allowSyntheticEvidence === true && environment === "TEST";
     const policy = loadReviewPolicy(reviewPolicy);
     // Decision 140: every trusted time is validated and stored as UTC ISO; a zone-less clock value is refused.
     const serverTime = () => new Date(instant(clock(), "INVALID_CLOCK")).toISOString();
@@ -250,6 +380,7 @@ export function createCore({ authorize, verifyPayment, verifyEmail, verifyBookin
     const restorationReferences = new Map();
     const reviewReferences = new Map();
     const replanReferences = new Map();
+    const evidenceReferences = new Map();
 
     function createOrder(packageId) {
         requireThat(Object.hasOwn(PACKAGES, packageId), "INVALID_PACKAGE");
@@ -263,12 +394,16 @@ export function createCore({ authorize, verifyPayment, verifyEmail, verifyBookin
         return order;
     }
 
-    async function dispatch(snapshot, command, principal) {
+    async function dispatch(snapshot, untrustedCommand, untrustedPrincipal) {
         requireThat(snapshot && typeof snapshot.id === "string" && opaque(snapshot.id.replaceAll("-", "")), "INVALID_ORDER");
         const order = orders.get(snapshot.id);
         requireThat(order, "UNKNOWN_ORDER");
         requireThat(snapshot.packageId === order.packageId, "INVALID_ORDER");
-        requireThat(command && typeof command === "object" && opaque(command.requestId), "INVALID_COMMAND");
+        // Görev 154 (F153-01): the one trusted context of this dispatch, taken before the first await. Authorization,
+        // four eyes, idempotency, execution, events and audit all read this snapshot; the caller's objects are never
+        // read again, so changing them while a verifier is awaited changes nothing.
+        const { command, principal } = requestContext(untrustedCommand, untrustedPrincipal);
+        requireThat(opaque(command.requestId), "INVALID_COMMAND");
         const requiredRole = roleFor(command.kind, principal);
         requireThat(typeof requiredRole === "string", "UNKNOWN_ACTION");
         // The server adapter must authenticate the principal; a browser-provided role is never trusted.
@@ -277,7 +412,8 @@ export function createCore({ authorize, verifyPayment, verifyEmail, verifyBookin
         requireThat(typeof authorize === "function" && await authorize(principal, order, requiredRole) === true,
             "UNAUTHORIZED");
         requireThat(orders.get(order.id) === order, "VERSION_CONFLICT");
-        const data = command.data || {};
+        // Görev 152 (F151-02): the request data is part of the deep, frozen snapshot above, never a second copy.
+        const data = command.data;
         const payment = data.proof;
         // Only the fingerprint is logged; no raw proof or contact is persisted.
         const intent = [command.kind, data.options, data.selectedOption, data.mp3Ref,
@@ -319,7 +455,11 @@ export function createCore({ authorize, verifyPayment, verifyEmail, verifyBookin
         let restorationRef = null;
         let reviewRef = null;
         let replanRef = null;
+        let evidenceRef = null;
+        let linkedOrder = null;
         const openRevision = () => order.revisions.findLast(revision => revision.status === "ACCEPTED");
+        // Accepted, undelivered revisions: each needs a financial assessment when the order closes (Decision 134-B).
+        const undeliveredRevisions = () => order.revisions.filter(revision => revision.status === "ACCEPTED");
         // Decision 134-A: a customer-confirmed new date supersedes, but never overwrites, the booked deadline.
         const effectiveDeadline = () => order.replannedDeadline ?? order.booking?.deadline ?? null;
         const requireLiveDeadline = () => {
@@ -614,16 +754,103 @@ export function createCore({ authorize, verifyPayment, verifyEmail, verifyBookin
                 // Decision 134-C / 135: the type, role and outcome are each valid; the combination must be in the policy.
                 requireThat(permittedOutcomes(policy, openReview.type, principal.role).includes(record.outcome),
                     "REVIEW_OUTCOME_NOT_PERMITTED");
-                requireThat(principal.role !== "admin" || record.outcome !== REVIEW_OUTCOMES.CLOSE ||
-                    record.reasonCode != null, "CLOSE_REASON_REQUIRED");
-                requireThat(typeof verifyReview === "function" && await verifyReview(record, order) === true,
-                    "UNTRUSTED_REVIEW");
+                const closing = record.outcome === REVIEW_OUTCOMES.CLOSE;
+                const rule = closing ? APPROVED_CLOSE_REASONS.codes[record.reasonCode] : null;
+                let verifier = null;
+                if (closing) {
+                    // Görev 148 (D-3): an undelivered revision right needs a financial assessment, which only the
+                    // financial case process (K-01) can settle. Until it exists such an order cannot be closed. The
+                    // canonical order decides, never the request; the review stays open and nothing is consumed.
+                    requireThat(undeliveredRevisions().length === 0, "FINANCIAL_CASE_REQUIRED");
+                    // Görev 147 (K-06): every CLOSE, by finance or admin, names an approved code for this review
+                    // type and role and carries evidence of that code's kind, bound to this order and review.
+                    requireThat(record.reasonCode != null, "CLOSE_REASON_REQUIRED");
+                    requireThat(record.closeReasonPolicy === APPROVED_CLOSE_REASONS.reference,
+                        "CLOSE_REASON_POLICY_MISMATCH");
+                    requireThat(Object.hasOwn(APPROVED_CLOSE_REASONS.codes, record.reasonCode), "CLOSE_REASON_UNKNOWN");
+                    requireThat(rule.types.includes(openReview.type), "CLOSE_REASON_NOT_FOR_TYPE");
+                    requireThat(rule.roles.includes(principal.role), "CLOSE_REASON_ROLE_NOT_PERMITTED");
+                    closeEvidence(record.evidence, rule, order, openReview);
+                    requireThat(!rule.finding || record.evidence.finding === rule.finding, "CLOSE_FINDING_NOT_CONFIRMED");
+                    // Görev 146 F-12: a close that leaves money owed to, or returned to, the customer waits for the
+                    // financial case process. It is refused, never shown as settled.
+                    requireThat(rule.obligations.includes(record.evidence.financialObligation), "FINANCIAL_CASE_REQUIRED");
+                    // Decision D-1: only external records may predate the review. Judged against the canonical review
+                    // opening, so it holds before any legal gate opens.
+                    requireThat(rule.priorEvidence || zonedInstant(record.evidence.createdAt) >=
+                        Date.parse(openReview.opening.at), "EVIDENCE_STALE");
+                    if (rule.linkedOrder) {
+                        // Görev 150 (F-02, D-4): the other order of the pair is checked in the core's own registry,
+                        // never taken on the request's word: it exists, was paid, and was not itself closed as the
+                        // duplicate. It must still be the same record when the decision commits.
+                        // Görev 152 (F151-01): a payment reference alone proves nothing about what became of the
+                        // money. The surviving order must still stand: paid and live or completed, never cancelled,
+                        // closed or itself under a cancellation, refund or dispute review.
+                        linkedOrder = orders.get(record.evidence.linkedOrderId) ?? null;
+                        requireThat(linkedOrder, "LINKED_ORDER_NOT_FOUND");
+                        requireThat(LINKED_ORDER_STATES.includes(linkedOrder.state) && linkedOrder.paymentReference !== null &&
+                            !linkedOrder.reviews.some(review => review.resolution?.reasonCode === "DUPLICATE_ORDER"),
+                            "LINKED_ORDER_INVALID");
+                    }
+                    requireThat(rule.legalReview === "NOT_REQUIRED", "CLOSE_REASON_PENDING_LEGAL_REVIEW");
+                    // Without a trusted evidence service a well-formed reference proves nothing: blocked.
+                    requireThat(typeof verifyEvidence === "function", "CLOSE_EVIDENCE_UNVERIFIABLE");
+                }
+                // Görev 150 (F-03): for a CLOSE the signature must be confirmed over the full decision binding.
+                const binding = closing ? closeDecisionBinding(record) : null;
+                const signed = typeof verifyReview === "function"
+                    ? await verifyReview(record, order, ...(closing ? [{ binding }] : [])) : null;
+                requireThat(closing ? signed !== null && typeof signed === "object" && signed.verified === true &&
+                    signed.binding === binding : signed === true, "UNTRUSTED_REVIEW");
+                requireThat(closing || (record.evidence === undefined && record.closeReasonPolicy === undefined),
+                    "INVALID_REVIEW");
+                if (closing) {
+                    // Görev 150 (F-01): the evidence service states every field from its own records. Signature and
+                    // evidence stay separate checks: a valid signature never vouches for the evidence, nor vice versa.
+                    const request = freezeDeep({
+                        evidenceId: record.evidence.evidenceId, evidenceKind: record.evidence.evidenceKind,
+                        source: record.evidence.source, orderId: order.id, reviewId: openReview.reviewId,
+                        createdAt: new Date(zonedInstant(record.evidence.createdAt)).toISOString(),
+                        digest: record.evidence.digest, financialObligation: record.evidence.financialObligation,
+                        linkedOrderId: record.evidence.linkedOrderId ?? null, finding: record.evidence.finding ?? null,
+                        closeReasonPolicy: APPROVED_CLOSE_REASONS.reference, reasonCode: record.reasonCode,
+                        decision: REVIEW_OUTCOMES.CLOSE, decisionBinding: binding
+                    });
+                    const attestation = await verifyEvidence(record.evidence, request, order);
+                    requireThat(attestation !== null && typeof attestation === "object" &&
+                        attestation.status === "VERIFIED" && attestation.verifier && typeof attestation.verifier === "object" &&
+                        EVIDENCE_VERIFIER_KINDS.includes(attestation.verifier.kind) && opaque(attestation.verifier.id) &&
+                        ATTESTED_FIELDS.every(field => attestation[field] === request[field]), "UNTRUSTED_EVIDENCE");
+                    requireThat(attestation.verifier.kind === "PRODUCTION" || syntheticEvidence,
+                        "SYNTHETIC_VERIFIER_NOT_ALLOWED");
+                    verifier = { kind: attestation.verifier.kind, id: attestation.verifier.id };
+                    requireThat(!evidenceReferences.has(record.evidence.evidenceId), "EVIDENCE_REFERENCE_USED");
+                }
                 requireThat(!reviewReferences.has(record.authorizationRef), "REVIEW_REFERENCE_USED");
                 at = serverTime();
                 reviewRef = record.authorizationRef;
+                let closeAudit = {};
+                if (closing) {
+                    // A backwards clock is reported as such before the evidence time is judged against it.
+                    notBefore(order, at);
+                    const created = zonedInstant(record.evidence.createdAt);
+                    requireThat(created <= instant(at, "INVALID_CLOCK") && created >= Date.parse(order.events[0].at),
+                        "EVIDENCE_TIME_INVALID");
+                    evidenceRef = record.evidence.evidenceId;
+                    const { evidenceId, evidenceKind, source, digest, financialObligation, linkedOrderId, finding } =
+                        record.evidence;
+                    // Only the reference, kind, source, time, digest and stated outcome are kept; never the content.
+                    closeAudit = {
+                        closeReasonPolicy: APPROVED_CLOSE_REASONS.reference, evidence: {
+                            evidenceId, evidenceKind, source, createdAt: new Date(created).toISOString(), digest,
+                            financialObligation, ...(linkedOrderId === undefined ? {} : { linkedOrderId }),
+                            ...(finding === undefined ? {} : { finding }), verifier
+                        }
+                    };
+                }
                 audit = {
                     orderId: order.id, reviewId: openReview.reviewId, outcome: record.outcome,
-                    ...humanActor(), reasonCode: record.reasonCode ?? null,
+                    ...humanActor(), reasonCode: record.reasonCode ?? null, ...closeAudit,
                     authorizationRef: record.authorizationRef, at, policyReference: policy.reference,
                     idempotencyKey: command.requestId
                 };
@@ -633,8 +860,9 @@ export function createCore({ authorize, verifyPayment, verifyEmail, verifyBookin
                 next.state = record.outcome === REVIEW_OUTCOMES.CONTINUE ? openReview.resumeState : STATES.CLOSED;
                 if (next.state === STATES.CLOSED) {
                     // Decision 134-B: accepted, undelivered revisions keep their record and right and are flagged
-                    // for an authorized financial review. No amount is computed and no money moves here.
-                    for (const revision of order.revisions.filter(item => item.status === "ACCEPTED")) {
+                    // for an authorized financial review. No amount is computed and no money moves here. Since Görev
+                    // 148 only a REFUND reaches this with such revisions; a CLOSE is refused above.
+                    for (const revision of undeliveredRevisions()) {
                         next.financialAssessments.push({
                             assessmentId: `assessment-${String(next.financialAssessments.length + 1).padStart(4, "0")}`,
                             orderId: order.id, reviewId: openReview.reviewId, revisionId: revision.revisionId,
@@ -756,6 +984,9 @@ export function createCore({ authorize, verifyPayment, verifyEmail, verifyBookin
         requireThat(!restorationRef || !restorationReferences.has(restorationRef), "RESTORATION_REFERENCE_USED");
         requireThat(!reviewRef || !reviewReferences.has(reviewRef), "REVIEW_REFERENCE_USED");
         requireThat(!replanRef || !replanReferences.has(replanRef), "REPLAN_REFERENCE_USED");
+        requireThat(!evidenceRef || !evidenceReferences.has(evidenceRef), "EVIDENCE_REFERENCE_USED");
+        // Görev 150 (F-02): the linked order must be exactly the record that was checked; any change since is a refusal.
+        requireThat(!linkedOrder || orders.get(linkedOrder.id) === linkedOrder, "LINKED_ORDER_CHANGED");
         const committed = freezeDeep(next);
         orders.set(order.id, committed);
         if (command.kind === "verify_payment") paymentReferences.set(payment.reference, order.id);
@@ -763,6 +994,7 @@ export function createCore({ authorize, verifyPayment, verifyEmail, verifyBookin
         if (restorationRef) restorationReferences.set(restorationRef, order.id);
         if (reviewRef) reviewReferences.set(reviewRef, order.id);
         if (replanRef) replanReferences.set(replanRef, order.id);
+        if (evidenceRef) evidenceReferences.set(evidenceRef, order.id);
         return committed;
     }
     /** Decision 140: trusted server-side read of a proposal's visible state from the canonical record and the
