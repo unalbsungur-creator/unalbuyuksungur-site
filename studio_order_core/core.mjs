@@ -1,5 +1,5 @@
 /* Isolated, in-memory prototype. Never publish this file or treat caller-supplied roles as authentication. */
-import { CalendarError, REVISION_OUTCOMES, TARIFFS, evaluateRevisionRequest, isEligible } from "./calendar.mjs";
+import { CalendarError, REVISION_OUTCOMES, TARIFFS, evaluateRevisionRequest, isEligible, parseInstant } from "./calendar.mjs";
 
 export const PACKAGES = Object.freeze({
     START: Object.freeze({ priceKurus: 69000, revisions: 3, alternatives: 8 }),
@@ -61,10 +61,46 @@ async function digest(value) {
     return Array.from(new Uint8Array(hash), byte => byte.toString(16).padStart(2, "0")).join("");
 }
 
+/** Decision 140: an instant is an ISO-8601 string with an explicit zone (Z or ±HH:MM) and exact calendar
+ * fields, parsed by the calendar's strict parser. Zone-less values are rejected, never read as local time. */
+function zonedInstant(value) {
+    if (typeof value !== "string") return Number.NaN;
+    try {
+        return parseInstant(value);
+    } catch (error) {
+        if (error instanceof CalendarError) return Number.NaN;
+        throw error;
+    }
+}
+
 function instant(value, code) {
-    const ms = typeof value === "string" ? Date.parse(value) : Number.NaN;
+    const ms = zonedInstant(value);
     requireThat(Number.isSafeInteger(ms), code);
     return ms;
+}
+
+export const PROPOSAL_VISIBILITY = Object.freeze({
+    ACTIVE: "ACTIVE", ACCEPTED: "ACCEPTED", REJECTED: "REJECTED", EXPIRED: "EXPIRED"
+});
+
+/** Decision 140: the visible state of a delivery-date proposal at a trusted server time `now`. Pure: it never
+ * changes the record, writes audit or uses a reference. A record of another order, an unknown status or broken
+ * time data fails closed; it is never shown as ACTIVE. Trusted server-side use only. */
+export function proposalVisibility(replan, orderId, now) {
+    requireThat(replan && typeof replan === "object" && replan.proposal && typeof orderId === "string" &&
+        replan.proposal.orderId === orderId && replan.proposal.replanId === replan.replanId, "PROPOSAL_MISMATCH");
+    const at = instant(now, "INVALID_CLOCK");
+    const created = instant(replan.createdAt, "INVALID_PROPOSAL_TIME");
+    const expires = instant(replan.expiresAt, "INVALID_PROPOSAL_TIME");
+    requireThat(expires > created, "INVALID_PROPOSAL_TIME");
+    switch (replan.status) {
+        case "CONFIRMED": return PROPOSAL_VISIBILITY.ACCEPTED;
+        case "REJECTED": return PROPOSAL_VISIBILITY.REJECTED;
+        case "EXPIRED": return PROPOSAL_VISIBILITY.EXPIRED;
+        // At expiresAt itself the proposal is already dead, as in confirm_delivery_date.
+        case "PROPOSED": return at < expires ? PROPOSAL_VISIBILITY.ACTIVE : PROPOSAL_VISIBILITY.EXPIRED;
+        default: throw new OrderError("INVALID_PROPOSAL_STATUS");
+    }
 }
 
 function calendarCall(fn) {
@@ -110,6 +146,7 @@ function roleFor(kind, principal) {
         start_production: "creative", initial_options: "creative", request_revision: "customer",
         revision_options: "creative", select_final: "customer", complete: "creative",
         cancel: "finance", restore_revision_right: ["creative", "admin"],
+        propose_revision_restoration: ["creative", "admin"], decide_revision_restoration: ["creative", "admin"],
         open_review: ["finance", "admin"], resolve_review: ["finance", "admin"],
         propose_delivery_date: ["creative", "admin"], confirm_delivery_date: "customer",
         expire_delivery_proposal: ["creative", "admin"]
@@ -156,6 +193,10 @@ function loadReviewPolicy(policy) {
 }
 
 const REASON_CODE = /^[A-Z][A-Z0-9_]{2,63}$/;
+// Decision 141: SYSTEM is not a role and no principal can claim it. It only labels the narrow automatic
+// step the core itself performs (closing an elapsed proposal when a new one is made).
+const SYSTEM_ACTOR_ID = "SYSTEM";
+const RESERVED_ACTOR = /^system(?:[^a-z0-9]|$)/i;
 const PROPOSAL_LIFETIME_MS = 48 * 60 * 60 * 1000; // Decision 135: elapsed time, not working hours
 
 function permittedOutcomes(policy, type, role) {
@@ -174,13 +215,15 @@ function revisionId(sequence) {
  * authoritative booking service (confirmed slot, and for URGENT the verified surcharge and
  * producer approval). `calendar` is a loadCalendar() result used for revision timing and
  * production hours. verifyRestoration(record, canonicalOrder) must return true only for a
- * producer/admin console record that the producer failed to deliver an accepted revision.
+ * producer/admin console record: a RESTORATION_PROPOSAL that the producer failed to deliver an accepted
+ * revision, with its evidence, or a RESTORATION_DECISION by another person on that proposal.
  * verifyReview(record, canonicalOrder) must return true only for a finance/admin console record that
  * opens a cancellation, refund or dispute review, or that resolves the open review. A REFUND outcome
  * is a recorded decision only; this core never moves money. `reviewPolicy` is the active review
- * outcome matrix (default APPROVED_REVIEW_POLICY; an injected one may only narrow it). For review commands
- * authorize() must also bind principal.actorId to the authenticated session: that id is the trusted actor
- * identity for the audit and the four-eyes rule, never a value taken from the request body.
+ * outcome matrix (default APPROVED_REVIEW_POLICY; an injected one may only narrow it). For review,
+ * restoration, delivery-proposal and manual expiry commands authorize() must also bind principal.actorId to
+ * the authenticated session: that id is the trusted actor identity for the audit and the four-eyes rules,
+ * never a value taken from the request body. No principal may carry a SYSTEM-shaped id.
  * verifyReplan(record, canonicalOrder) must return true
  * only for a producer/admin console delivery-date proposal, or for a customer confirmation that the
  * server's confirmation service recorded for exactly this order, proposal and date.
@@ -193,6 +236,13 @@ export function createCore({ authorize, verifyPayment, verifyEmail, verifyBookin
     verifyReplan, reviewPolicy = APPROVED_REVIEW_POLICY, calendar, clock = () => new Date().toISOString() } = {}) {
     requireThat(typeof clock === "function", "INVALID_CLOCK");
     const policy = loadReviewPolicy(reviewPolicy);
+    // Decision 140: every trusted time is validated and stored as UTC ISO; a zone-less clock value is refused.
+    const serverTime = () => new Date(instant(clock(), "INVALID_CLOCK")).toISOString();
+    const notBefore = (order, time) => {
+        // Decision 140: trusted time never runs backwards against the order's last recorded event.
+        const last = order.events.at(-1);
+        requireThat(!last || Date.parse(time) >= Date.parse(last.at), "CLOCK_REGRESSION");
+    };
     // The private registry is the only authority for state. External snapshots are ID handles,
     // not persisted records. A new process has no authority to restore them and fails closed.
     const orders = new Map();
@@ -206,7 +256,7 @@ export function createCore({ authorize, verifyPayment, verifyEmail, verifyBookin
         const order = freezeDeep({
             id: globalThis.crypto.randomUUID(), packageId, state: STATES.DRAFT,
             version: 0, events: [], paymentReference: null, booking: null, slaStartsAt: null, productionStartedAt: null,
-            options: [], revisionsUsed: 0, revisions: [], notifications: [], reviews: [], selectedOption: null,
+            options: [], revisionsUsed: 0, revisions: [], restorations: [], notifications: [], reviews: [], selectedOption: null,
             delivery: null, replannedDeadline: null, deliveryReplans: [], financialAssessments: []
         });
         orders.set(order.id, order);
@@ -232,7 +282,7 @@ export function createCore({ authorize, verifyPayment, verifyEmail, verifyBookin
         // Only the fingerprint is logged; no raw proof or contact is persisted.
         const intent = [command.kind, data.options, data.selectedOption, data.mp3Ref,
         data.wavRef, data.wavFeasible, data.proof, data.booking, data.revisionId, data.restoration, data.review,
-        data.resolution, data.proposal, data.confirmation];
+        data.resolution, data.proposal, data.confirmation, data.restorationId, data.decision];
         const fingerprint = await digest(intent);
         const prior = order.events.find(event => event.requestId === command.requestId);
         if (prior) {
@@ -259,7 +309,8 @@ export function createCore({ authorize, verifyPayment, verifyEmail, verifyBookin
         const next = {
             ...order, options: [...order.options], events: [...order.events],
             revisions: [...order.revisions], notifications: [...order.notifications], reviews: [...order.reviews],
-            deliveryReplans: [...order.deliveryReplans], financialAssessments: [...order.financialAssessments]
+            deliveryReplans: [...order.deliveryReplans], financialAssessments: [...order.financialAssessments],
+            restorations: [...order.restorations]
         };
         const inState = (...states) => requireThat(states.includes(order.state), "INVALID_TRANSITION");
         // Trusted server time for the transition; commands that read the clock fix it here once.
@@ -273,16 +324,23 @@ export function createCore({ authorize, verifyPayment, verifyEmail, verifyBookin
         const effectiveDeadline = () => order.replannedDeadline ?? order.booking?.deadline ?? null;
         const requireLiveDeadline = () => {
             // After a review, time-bound work waits for a confirmed new commitment once the current one has passed.
-            at ??= clock();
+            at ??= serverTime();
             const due = effectiveDeadline();
             requireThat(order.reviews.length === 0 || due === null || Date.parse(due) > instant(at, "INVALID_CLOCK"),
                 "DELIVERY_REPLAN_REQUIRED");
         };
         const replanStates = [STATES.START_APPROVED, STATES.IN_PRODUCTION, STATES.REVISION_PENDING, STATES.FINAL_SELECTED];
-        const expire = replan => ({
+        // Decision 141 (K-08): a verified person. The id comes from the authenticated principal, never from the
+        // request body, and an id shaped like the reserved SYSTEM actor is refused.
+        const requireHumanActor = () => {
+            requireThat(opaque(principal.actorId), "ACTOR_REQUIRED");
+            requireThat(!RESERVED_ACTOR.test(principal.actorId), "RESERVED_ACTOR");
+        };
+        const humanActor = () => ({ actorId: principal.actorId, actorType: "HUMAN", role: principal.role });
+        const expire = (replan, actor) => ({
             ...replan, status: "EXPIRED", expiry: {
                 orderId: order.id, replanId: replan.replanId, expiredAt: replan.expiresAt, recordedAt: at,
-                recordedBy: command.kind, role: principal.role, idempotencyKey: command.requestId
+                recordedBy: command.kind, ...actor, idempotencyKey: command.requestId
             }
         });
         const checkedDeadline = (value, now) => {
@@ -339,7 +397,7 @@ export function createCore({ authorize, verifyPayment, verifyEmail, verifyBookin
                     "URGENT_NOT_CLEARED");
                 // Early or late, the actual start is recorded separately; slaStartsAt and the committed
                 // deadline never move. Work may only start inside the tariff's production hours.
-                next.productionStartedAt = clock();
+                next.productionStartedAt = serverTime();
                 const startedAt = instant(next.productionStartedAt, "INVALID_CLOCK");
                 requireThat(calendarCall(() => isEligible(startedAt, order.booking.tariff, calendar)),
                     "OUTSIDE_PRODUCTION_HOURS");
@@ -401,35 +459,93 @@ export function createCore({ authorize, verifyPayment, verifyEmail, verifyBookin
                 next.state = STATES.IN_PRODUCTION;
                 break;
             }
-            case "restore_revision_right": {
-                // PDR-27: one restoration for an accepted, undelivered revision when the producer could not deliver.
+            case "restore_revision_right":
+                // Decision 141 (K-08): the single-person restoration is closed; it must go through
+                // propose_revision_restoration and a second person's decide_revision_restoration.
+                throw new OrderError("RESTORATION_REQUIRES_APPROVAL");
+            case "propose_revision_restoration": {
+                // PDR-27 eligibility, unchanged: an accepted, undelivered revision the producer could not deliver.
                 // IN_PRODUCTION is admitted only to report delivered/restored revisions precisely; it has no open one.
                 inState(STATES.REVISION_PENDING, STATES.IN_PRODUCTION);
+                requireHumanActor();
                 const record = data.restoration;
-                requireThat(record && typeof record === "object" && record.orderId === order.id &&
-                    record.revisionId === data.revisionId && record.source === RESTORATION_SOURCES[principal.role],
+                requireThat(record && typeof record === "object" && record.kind === "RESTORATION_PROPOSAL" &&
+                    record.orderId === order.id && record.revisionId === data.revisionId &&
+                    record.source === RESTORATION_SOURCES[principal.role] && record.actorId === principal.actorId,
                     "RESTORATION_MISMATCH");
                 const target = order.revisions.find(revision => revision.revisionId === data.revisionId);
                 requireThat(target, "UNKNOWN_REVISION");
                 requireThat(target.status !== "RESTORED", "ALREADY_RESTORED");
                 requireThat(target.status !== "DELIVERED", "REVISION_ALREADY_DELIVERED");
                 requireThat(target === openRevision(), "UNKNOWN_REVISION");
-                requireThat(record.reasonCode === "PRODUCER_NON_DELIVERY" && opaque(record.authorizationRef),
-                    "INVALID_RESTORATION");
+                requireThat(record.reasonCode === "PRODUCER_NON_DELIVERY" && opaque(record.authorizationRef) &&
+                    opaque(record.evidenceRef), "INVALID_RESTORATION");
+                requireThat(!order.restorations.some(item => item.revisionId === target.revisionId &&
+                    item.status === "PENDING_APPROVAL"), "RESTORATION_PENDING");
                 requireThat(typeof verifyRestoration === "function" &&
                     await verifyRestoration(record, order) === true, "UNTRUSTED_RESTORATION");
                 requireThat(!restorationReferences.has(record.authorizationRef), "RESTORATION_REFERENCE_USED");
                 requireThat(order.revisionsUsed >= 1, "REVISION_LIMIT");
-                at = clock();
+                at = serverTime();
                 restorationRef = record.authorizationRef;
+                const id = `restoration-${String(order.restorations.length + 1).padStart(4, "0")}`;
                 audit = {
-                    orderId: order.id, revisionId: target.revisionId, reasonCode: record.reasonCode,
+                    orderId: order.id, restorationId: id, revisionId: target.revisionId, step: "PROPOSAL",
+                    reasonCode: record.reasonCode, evidenceRef: record.evidenceRef, ...humanActor(),
                     authorizationRef: record.authorizationRef, at, idempotencyKey: command.requestId
                 };
-                next.revisionsUsed -= 1;
-                next.revisions = order.revisions.map(revision => revision === target
-                    ? { ...revision, status: "RESTORED", restoration: audit } : revision);
-                next.state = STATES.IN_PRODUCTION;
+                // A proposal changes no right and no revision: only the decision of a second person can.
+                next.restorations.push({
+                    restorationId: id, revisionId: target.revisionId, status: "PENDING_APPROVAL", proposal: audit,
+                    decision: null
+                });
+                break;
+            }
+            case "decide_revision_restoration": {
+                inState(STATES.REVISION_PENDING, STATES.IN_PRODUCTION);
+                requireHumanActor();
+                const pending = order.restorations.find(item => item.restorationId === data.restorationId);
+                requireThat(pending, "UNKNOWN_RESTORATION");
+                requireThat(pending.status === "PENDING_APPROVAL", "RESTORATION_NOT_PENDING");
+                const record = data.decision;
+                // The decision re-asserts the proposal's order, revision and evidence under its own signature.
+                requireThat(record && typeof record === "object" && record.kind === "RESTORATION_DECISION" &&
+                    record.orderId === order.id && record.restorationId === pending.restorationId &&
+                    record.revisionId === pending.revisionId && record.evidenceRef === pending.proposal.evidenceRef &&
+                    ["APPROVE", "REJECT"].includes(record.decision) &&
+                    record.source === RESTORATION_SOURCES[principal.role] && record.actorId === principal.actorId &&
+                    opaque(record.authorizationRef) && (record.reasonCode == null || REASON_CODE.test(record.reasonCode)),
+                    "RESTORATION_MISMATCH");
+                requireThat(record.decision === "APPROVE" || record.reasonCode != null, "REJECTION_REASON_REQUIRED");
+                // Four eyes: the proposer never decides, whatever role they use.
+                requireThat(principal.actorId !== pending.proposal.actorId, "FOUR_EYES_VIOLATION");
+                requireThat(typeof verifyRestoration === "function" &&
+                    await verifyRestoration(record, order) === true, "UNTRUSTED_RESTORATION");
+                requireThat(!restorationReferences.has(record.authorizationRef), "RESTORATION_REFERENCE_USED");
+                const target = order.revisions.find(revision => revision.revisionId === pending.revisionId);
+                const approve = record.decision === "APPROVE";
+                if (approve) {
+                    // Still eligible at approval time: accepted, undelivered and the open revision.
+                    requireThat(target.status === "ACCEPTED" && target === openRevision(), "RESTORATION_NOT_ELIGIBLE");
+                    requireThat(order.revisionsUsed >= 1, "REVISION_LIMIT");
+                }
+                at = serverTime();
+                restorationRef = record.authorizationRef;
+                audit = {
+                    orderId: order.id, restorationId: pending.restorationId, revisionId: pending.revisionId,
+                    step: "DECISION", decision: record.decision, reasonCode: record.reasonCode ?? null,
+                    evidenceRef: record.evidenceRef, ...humanActor(), authorizationRef: record.authorizationRef, at,
+                    idempotencyKey: command.requestId
+                };
+                next.restorations = order.restorations.map(item => item === pending
+                    ? { ...item, status: approve ? "APPROVED" : "REJECTED", decision: audit } : item);
+                if (approve) {
+                    next.revisionsUsed -= 1;
+                    next.revisions = order.revisions.map(revision => revision === target
+                        ? { ...revision, status: "RESTORED", restoration: { proposal: pending.proposal, approval: audit } }
+                        : revision);
+                    next.state = STATES.IN_PRODUCTION;
+                }
                 break;
             }
             case "select_final":
@@ -457,7 +573,7 @@ export function createCore({ authorize, verifyPayment, verifyEmail, verifyBookin
                 break;
             case "open_review": {
                 // The actor id comes from the authenticated principal; the signed record must name the same actor.
-                requireThat(opaque(principal.actorId), "ACTOR_REQUIRED");
+                requireHumanActor();
                 const record = data.review;
                 requireThat(record && typeof record === "object" && record.orderId === order.id &&
                     Object.hasOwn(REVIEW_STATES, record.type) && record.source === REVIEW_SOURCES[principal.role] &&
@@ -468,11 +584,11 @@ export function createCore({ authorize, verifyPayment, verifyEmail, verifyBookin
                 requireThat(typeof verifyReview === "function" && await verifyReview(record, order) === true,
                     "UNTRUSTED_REVIEW");
                 requireThat(!reviewReferences.has(record.authorizationRef), "REVIEW_REFERENCE_USED");
-                at = clock();
+                at = serverTime();
                 reviewRef = record.authorizationRef;
                 const id = `review-${String(order.reviews.length + 1).padStart(4, "0")}`;
                 audit = {
-                    orderId: order.id, reviewId: id, type: record.type, actorId: principal.actorId, role: principal.role,
+                    orderId: order.id, reviewId: id, type: record.type, ...humanActor(),
                     authorizationRef: record.authorizationRef, at, policyReference: policy.reference,
                     idempotencyKey: command.requestId
                 };
@@ -486,7 +602,7 @@ export function createCore({ authorize, verifyPayment, verifyEmail, verifyBookin
             }
             case "resolve_review": {
                 requireThat(openReview, "INVALID_TRANSITION");
-                requireThat(opaque(principal.actorId), "ACTOR_REQUIRED");
+                requireHumanActor();
                 const record = data.resolution;
                 requireThat(record && typeof record === "object" && record.orderId === order.id &&
                     record.reviewId === openReview.reviewId && Object.hasOwn(REVIEW_OUTCOMES, record.outcome) &&
@@ -503,11 +619,11 @@ export function createCore({ authorize, verifyPayment, verifyEmail, verifyBookin
                 requireThat(typeof verifyReview === "function" && await verifyReview(record, order) === true,
                     "UNTRUSTED_REVIEW");
                 requireThat(!reviewReferences.has(record.authorizationRef), "REVIEW_REFERENCE_USED");
-                at = clock();
+                at = serverTime();
                 reviewRef = record.authorizationRef;
                 audit = {
                     orderId: order.id, reviewId: openReview.reviewId, outcome: record.outcome,
-                    actorId: principal.actorId, role: principal.role, reasonCode: record.reasonCode ?? null,
+                    ...humanActor(), reasonCode: record.reasonCode ?? null,
                     authorizationRef: record.authorizationRef, at, policyReference: policy.reference,
                     idempotencyKey: command.requestId
                 };
@@ -535,11 +651,13 @@ export function createCore({ authorize, verifyPayment, verifyEmail, verifyBookin
                 inState(...replanStates);
                 requireThat(order.reviews.some(review => review.resolution?.outcome === REVIEW_OUTCOMES.CONTINUE),
                     "REPLAN_NOT_ALLOWED");
+                requireHumanActor();
                 const record = data.proposal;
                 requireThat(record && typeof record === "object" && record.kind === "DELIVERY_PROPOSAL" &&
                     record.orderId === order.id && record.source === RESTORATION_SOURCES[principal.role] &&
-                    opaque(record.authorizationRef) && typeof record.proposedDeadline === "string", "INVALID_PROPOSAL");
-                at = clock();
+                    record.actorId === principal.actorId && opaque(record.authorizationRef) &&
+                    typeof record.proposedDeadline === "string", "INVALID_PROPOSAL");
+                at = serverTime();
                 const now = instant(at, "INVALID_CLOCK");
                 // One active proposal at a time. An expired one is closed on record below, never silently replaced.
                 const previous = order.deliveryReplans.findLast(replan => replan.status === "PROPOSED");
@@ -554,11 +672,16 @@ export function createCore({ authorize, verifyPayment, verifyEmail, verifyBookin
                 const id = `replan-${String(order.deliveryReplans.length + 1).padStart(4, "0")}`;
                 const expiresAt = new Date(now + PROPOSAL_LIFETIME_MS).toISOString();
                 audit = {
-                    orderId: order.id, replanId: id, proposedDeadline: proposed, missedDeadline: missed,
+                    orderId: order.id, replanId: id, proposedDeadline: proposed, missedDeadline: missed, ...humanActor(),
                     authorizationRef: record.authorizationRef, at, expiresAt, idempotencyKey: command.requestId
                 };
+                // The only SYSTEM step: the elapsed proposal is closed by the core itself, on the trusted clock,
+                // inside this person's transaction. SYSTEM approves nothing and counts as no second person.
                 if (previous) next.deliveryReplans = order.deliveryReplans.map(replan => replan === previous
-                    ? expire(replan) : replan);
+                    ? expire(replan, {
+                        actorId: SYSTEM_ACTOR_ID, actorType: "SYSTEM", role: null, reason: "EXPIRED_BEFORE_NEW_PROPOSAL",
+                        triggeredBy: { actorId: principal.actorId, role: principal.role }
+                    }) : replan);
                 // The missed commitment stays on record as delay history; slaStartsAt and booking are untouched.
                 next.deliveryReplans.push({
                     replanId: id, status: "PROPOSED", proposedDeadline: proposed, missedDeadline: missed,
@@ -570,11 +693,12 @@ export function createCore({ authorize, verifyPayment, verifyEmail, verifyBookin
             case "expire_delivery_proposal": {
                 // Records an expiry on the order. Only the trusted clock decides; nothing else changes.
                 inState(...replanStates);
+                requireHumanActor();
                 const pending = order.deliveryReplans.findLast(replan => replan.status === "PROPOSED");
                 requireThat(pending, "REPLAN_NOT_PENDING");
-                at = clock();
+                at = serverTime();
                 requireThat(instant(at, "INVALID_CLOCK") >= Date.parse(pending.expiresAt), "PROPOSAL_NOT_EXPIRED");
-                const expired = expire(pending);
+                const expired = expire(pending, { ...humanActor(), reason: "MANUAL_EXPIRY_RECORD" });
                 audit = expired.expiry;
                 next.deliveryReplans = order.deliveryReplans.map(replan => replan === pending ? expired : replan);
                 break;
@@ -586,12 +710,14 @@ export function createCore({ authorize, verifyPayment, verifyEmail, verifyBookin
                 const record = data.confirmation;
                 requireThat(record && typeof record === "object" && record.kind === "DELIVERY_CONFIRMATION" &&
                     record.orderId === order.id && record.replanId === pending.replanId &&
-                    record.proposedDeadline === pending.proposedDeadline && ["ACCEPT", "REJECT"].includes(record.decision) &&
+                    // The same instant in any explicit offset matches; a zone-less or other date never does.
+                    zonedInstant(record.proposedDeadline) === Date.parse(pending.proposedDeadline) &&
+                    ["ACCEPT", "REJECT"].includes(record.decision) &&
                     record.source === CONFIRMATION_SOURCE && opaque(record.confirmationRef), "INVALID_CONFIRMATION");
                 requireThat(typeof verifyReplan === "function" && await verifyReplan(record, order) === true,
                     "UNTRUSTED_CONFIRMATION");
                 requireThat(!replanReferences.has(record.confirmationRef), "REPLAN_REFERENCE_USED");
-                at = clock();
+                at = serverTime();
                 // Decision 135: the answer must arrive strictly before expiresAt; at expiresAt the proposal is dead.
                 requireThat(instant(at, "INVALID_CLOCK") < Date.parse(pending.expiresAt), "PROPOSAL_EXPIRED");
                 // The date and calendar are checked again: a confirmation never commits a past or ineligible date.
@@ -612,11 +738,13 @@ export function createCore({ authorize, verifyPayment, verifyEmail, verifyBookin
         next.version += 1;
         const event = {
             sequence: next.version, requestId: command.requestId, kind: command.kind,
-            role: principal.role, from: order.state, to: next.state, fingerprint, at: at ?? clock(),
+            role: principal.role, from: order.state, to: next.state, fingerprint, at: at ?? serverTime(),
             previousHash: order.events.at(-1)?.hash || null
         };
         if (audit) event.audit = audit;
         requireThat(typeof event.at === "string" && !Number.isNaN(Date.parse(event.at)), "INVALID_CLOCK");
+        // Checked before anything is committed: a refused transition changes no state, right or reference.
+        notBefore(order, event.at);
         event.hash = await digest(event);
         next.events.push(event);
         requireThat(orders.get(order.id) === order, "VERSION_CONFLICT");
@@ -637,5 +765,23 @@ export function createCore({ authorize, verifyPayment, verifyEmail, verifyBookin
         if (replanRef) replanReferences.set(replanRef, order.id);
         return committed;
     }
-    return Object.freeze({ createOrder, dispatch });
+    /** Decision 140: trusted server-side read of a proposal's visible state from the canonical record and the
+     * trusted clock. It writes no event, audit or reference and never extends a proposal. */
+    function viewProposal(snapshot, replanId) {
+        requireThat(snapshot && typeof snapshot.id === "string", "INVALID_ORDER");
+        const order = orders.get(snapshot.id);
+        requireThat(order, "UNKNOWN_ORDER");
+        requireThat(snapshot.packageId === order.packageId, "INVALID_ORDER");
+        const replan = order.deliveryReplans.find(item => item.replanId === replanId);
+        requireThat(replan, "UNKNOWN_PROPOSAL");
+        const now = serverTime();
+        // A clock behind the order's history could show an expired proposal as ACTIVE: refuse instead.
+        notBefore(order, now);
+        return freezeDeep({
+            orderId: order.id, replanId: replan.replanId, visibleStatus: proposalVisibility(replan, order.id, now),
+            storedStatus: replan.status, proposedDeadline: replan.proposedDeadline, createdAt: replan.createdAt,
+            expiresAt: replan.expiresAt, evaluatedAt: now
+        });
+    }
+    return Object.freeze({ createOrder, dispatch, viewProposal });
 }

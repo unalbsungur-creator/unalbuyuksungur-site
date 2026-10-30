@@ -1,7 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
-import { APPROVED_REVIEW_POLICY, createCore, OrderError, PACKAGES, STATES } from "./core.mjs";
+import { APPROVED_REVIEW_POLICY, createCore, OrderError, PACKAGES, PROPOSAL_VISIBILITY, proposalVisibility, STATES }
+    from "./core.mjs";
 import { loadCalendar } from "./calendar.mjs";
 
 const SERVER = Symbol("synthetic-server-session");
@@ -34,8 +35,9 @@ function signBooking(record) {
 }
 
 function signRestoration(record) {
-    return hmac(["restoration", record.orderId, record.revisionId, record.reasonCode, record.authorizationRef,
-        record.source]);
+    return hmac(["restoration", record.kind ?? null, record.orderId, record.revisionId, record.reasonCode ?? null,
+        record.authorizationRef, record.source, record.actorId ?? null, record.evidenceRef ?? null,
+        record.restorationId ?? null, record.decision ?? null]);
 }
 
 function signReview(record) {
@@ -50,7 +52,8 @@ function session(actorId, role) {
 
 function signReplan(record) {
     return hmac(["replan", record.kind, record.orderId, record.proposedDeadline, record.replanId ?? null,
-        record.decision ?? null, record.authorizationRef ?? null, record.confirmationRef ?? null, record.source]);
+        record.decision ?? null, record.authorizationRef ?? null, record.confirmationRef ?? null, record.source,
+        record.actorId ?? null]);
 }
 
 function signatureMatches(signature, expected) {
@@ -101,15 +104,51 @@ function setup(overrides = {}) {
         };
         return { ...record, signature: signBooking(record) };
     }
+    // Görev 141: restoration people; the role follows the console source of the record.
+    const producerSide = (source, step) => `synthetic-${source === "admin_console" ? "admin" : "creative"}-${step}`;
     function restoration(order, revisionId, extra = {}) {
+        const source = extra.source ?? "producer_console";
         const record = {
-            orderId: order.id, revisionId, reasonCode: "PRODUCER_NON_DELIVERY",
-            authorizationRef: `synthetic-authorization-${++counter}`, source: "producer_console", ...extra
+            kind: "RESTORATION_PROPOSAL", orderId: order.id, revisionId, reasonCode: "PRODUCER_NON_DELIVERY",
+            authorizationRef: `synthetic-authorization-${++counter}`, source, actorId: producerSide(source, "proposer"),
+            evidenceRef: `synthetic-evidence-${counter}`, ...extra
         };
         return { ...record, signature: signRestoration(record) };
     }
-    function restore(order, revisionId, record = restoration(order, revisionId), role = "creative", options = {}) {
-        return send(order, "restore_revision_right", role, { revisionId, restoration: record }, options);
+    function restorationDecision(order, decision, pending = order.restorations.at(-1), extra = {}) {
+        const source = extra.source ?? "producer_console";
+        const record = {
+            kind: "RESTORATION_DECISION", orderId: order.id, restorationId: pending.restorationId,
+            revisionId: pending.revisionId, evidenceRef: pending.proposal.evidenceRef, decision,
+            ...(decision === "REJECT" ? { reasonCode: "SYNTHETIC_EVIDENCE_INSUFFICIENT" } : {}),
+            authorizationRef: `synthetic-restoration-decision-${++counter}`, source,
+            actorId: producerSide(source, "approver"), ...extra
+        };
+        return { ...record, signature: signRestoration(record) };
+    }
+    function proposeRestoration(order, revisionId, record = restoration(order, revisionId), role = "creative",
+        options = {}) {
+        return send(order, "propose_revision_restoration", role, { revisionId, restoration: record },
+            { actorId: record?.actorId, ...options });
+    }
+    function decideRestoration(order, decision, record = restorationDecision(order, decision), role = "creative",
+        options = {}) {
+        return send(order, "decide_revision_restoration", role, { restorationId: record?.restorationId, decision: record },
+            { actorId: record?.actorId, ...options });
+    }
+    /** The full approved restoration: proposal by one person, approval by a second person of the same role.
+     * The approval is derived from the proposal so that a retried pair is idempotent end to end. */
+    async function restore(order, revisionId, record = restoration(order, revisionId), role = "creative", options = {}) {
+        const proposed = await proposeRestoration(order, revisionId, record, role, options);
+        const pending = proposed.restorations.findLast(item => item.revisionId === revisionId);
+        const source = role === "admin" ? "admin_console" : "producer_console";
+        const approval = { kind: "RESTORATION_DECISION", orderId: proposed.id, restorationId: pending.restorationId,
+            revisionId, evidenceRef: pending.proposal.evidenceRef, decision: "APPROVE",
+            authorizationRef: `${record.authorizationRef}-approval`, source, actorId: producerSide(source, "approver") };
+        return decideRestoration(proposed, "APPROVE", { ...approval, signature: signRestoration(approval) }, role, {
+            ...options, requestId: options.requestId ? `${options.requestId}-approve` : undefined,
+            version: options.version === undefined ? undefined : options.version + 1
+        });
     }
     // Görev 135: by default one synthetic person opens and a different person of the same team decides.
     const staff = (source, step) => `synthetic-${source === "admin_console" ? "admin" : "finance"}-${step}`;
@@ -138,9 +177,11 @@ function setup(overrides = {}) {
         return send(order, "resolve_review", role, { resolution: record }, { actorId: record?.actorId, ...options });
     }
     function proposal(order, proposedDeadline, extra = {}) {
+        const source = extra.source ?? "producer_console";
         const record = {
             kind: "DELIVERY_PROPOSAL", orderId: order.id, proposedDeadline,
-            authorizationRef: `synthetic-proposal-${++counter}`, source: "producer_console", ...extra
+            authorizationRef: `synthetic-proposal-${++counter}`, source, actorId: producerSide(source, "planner"),
+            ...extra
         };
         return { ...record, signature: signReplan(record) };
     }
@@ -153,15 +194,15 @@ function setup(overrides = {}) {
         return { ...record, signature: signReplan(record) };
     }
     function propose(order, proposedDeadline, record = proposal(order, proposedDeadline), role = "creative", options = {}) {
-        return send(order, "propose_delivery_date", role, { proposal: record }, options);
+        return send(order, "propose_delivery_date", role, { proposal: record }, { actorId: record?.actorId, ...options });
     }
     function confirm(order, decision, record = confirmation(order, decision), role = "customer", options = {}) {
         return send(order, "confirm_delivery_date", role, { confirmation: record }, options);
     }
     const setNow = value => { now = value; };
     return {
-        core, actor, send, payment, booking, restoration, restore, reviewRecord, resolution, openReview,
-        resolveReview, proposal, confirmation, propose, confirm, setNow
+        core, actor, send, payment, booking, restoration, restorationDecision, proposeRestoration, decideRestoration,
+        restore, reviewRecord, resolution, openReview, resolveReview, proposal, confirmation, propose, confirm, setNow
     };
 }
 
@@ -672,7 +713,8 @@ test("PDR-26/1,2,3,6: a valid request is accepted automatically with one right a
         dispatch: "PENDING_OUTBOX"
     }]);
     // No producer command was needed, and the core exposes no sending capability or delivery claim.
-    assert.deepEqual(Object.keys(h.core), ["createOrder", "dispatch"]);
+    // Görev 140 added only the read-only viewProposal; still nothing that sends or notifies.
+    assert.deepEqual(Object.keys(h.core), ["createOrder", "dispatch", "viewProposal"]);
     const delivered = await h.send(accepted, "revision_options", "creative", { options: ["synthetic-n1", "synthetic-n2"] });
     assert.equal(delivered.revisionsUsed, 1);
     assert.equal(delivered.revisions[0].status, "DELIVERED");
@@ -724,16 +766,30 @@ test("PDR-27/9,14: a producer non-delivery restores one right with an atomic aud
         const restored = await h.restore(accepted, "revision-0001", record, role, { requestId: `synthetic-restore-${role}` });
         assert.equal(restored.revisionsUsed, 0);
         assert.equal(restored.state, STATES.IN_PRODUCTION);
-        assert.equal(restored.version, accepted.version + 1);
-        const event = restored.events.at(-1);
-        const audit = {
-            orderId: accepted.id, revisionId: "revision-0001", reasonCode: "PRODUCER_NON_DELIVERY",
-            authorizationRef: record.authorizationRef, at: FIXED_TIME, idempotencyKey: `synthetic-restore-${role}`
+        // Görev 141: proposal and approval are two atomic transitions; only the approval restores the right.
+        assert.equal(restored.version, accepted.version + 2);
+        const [proposalEvent, approvalEvent] = restored.events.slice(-2);
+        const proposal = {
+            orderId: accepted.id, restorationId: "restoration-0001", revisionId: "revision-0001", step: "PROPOSAL",
+            reasonCode: "PRODUCER_NON_DELIVERY", evidenceRef: record.evidenceRef, actorId: record.actorId,
+            actorType: "HUMAN", role, authorizationRef: record.authorizationRef, at: FIXED_TIME,
+            idempotencyKey: `synthetic-restore-${role}`
         };
-        assert.deepEqual(event.audit, audit);
-        assert.deepEqual([event.kind, event.role, event.from, event.to],
-            ["restore_revision_right", role, STATES.REVISION_PENDING, STATES.IN_PRODUCTION]);
-        assert.deepEqual(restored.revisions[0], { ...accepted.revisions[0], status: "RESTORED", restoration: audit });
+        const approval = {
+            orderId: accepted.id, restorationId: "restoration-0001", revisionId: "revision-0001", step: "DECISION",
+            decision: "APPROVE", reasonCode: null, evidenceRef: record.evidenceRef, actorId: `synthetic-${role}-approver`,
+            actorType: "HUMAN", role, authorizationRef: `${record.authorizationRef}-approval`, at: FIXED_TIME,
+            idempotencyKey: `synthetic-restore-${role}-approve`
+        };
+        assert.deepEqual([proposalEvent.audit, approvalEvent.audit], [proposal, approval]);
+        assert.deepEqual([proposalEvent.kind, proposalEvent.from, proposalEvent.to],
+            ["propose_revision_restoration", STATES.REVISION_PENDING, STATES.REVISION_PENDING]);
+        assert.deepEqual([approvalEvent.kind, approvalEvent.role, approvalEvent.from, approvalEvent.to],
+            ["decide_revision_restoration", role, STATES.REVISION_PENDING, STATES.IN_PRODUCTION]);
+        assert.deepEqual(restored.revisions[0],
+            { ...accepted.revisions[0], status: "RESTORED", restoration: { proposal, approval } });
+        assert.deepEqual(restored.restorations, [{ restorationId: "restoration-0001", revisionId: "revision-0001",
+            status: "APPROVED", proposal, decision: approval }]);
         assert.ok(!JSON.stringify(restored.events).includes(record.signature));
         // The restored right can be used again for a new, separately identified revision.
         const next = await h.send(restored, "request_revision", "customer");
@@ -828,8 +884,9 @@ test("PDR-27/15: a failed restoration changes neither rights, audit nor referenc
         { authorizationRef: good.authorizationRef, reasonCode: "OTHER" })), /INVALID_RESTORATION/);
     // The registry still holds the accepted version, and the reference was not consumed by the failures.
     const restored = await h.restore(accepted, "revision-0001", good);
-    assert.equal(restored.version, accepted.version + 1);
-    assert.equal(restored.events.filter(event => event.audit).length, 1);
+    // Görev 141: exactly the proposal and the approval were recorded, nothing from the failed attempts.
+    assert.equal(restored.version, accepted.version + 2);
+    assert.equal(restored.events.filter(event => event.audit).length, 2);
     assert.equal(restored.revisionsUsed, 0);
 });
 
@@ -1704,7 +1761,8 @@ test("FE/15,16: an admin CLOSE needs a verified reason code and is fully audited
 const PROPOSAL_EXPIRES = "2026-11-04T07:00:00.000Z"; // AFTER_DEADLINE + 48 hours
 
 function expireProposal(h, order, role = "creative", options = {}) {
-    return h.send(order, "expire_delivery_proposal", role, {}, options);
+    // Görev 141: a manual expiry record names the verified person who made it.
+    return h.send(order, "expire_delivery_proposal", role, {}, { actorId: `synthetic-${role}-operator`, ...options });
 }
 
 test("EX/19,20: a proposal lives exactly 48 hours; an answer just before the end is accepted", async () => {
@@ -1758,7 +1816,9 @@ test("EX/23,24,25,26: expiry is recorded and changes no SLA, deadline, delay his
     const [replan] = expired.deliveryReplans;
     assert.deepEqual(replan.expiry, {
         orderId: expired.id, replanId: "replan-0001", expiredAt: PROPOSAL_EXPIRES, recordedAt: PROPOSAL_EXPIRES,
-        recordedBy: "expire_delivery_proposal", role: "admin", idempotencyKey: expired.events.at(-1).requestId
+        recordedBy: "expire_delivery_proposal", role: "admin", idempotencyKey: expired.events.at(-1).requestId,
+        // Görev 141: the verified person who recorded the manual expiry.
+        actorId: "synthetic-admin-operator", actorType: "HUMAN", reason: "MANUAL_EXPIRY_RECORD"
     });
     assert.deepEqual(expired.events.at(-1).audit, replan.expiry);
     assert.equal(replan.missedDeadline, DEADLINE);
@@ -1825,4 +1885,493 @@ test("EX/31: acceptance and expiry racing at the same instant resolve by trusted
             assert.equal(won.value.replannedDeadline, winner === "ACCEPTED" ? NEW_DEADLINE : null);
         }
     }
+});
+
+// ---- Görev 140: proposal visibility ----
+
+const { ACTIVE, ACCEPTED, REJECTED, EXPIRED } = PROPOSAL_VISIBILITY;
+
+test("VIS/1,2,3,4,5: visible states follow the stored status and the trusted clock; expiresAt is already EXPIRED",
+    async () => {
+        const h = await overdueAfterReview();
+        const proposed = await h.propose(h.order, NEW_DEADLINE);
+        const view = h.core.viewProposal(proposed, "replan-0001");
+        assert.deepEqual(view, {
+            orderId: proposed.id, replanId: "replan-0001", visibleStatus: ACTIVE, storedStatus: "PROPOSED",
+            proposedDeadline: NEW_DEADLINE, createdAt: AFTER_DEADLINE, expiresAt: PROPOSAL_EXPIRES, evaluatedAt: AFTER_DEADLINE
+        });
+        assert.ok(Object.isFrozen(view));
+        h.setNow("2026-11-04T06:59:59.999Z");
+        assert.equal(h.core.viewProposal(proposed, "replan-0001").visibleStatus, ACTIVE);
+        h.setNow(PROPOSAL_EXPIRES);
+        assert.deepEqual([h.core.viewProposal(proposed, "replan-0001").visibleStatus,
+            h.core.viewProposal(proposed, "replan-0001").storedStatus], [EXPIRED, "PROPOSED"]);
+        const marked = await expireProposal(h, proposed);
+        assert.equal(h.core.viewProposal(marked, "replan-0001").visibleStatus, EXPIRED);
+        const accepted = await overdueAfterReview();
+        const confirmed = await accepted.confirm(await accepted.propose(accepted.order, NEW_DEADLINE), "ACCEPT");
+        assert.equal(accepted.core.viewProposal(confirmed, "replan-0001").visibleStatus, ACCEPTED);
+        const refused = await overdueAfterReview();
+        const rejected = await refused.confirm(await refused.propose(refused.order, NEW_DEADLINE), "REJECT");
+        assert.equal(refused.core.viewProposal(rejected, "replan-0001").visibleStatus, REJECTED);
+        // A closed proposal never comes back as ACTIVE, whatever the time.
+        for (const status of ["CONFIRMED", "REJECTED", "EXPIRED"]) {
+            assert.notEqual(proposalVisibility({ ...proposed.deliveryReplans[0], status }, proposed.id, AFTER_DEADLINE), ACTIVE);
+        }
+    });
+
+test("VIS/6,7,8: reading the visible state changes nothing, writes no audit and uses no reference", async () => {
+    const h = await overdueAfterReview();
+    const proposed = await h.propose(h.order, NEW_DEADLINE);
+    h.setNow(PROPOSAL_EXPIRES);
+    for (let i = 0; i < 3; i++) assert.equal(h.core.viewProposal(proposed, "replan-0001").visibleStatus, EXPIRED);
+    // The canonical order is unchanged: the next command still applies to the same version, and the expiry
+    // is not recorded and the window not extended by the reads.
+    const expired = await expireProposal(h, proposed);
+    assert.equal(expired.version, proposed.version + 1);
+    assert.equal(expired.events.length, proposed.events.length + 1);
+    assert.equal(expired.deliveryReplans[0].expiresAt, PROPOSAL_EXPIRES);
+    // Reads before the expiry did not consume the customer's confirmation reference either.
+    const fresh = await overdueAfterReview();
+    const pending = await fresh.propose(fresh.order, NEW_DEADLINE);
+    const answer = fresh.confirmation(pending, "ACCEPT");
+    fresh.core.viewProposal(pending, "replan-0001");
+    fresh.core.viewProposal(pending, "replan-0001");
+    assert.equal((await fresh.confirm(pending, "ACCEPT", answer)).deliveryReplans[0].status, "CONFIRMED");
+});
+
+test("VIS/9,14: broken time data, unknown status or another order's record never show as ACTIVE", async () => {
+    const h = await overdueAfterReview();
+    const proposed = await h.propose(h.order, NEW_DEADLINE);
+    const replan = proposed.deliveryReplans[0];
+    const cases = [
+        [{ ...replan, createdAt: "2026-11-02T07:00:00" }, proposed.id, AFTER_DEADLINE, /INVALID_PROPOSAL_TIME/],
+        [{ ...replan, expiresAt: undefined }, proposed.id, AFTER_DEADLINE, /INVALID_PROPOSAL_TIME/],
+        [{ ...replan, expiresAt: "2026-11-04T07:00:00" }, proposed.id, AFTER_DEADLINE, /INVALID_PROPOSAL_TIME/],
+        [{ ...replan, expiresAt: replan.createdAt }, proposed.id, AFTER_DEADLINE, /INVALID_PROPOSAL_TIME/],
+        [replan, proposed.id, "2026-11-02T10:00:00", /INVALID_CLOCK/],
+        [replan, proposed.id, undefined, /INVALID_CLOCK/],
+        [{ ...replan, status: "ACTIVE" }, proposed.id, AFTER_DEADLINE, /INVALID_PROPOSAL_STATUS/],
+        [replan, "another-order-id", AFTER_DEADLINE, /PROPOSAL_MISMATCH/],
+        [{ ...replan, proposal: { ...replan.proposal, replanId: "replan-0002" } }, proposed.id, AFTER_DEADLINE,
+            /PROPOSAL_MISMATCH/],
+        [null, proposed.id, AFTER_DEADLINE, /PROPOSAL_MISMATCH/]
+    ];
+    for (const [record, orderId, now, error] of cases) {
+        assert.throws(() => proposalVisibility(record, orderId, now), error);
+    }
+    // The core read uses only the canonical order and the trusted clock.
+    const other = await overdueAfterReview();
+    const foreign = await other.propose(other.order, NEW_DEADLINE);
+    assert.throws(() => h.core.viewProposal(foreign, "replan-0001"), /UNKNOWN_ORDER/);
+    assert.throws(() => h.core.viewProposal({ ...proposed, packageId: "PREMIUM" }, "replan-0001"), /INVALID_ORDER/);
+    assert.throws(() => h.core.viewProposal(proposed, "replan-0009"), /UNKNOWN_PROPOSAL/);
+    // Snapshot contents are ignored: an emptied or rewritten copy still reads the canonical proposal.
+    assert.equal(h.core.viewProposal({ ...proposed, deliveryReplans: [] }, "replan-0001").visibleStatus, ACTIVE);
+    // A caller-supplied time is never used in place of the trusted clock, in either direction.
+    const early = h.core.viewProposal({ ...proposed, now: PROPOSAL_EXPIRES }, "replan-0001");
+    assert.deepEqual([early.visibleStatus, early.evaluatedAt], [ACTIVE, AFTER_DEADLINE]);
+    h.setNow(PROPOSAL_EXPIRES);
+    const late = h.core.viewProposal({ ...proposed, now: AFTER_DEADLINE, evaluatedAt: AFTER_DEADLINE }, "replan-0001");
+    assert.deepEqual([late.visibleStatus, late.evaluatedAt], [EXPIRED, PROPOSAL_EXPIRES]);
+    // Commands ignore time fields sent with the request as well.
+    await assert.rejects(h.confirm(proposed, "ACCEPT", { ...h.confirmation(proposed, "ACCEPT"), now: AFTER_DEADLINE,
+        at: AFTER_DEADLINE }), /PROPOSAL_EXPIRED/);
+    h.setNow("2026-11-02T10:00:00"); // zone-less trusted clock
+    assert.throws(() => h.core.viewProposal(proposed, "replan-0001"), /INVALID_CLOCK/);
+});
+
+// ---- Görev 140: explicit time zones and UTC normalization ----
+
+test("TZ/10,11,12,13,17: trusted times need an explicit zone and are stored as UTC ISO", async () => {
+    const h = setup();
+    const draft = h.core.createOrder("START");
+    h.setNow("2026-10-28T12:00:00"); // zone-less: never read as server local time
+    await assert.rejects(h.send(draft, "submit", "customer"), /INVALID_CLOCK/);
+    h.setNow("2026-10-28T12:00:00.000+03:00");
+    const submitted = await h.send(draft, "submit", "customer");
+    assert.equal(submitted.version, 1);
+    assert.equal(submitted.events[0].at, "2026-10-28T09:00:00.000Z");
+    h.setNow("2026-10-28T04:30:00-05:00");
+    const paid = await h.send(submitted, "verify_payment", "finance", { proof: h.payment(submitted) });
+    assert.equal(paid.events.at(-1).at, "2026-10-28T09:30:00.000Z");
+    h.setNow("2026-10-28T09:30:00Z");
+    assert.equal((await h.send(paid, "request_email", "customer")).events.at(-1).at, "2026-10-28T09:30:00.000Z");
+    // Booking times from the booking service: offsets are normalized, zone-less values refused.
+    const offset = await ready("START", { scheduledStart: "2026-10-28T13:00:00+03:00", deadline: "2026-10-30T15:00:00+03:00" });
+    assert.equal(offset.order.slaStartsAt, PLANNED_START);
+    assert.equal(offset.order.booking.scheduledStart, PLANNED_START);
+    assert.equal(offset.order.booking.deadline, DEADLINE);
+    const b = await booked();
+    await assert.rejects(b.send(b.order, "approve_start", "scheduler",
+        { booking: b.booking(b.order, { scheduledStart: "2026-10-28T13:00:00" }) }), /INVALID_BOOKING/);
+    await assert.rejects(b.send(b.order, "approve_start", "scheduler",
+        { booking: b.booking(b.order, { deadline: "2026-10-30T15:00:00" }) }), /INVALID_BOOKING/);
+});
+
+test("TZ/14,15: impossible dates, times and offsets are rejected", async () => {
+    const h = await overdueAfterReview();
+    for (const date of ["2026-02-30T12:00:00Z", "2026-13-04T12:00:00Z", "2026-11-31T12:00:00Z",
+        "2026-11-04T24:00:00Z", "2026-11-04T12:60:00Z", "2026-11-04T12:00:60Z", "2026-11-04 12:00:00Z",
+        "2026-11-04T12:00:00+15:00", "2026-11-04T15:00:00+03:60", "2026-11-04T15:00:00+0300",
+        "2026-11-04T15:00:00+3:00", "2026-11-04T15:00:00GMT", "2026-11-04T12:00:00.0000Z", "2026-11-04"]) {
+        await assert.rejects(h.propose(h.order, date), /INVALID_PROPOSAL/, date);
+    }
+    assert.equal(h.order.deliveryReplans.length, 0);
+    h.setNow("2026-11-02T07:00:00+03:60");
+    await assert.rejects(h.propose(h.order, NEW_DEADLINE), /INVALID_CLOCK/);
+});
+
+test("TZ/16,17: the same instant in different offsets is the same date; 48 hours are counted in UTC", async () => {
+    const h = await overdueAfterReview();
+    h.setNow("2026-11-02T10:00:00.000+03:00"); // = AFTER_DEADLINE
+    const proposed = await h.propose(h.order, "2026-11-04T15:00:00+03:00"); // = NEW_DEADLINE
+    const [replan] = proposed.deliveryReplans;
+    assert.deepEqual([replan.proposedDeadline, replan.createdAt, replan.expiresAt],
+        [NEW_DEADLINE, AFTER_DEADLINE, PROPOSAL_EXPIRES]);
+    // The zone-less spelling that a lenient parser on this machine would read as exactly NEW_DEADLINE.
+    const local = new Date(NEW_DEADLINE);
+    const pad = value => String(value).padStart(2, "0");
+    const zoneless = `${local.getFullYear()}-${pad(local.getMonth() + 1)}-${pad(local.getDate())}T` +
+        `${pad(local.getHours())}:${pad(local.getMinutes())}:${pad(local.getSeconds())}`;
+    assert.equal(Date.parse(zoneless), Date.parse(NEW_DEADLINE));
+    // Another instant or a zone-less value does not match the proposal.
+    for (const date of [zoneless, "2026-11-04T12:00:00", "2026-11-04T12:00:01Z", "2026-11-04T15:00:00+02:00"]) {
+        await assert.rejects(h.confirm(proposed, "ACCEPT",
+            h.confirmation(proposed, "ACCEPT", undefined, { proposedDeadline: date })), /INVALID_CONFIRMATION/, date);
+    }
+    // The same instant written in any explicit offset matches and commits the same UTC date.
+    for (const date of ["2026-11-04T13:00:00+01:00", "2026-11-04T10:00:00.000-02:00", "2026-11-04T12:00:00Z"]) {
+        const o = await overdueAfterReview();
+        const p = await o.propose(o.order, NEW_DEADLINE);
+        const confirmed = await o.confirm(p, "ACCEPT", o.confirmation(p, "ACCEPT", undefined, { proposedDeadline: date }));
+        assert.deepEqual([confirmed.replannedDeadline, confirmed.booking.deadline], [NEW_DEADLINE, DEADLINE], date);
+    }
+});
+
+// ---- Görev 140: trusted time never runs backwards ----
+
+test("CHR/18,19,20,21: a backwards clock is refused before any state, right or reference changes", async () => {
+    // Revision acceptance: no right is consumed.
+    const p = await producing("PLUS");
+    p.setNow("2026-10-28T08:59:59.999Z"); // 1 ms before the last event
+    await assert.rejects(p.send(p.order, "request_revision", "customer"), /CLOCK_REGRESSION/);
+    p.setNow(FIXED_TIME);
+    const accepted = await p.send(p.order, "request_revision", "customer");
+    assert.deepEqual([accepted.version, accepted.revisionsUsed], [p.order.version + 1, 1]);
+    // Review decision: no closing, no financial assessment, no reference consumed.
+    const r = await pendingRevision();
+    r.setNow("2026-10-29T09:00:00.000Z");
+    const reviewed = await r.openReview(r.order, "REFUND");
+    const decision = r.resolution(reviewed, reviewed.reviews[0].reviewId, "CLOSE");
+    r.setNow("2026-10-29T08:00:00.000Z");
+    await assert.rejects(r.resolveReview(reviewed, "CLOSE", decision), /CLOCK_REGRESSION/);
+    r.setNow("2026-10-29T09:00:00.000Z");
+    const closed = await r.resolveReview(reviewed, "CLOSE", decision);
+    assert.deepEqual([closed.version, closed.financialAssessments.length], [reviewed.version + 1, 1]);
+    // Customer confirmation: the proposal stays open and the confirmation reference unused.
+    const h = await overdueAfterReview();
+    const proposed = await h.propose(h.order, NEW_DEADLINE);
+    const answer = h.confirmation(proposed, "ACCEPT");
+    h.setNow("2026-11-02T06:59:59.999Z");
+    await assert.rejects(h.confirm(proposed, "ACCEPT", answer), /CLOCK_REGRESSION/);
+    assert.throws(() => h.core.viewProposal(proposed, "replan-0001"), /CLOCK_REGRESSION/);
+    h.setNow("2026-11-03T07:00:00.000Z");
+    const confirmed = await h.confirm(proposed, "ACCEPT", answer);
+    assert.deepEqual([confirmed.version, confirmed.replannedDeadline, confirmed.slaStartsAt],
+        [proposed.version + 1, NEW_DEADLINE, PLANNED_START]);
+    assert.equal(confirmed.deliveryReplans[0].missedDeadline, DEADLINE);
+});
+
+test("CHR/22,23: equal timestamps and retried requests keep working; normal order of time is unchanged", async () => {
+    const h = setup();
+    let order = h.core.createOrder("START");
+    order = await h.send(order, "submit", "customer", {}, { requestId: "synthetic-same-time-1" });
+    order = await h.send(order, "verify_payment", "finance", { proof: h.payment(order) });
+    assert.equal(order.events[0].at, order.events[1].at); // two transitions at the same instant
+    // A retried request returns the committed result even if the clock has since moved backwards.
+    h.setNow("2026-10-28T08:00:00.000Z");
+    const replay = await h.send(order, "submit", "customer", {}, { requestId: "synthetic-same-time-1", version: 0 });
+    assert.strictEqual(replay, order);
+    // Strictly increasing times across a whole flow behave as before.
+    const flow = setup();
+    const times = ["2026-10-28T08:00:00.000Z", "2026-10-28T08:10:00.000Z", "2026-10-28T08:20:00.000Z",
+        "2026-10-28T08:30:00.000Z", "2026-10-28T08:40:00.000Z"];
+    let o = flow.core.createOrder("START");
+    for (const [kind, role, data] of [["submit", "customer", {}], ["verify_payment", "finance", null],
+        ["request_email", "customer", {}], ["verify_email", "customer", null], ["request_booking", "customer", {}]]) {
+        flow.setNow(times[o.version]);
+        o = await flow.send(o, kind, role, data ?? (kind === "verify_payment" ? { proof: flow.payment(o) }
+            : { proof: { orderId: o.id, code: "SYNTHETIC-ONE-USE-CODE" } }));
+    }
+    assert.deepEqual(o.events.map(event => event.at), times);
+    assert.equal(o.state, STATES.BOOKING_PENDING);
+});
+
+// ---- Görev 141: four-eyes revision right restoration (K-08) ----
+
+const PROPOSER = "synthetic-creative-proposer";
+const ADMIN_SIDE = { source: "admin_console" };
+
+async function proposedRestoration(packageId = "PLUS", h = setup()) {
+    const p = await pendingRevision(packageId, h);
+    const record = p.restoration(p.order, "revision-0001");
+    const order = await p.proposeRestoration(p.order, "revision-0001", record);
+    return { ...p, accepted: p.order, record, order };
+}
+
+test("RS/1,5,26: a verified person proposes; the proposal is audited and changes no right", async () => {
+    const h = await proposedRestoration();
+    const [item] = h.order.restorations;
+    assert.deepEqual([item.restorationId, item.revisionId, item.status, item.decision],
+        ["restoration-0001", "revision-0001", "PENDING_APPROVAL", null]);
+    assert.deepEqual(item.proposal, {
+        orderId: h.order.id, restorationId: "restoration-0001", revisionId: "revision-0001", step: "PROPOSAL",
+        reasonCode: "PRODUCER_NON_DELIVERY", evidenceRef: h.record.evidenceRef, actorId: PROPOSER, actorType: "HUMAN",
+        role: "creative", authorizationRef: h.record.authorizationRef, at: FIXED_TIME,
+        idempotencyKey: h.order.events.at(-1).requestId
+    });
+    assert.deepEqual(h.order.events.at(-1).audit, item.proposal);
+    assert.deepEqual([h.order.state, h.order.revisionsUsed], [STATES.REVISION_PENDING, 1]);
+    assert.deepEqual(h.order.revisions, h.accepted.revisions);
+    assert.ok(Object.isFrozen(item.proposal));
+});
+
+test("RS/2,3,4,24,27: missing, forged, foreign or SYSTEM identities cannot propose; failures consume nothing", async () => {
+    const h = await pendingRevision();
+    const order = h.order;
+    const record = h.restoration(order, "revision-0001");
+    await assert.rejects(h.proposeRestoration(order, "revision-0001", record, "creative", { actorId: undefined }),
+        /ACTOR_REQUIRED/);
+    await assert.rejects(h.proposeRestoration(order, "revision-0001", record, "creative", { session: "0".repeat(64) }),
+        /UNAUTHORIZED/);
+    // A genuine session of another person cannot use a record issued to the proposer.
+    await assert.rejects(h.proposeRestoration(order, "revision-0001", record, "creative",
+        { actorId: "synthetic-creative-other" }), /RESTORATION_MISMATCH/);
+    await assert.rejects(h.proposeRestoration(order, "revision-0001", { ...record, actorId: "synthetic-creative-other" },
+        "creative", { actorId: "synthetic-creative-other" }), /UNTRUSTED_RESTORATION/);
+    const other = await pendingRevision();
+    await assert.rejects(h.proposeRestoration(order, "revision-0001", h.restoration(other.order, "revision-0001")),
+        /RESTORATION_MISMATCH/);
+    await assert.rejects(h.proposeRestoration(order, "revision-0001",
+        h.restoration(order, "revision-0001", { evidenceRef: undefined })), /INVALID_RESTORATION/);
+    // SYSTEM is not a person and cannot be claimed by any caller, in any spelling or role.
+    for (const actorId of ["SYSTEM-scheduler", "system_job_0001", "System-0000001"]) {
+        await assert.rejects(h.proposeRestoration(order, "revision-0001",
+            h.restoration(order, "revision-0001", { actorId })), /RESERVED_ACTOR/, actorId);
+    }
+    await assert.rejects(h.proposeRestoration(order, "revision-0001", h.restoration(order, "revision-0001",
+        { actorId: "SYSTEM" })), /ACTOR_REQUIRED/);
+    await assert.rejects(h.proposeRestoration(order, "revision-0001", record, "system"), /UNAUTHORIZED/);
+    // Nothing was registered: the original record still proposes once.
+    const proposed = await h.proposeRestoration(order, "revision-0001", record);
+    assert.deepEqual([proposed.version, proposed.restorations.length], [order.version + 1, 1]);
+});
+
+test("RS/13: one open proposal per revision; a reference is used once", async () => {
+    const h = await proposedRestoration();
+    await assert.rejects(h.proposeRestoration(h.order, "revision-0001"), /RESTORATION_PENDING/);
+    await assert.rejects(h.proposeRestoration(h.order, "revision-0001",
+        h.restoration(h.order, "revision-0001", ADMIN_SIDE), "admin"), /RESTORATION_PENDING/);
+    // References are unique within one core's registry, across all of its orders.
+    const shared = setup();
+    const a = await pendingRevision("PLUS", shared);
+    const b = await pendingRevision("PLUS", shared);
+    const recordA = shared.restoration(a.order, "revision-0001");
+    await shared.proposeRestoration(a.order, "revision-0001", recordA);
+    await assert.rejects(shared.proposeRestoration(b.order, "revision-0001", shared.restoration(b.order, "revision-0001",
+        { authorizationRef: recordA.authorizationRef })), /RESTORATION_REFERENCE_USED/);
+});
+
+test("RS/6,14,15: a second person approves; exactly one right comes back, once", async () => {
+    for (const [role, extra] of [["creative", {}], ["admin", ADMIN_SIDE]]) {
+        const h = await proposedRestoration();
+        const record = h.restorationDecision(h.order, "APPROVE", undefined, extra);
+        const approved = await h.decideRestoration(h.order, "APPROVE", record, role, { requestId: `synthetic-approve-${role}` });
+        assert.deepEqual([approved.revisionsUsed, approved.state, approved.revisions[0].status, approved.restorations[0].status],
+            [0, STATES.IN_PRODUCTION, "RESTORED", "APPROVED"]);
+        assert.deepEqual([approved.restorations[0].decision.actorId, approved.restorations[0].decision.role],
+            [record.actorId, role]);
+        const replay = await h.decideRestoration(h.order, "APPROVE", record, role,
+            { requestId: `synthetic-approve-${role}`, version: h.order.version });
+        assert.strictEqual(replay, approved);
+        await assert.rejects(h.decideRestoration(approved, "APPROVE", h.restorationDecision(approved, "APPROVE",
+            approved.restorations[0], extra), role), /RESTORATION_NOT_PENDING|INVALID_TRANSITION/);
+        await assert.rejects(h.proposeRestoration(approved, "revision-0001"), /ALREADY_RESTORED/);
+        assert.equal(approved.revisionsUsed, 0);
+    }
+});
+
+test("RS/7,8,9,25: the proposer, the same person in another role, or SYSTEM can never approve", async () => {
+    const h = await proposedRestoration();
+    await assert.rejects(h.decideRestoration(h.order, "APPROVE",
+        h.restorationDecision(h.order, "APPROVE", undefined, { actorId: PROPOSER })), /FOUR_EYES_VIOLATION/);
+    await assert.rejects(h.decideRestoration(h.order, "APPROVE",
+        h.restorationDecision(h.order, "APPROVE", undefined, { ...ADMIN_SIDE, actorId: PROPOSER }), "admin"),
+    /FOUR_EYES_VIOLATION/);
+    await assert.rejects(h.decideRestoration(h.order, "REJECT",
+        h.restorationDecision(h.order, "REJECT", undefined, { actorId: PROPOSER })), /FOUR_EYES_VIOLATION/);
+    for (const actorId of ["SYSTEM", "SYSTEM-approver"]) {
+        await assert.rejects(h.decideRestoration(h.order, "APPROVE",
+            h.restorationDecision(h.order, "APPROVE", undefined, { actorId })), /ACTOR_REQUIRED|RESERVED_ACTOR/);
+    }
+    assert.deepEqual([h.order.revisionsUsed, h.order.restorations[0].status], [1, "PENDING_APPROVAL"]);
+});
+
+test("RS/10,11,12: an unauthorized person, another order's or another revision's decision cannot approve", async () => {
+    const h = await proposedRestoration();
+    const record = h.restorationDecision(h.order, "APPROVE");
+    for (const role of ["customer", "finance", "scheduler"]) {
+        await assert.rejects(h.decideRestoration(h.order, "APPROVE", record, role), /UNAUTHORIZED/);
+    }
+    await assert.rejects(h.decideRestoration(h.order, "APPROVE", record, "creative", { session: "f".repeat(64) }),
+        /UNAUTHORIZED/);
+    await assert.rejects(h.decideRestoration(h.order, "APPROVE", { ...record, signature: undefined }),
+        /UNTRUSTED_RESTORATION/);
+    // A genuine session of a third person cannot use the decision record issued to the approver.
+    await assert.rejects(h.decideRestoration(h.order, "APPROVE", record, "creative", { actorId: "synthetic-creative-third" }),
+        /RESTORATION_MISMATCH/);
+    await assert.rejects(h.decideRestoration(h.order, "APPROVE",
+        h.restorationDecision(h.order, "APPROVE", undefined, ADMIN_SIDE)), /RESTORATION_MISMATCH/);
+    // Another order's genuine proposal and decision do not fit this order.
+    const other = await proposedRestoration();
+    await assert.rejects(h.decideRestoration(h.order, "APPROVE", other.restorationDecision(other.order, "APPROVE")),
+        /RESTORATION_MISMATCH/);
+    // A decision naming another revision, other evidence or an unknown proposal is refused.
+    await assert.rejects(h.decideRestoration(h.order, "APPROVE",
+        h.restorationDecision(h.order, "APPROVE", undefined, { revisionId: "revision-0002" })), /RESTORATION_MISMATCH/);
+    await assert.rejects(h.decideRestoration(h.order, "APPROVE",
+        h.restorationDecision(h.order, "APPROVE", undefined, { evidenceRef: "synthetic-evidence-other" })),
+    /RESTORATION_MISMATCH/);
+    await assert.rejects(h.decideRestoration(h.order, "APPROVE",
+        h.restorationDecision(h.order, "APPROVE", undefined, { restorationId: "restoration-0009" })),
+    /UNKNOWN_RESTORATION/);
+    // None of the failures consumed the genuine decision.
+    assert.equal((await h.decideRestoration(h.order, "APPROVE", record)).revisionsUsed, 0);
+});
+
+test("RS/16,17: a rejection keeps the right, is audited and can never be approved later", async () => {
+    const h = await proposedRestoration();
+    await assert.rejects(h.decideRestoration(h.order, "REJECT",
+        h.restorationDecision(h.order, "REJECT", undefined, { reasonCode: undefined })), /REJECTION_REASON_REQUIRED/);
+    await assert.rejects(h.decideRestoration(h.order, "REJECT",
+        h.restorationDecision(h.order, "REJECT", undefined, { reasonCode: "kanıt yetersiz" })), /RESTORATION_MISMATCH/);
+    const rejected = await h.decideRestoration(h.order, "REJECT");
+    const decision = rejected.restorations[0].decision;
+    assert.deepEqual([rejected.restorations[0].status, decision.decision, decision.reasonCode, decision.actorId],
+        ["REJECTED", "REJECT", "SYNTHETIC_EVIDENCE_INSUFFICIENT", "synthetic-creative-approver"]);
+    assert.deepEqual([rejected.revisionsUsed, rejected.state, rejected.revisions], [1, STATES.REVISION_PENDING,
+        h.order.revisions]);
+    await assert.rejects(h.decideRestoration(rejected, "APPROVE",
+        h.restorationDecision(rejected, "APPROVE", rejected.restorations[0])), /RESTORATION_NOT_PENDING/);
+    // A new proposal under the usual eligibility rules may follow, and needs its own second person.
+    const again = await h.proposeRestoration(rejected, "revision-0001");
+    const approved = await h.decideRestoration(again, "APPROVE");
+    assert.deepEqual([approved.restorations.map(item => item.status), approved.revisionsUsed], [["REJECTED", "APPROVED"], 0]);
+    // A revision delivered while a proposal waits is no longer eligible at approval time.
+    const late = await proposedRestoration();
+    const delivered = await late.send(late.order, "revision_options", "creative", { options: ["synthetic-l1", "synthetic-l2"] });
+    await assert.rejects(late.decideRestoration(delivered, "APPROVE",
+        late.restorationDecision(delivered, "APPROVE", delivered.restorations[0])), /RESTORATION_NOT_ELIGIBLE/);
+});
+
+test("RS/18: the old single-step command can no longer restore a right", async () => {
+    const h = await pendingRevision();
+    const legacy = { orderId: h.order.id, revisionId: "revision-0001", reasonCode: "PRODUCER_NON_DELIVERY",
+        authorizationRef: "synthetic-legacy-0001", source: "producer_console" };
+    for (const [role, actorId] of [["creative", "synthetic-creative-legacy"], ["admin", "synthetic-admin-legacy"]]) {
+        await assert.rejects(h.send(h.order, "restore_revision_right", role,
+            { revisionId: "revision-0001", restoration: { ...legacy, signature: signRestoration(legacy) } }, { actorId }),
+        /RESTORATION_REQUIRES_APPROVAL/);
+    }
+    await assert.rejects(h.send(h.order, "restore_revision_right", "customer", { revisionId: "revision-0001" }),
+        /UNAUTHORIZED/);
+    assert.deepEqual([h.order.revisionsUsed, h.order.revisions[0].status], [1, "ACCEPTED"]);
+    // The same legacy reference is still unused: it was never registered.
+    const proposed = await h.proposeRestoration(h.order, "revision-0001",
+        h.restoration(h.order, "revision-0001", { authorizationRef: legacy.authorizationRef }));
+    assert.equal(proposed.restorations[0].proposal.authorizationRef, legacy.authorizationRef);
+});
+
+test("RS/19,20,28: reviews, closed orders and a backwards clock block restoration steps", async () => {
+    const h = await proposedRestoration();
+    const reviewed = await h.openReview(h.order, "DISPUTE");
+    await assert.rejects(h.decideRestoration(reviewed, "APPROVE", h.restorationDecision(reviewed, "APPROVE")),
+        /REVIEW_IN_PROGRESS/);
+    await assert.rejects(h.proposeRestoration(reviewed, "revision-0001"), /REVIEW_IN_PROGRESS/);
+    const closed = await h.resolveReview(reviewed, "CLOSE");
+    await assert.rejects(h.decideRestoration(closed, "APPROVE", h.restorationDecision(closed, "APPROVE")),
+        /INVALID_TRANSITION/);
+    assert.deepEqual([closed.revisionsUsed, closed.restorations[0].status], [1, "PENDING_APPROVAL"]);
+    // Görev 140 time integrity: an approval at a backwards clock is refused and consumes nothing.
+    const t = await pendingRevision();
+    t.setNow("2026-10-28T10:00:00.000Z");
+    const proposed = await t.proposeRestoration(t.order, "revision-0001");
+    const approval = t.restorationDecision(proposed, "APPROVE");
+    t.setNow(FIXED_TIME);
+    await assert.rejects(t.decideRestoration(proposed, "APPROVE", approval), /CLOCK_REGRESSION/);
+    t.setNow("2026-10-28T10:00:00.000Z");
+    assert.equal((await t.decideRestoration(proposed, "APPROVE", approval)).revisionsUsed, 0);
+});
+
+// ---- Görev 141: verified identity for delivery proposals and manual expiry; the SYSTEM actor ----
+
+test("ID/21,22,26: a delivery-date proposal needs a verified person, recorded in the audit", async () => {
+    const h = await overdueAfterReview();
+    const record = h.proposal(h.order, NEW_DEADLINE);
+    await assert.rejects(h.propose(h.order, NEW_DEADLINE, record, "creative", { actorId: undefined }), /ACTOR_REQUIRED/);
+    await assert.rejects(h.propose(h.order, NEW_DEADLINE, record, "creative", { session: "0".repeat(64) }), /UNAUTHORIZED/);
+    await assert.rejects(h.propose(h.order, NEW_DEADLINE, record, "creative", { actorId: "synthetic-creative-other" }),
+        /INVALID_PROPOSAL/);
+    await assert.rejects(h.propose(h.order, NEW_DEADLINE, { ...record, actorId: "synthetic-creative-other" }, "creative",
+        { actorId: "synthetic-creative-other" }), /UNTRUSTED_PROPOSAL/);
+    await assert.rejects(h.propose(h.order, NEW_DEADLINE, h.proposal(h.order, NEW_DEADLINE,
+        { actorId: "SYSTEM-planner" })), /RESERVED_ACTOR/);
+    const proposed = await h.propose(h.order, NEW_DEADLINE, record);
+    const audit = proposed.deliveryReplans[0].proposal;
+    assert.deepEqual([audit.actorId, audit.actorType, audit.role, audit.authorizationRef, audit.at],
+        ["synthetic-creative-planner", "HUMAN", "creative", record.authorizationRef, AFTER_DEADLINE]);
+    // The customer confirmation and the 48-hour rule are unchanged.
+    const confirmed = await h.confirm(proposed, "ACCEPT");
+    assert.deepEqual([confirmed.replannedDeadline, confirmed.slaStartsAt, confirmed.booking.deadline],
+        [NEW_DEADLINE, PLANNED_START, DEADLINE]);
+});
+
+test("ID/23: a manual expiry needs a verified person; SYSTEM cannot act manually", async () => {
+    const h = await overdueAfterReview();
+    const proposed = await h.propose(h.order, NEW_DEADLINE);
+    h.setNow(PROPOSAL_EXPIRES);
+    await assert.rejects(expireProposal(h, proposed, "creative", { actorId: undefined }), /ACTOR_REQUIRED/);
+    await assert.rejects(expireProposal(h, proposed, "creative", { actorId: "SYSTEM-expirer" }), /RESERVED_ACTOR/);
+    await assert.rejects(expireProposal(h, proposed, "creative", { session: "0".repeat(64) }), /UNAUTHORIZED/);
+    const expired = await expireProposal(h, proposed, "creative");
+    assert.deepEqual([expired.deliveryReplans[0].expiry.actorId, expired.deliveryReplans[0].expiry.actorType,
+        expired.deliveryReplans[0].expiry.recordedAt], ["synthetic-creative-operator", "HUMAN", PROPOSAL_EXPIRES]);
+    assert.equal(h.core.viewProposal(expired, "replan-0001").visibleStatus, PROPOSAL_VISIBILITY.EXPIRED);
+    assert.deepEqual([expired.revisionsUsed, expired.slaStartsAt, expired.financialAssessments],
+        [proposed.revisionsUsed, PLANNED_START, []]);
+});
+
+test("SYS/24,25: SYSTEM only closes an elapsed proposal inside a person's transaction; no caller can be SYSTEM", async () => {
+    const h = await overdueAfterReview();
+    const first = await h.propose(h.order, NEW_DEADLINE);
+    h.setNow(PROPOSAL_EXPIRES);
+    const second = await h.propose(first, "2026-11-06T12:00:00.000Z");
+    assert.deepEqual(second.deliveryReplans[0].expiry, {
+        orderId: second.id, replanId: "replan-0001", expiredAt: PROPOSAL_EXPIRES, recordedAt: PROPOSAL_EXPIRES,
+        recordedBy: "propose_delivery_date", actorId: "SYSTEM", actorType: "SYSTEM", role: null,
+        reason: "EXPIRED_BEFORE_NEW_PROPOSAL", triggeredBy: { actorId: "synthetic-creative-planner", role: "creative" },
+        idempotencyKey: second.events.at(-1).requestId
+    });
+    // The new proposal itself is attributed to the person, not to SYSTEM.
+    assert.deepEqual([second.deliveryReplans[1].proposal.actorId, second.deliveryReplans[1].proposal.actorType],
+        ["synthetic-creative-planner", "HUMAN"]);
+    // No command accepts a SYSTEM-shaped caller: reviews included.
+    const r = await pendingRevision();
+    await assert.rejects(r.openReview(r.order, "REFUND", r.reviewRecord(r.order, "REFUND", { actorId: "SYSTEM-reviewer" })),
+        /RESERVED_ACTOR/);
+    const reviewed = await r.openReview(r.order, "REFUND");
+    await assert.rejects(r.resolveReview(reviewed, "CONTINUE", r.resolution(reviewed, reviewed.reviews[0].reviewId,
+        "CONTINUE", { actorId: "system-decider" })), /RESERVED_ACTOR/);
+    assert.equal(reviewed.state, STATES.REFUND_REVIEW);
 });
