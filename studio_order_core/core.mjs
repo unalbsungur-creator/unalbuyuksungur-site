@@ -304,6 +304,13 @@ const ATTESTED_FIELDS = Object.freeze(["evidenceId", "evidenceKind", "source", "
 const EVIDENCE_VERIFIER_KINDS = Object.freeze(["PRODUCTION", "SYNTHETIC"]);
 const DEPLOYMENT_ENVIRONMENTS = Object.freeze(["PRODUCTION", "STAGING", "TEST"]);
 
+/** Görev 159 (K-01 Faz 1): financial cases, creation only. A REFUND opens an ORDER_REFUND case; accepted, undelivered
+ * revisions open one UNDELIVERED_REVISION case over their assessments. Cases are opened inside the deciding
+ * transaction, start OPEN and carry no amount: approving, closing, paying and reconciling come in later phases. */
+export const FINANCIAL_CASE_POLICY = freezeDeep({
+    reference: "UNAI-FINANCIAL-CASE-v1.0", types: ["ORDER_REFUND", "UNDELIVERED_REVISION"]
+});
+
 const REASON_CODE = /^[A-Z][A-Z0-9_]{2,63}$/;
 // Decision 141: SYSTEM is not a role and no principal can claim it. It only labels the narrow automatic
 // step the core itself performs (closing an elapsed proposal when a new one is made).
@@ -388,7 +395,7 @@ export function createCore({ authorize, verifyPayment, verifyEmail, verifyBookin
             id: globalThis.crypto.randomUUID(), packageId, state: STATES.DRAFT,
             version: 0, events: [], paymentReference: null, booking: null, slaStartsAt: null, productionStartedAt: null,
             options: [], revisionsUsed: 0, revisions: [], restorations: [], notifications: [], reviews: [], selectedOption: null,
-            delivery: null, replannedDeadline: null, deliveryReplans: [], financialAssessments: []
+            delivery: null, replannedDeadline: null, deliveryReplans: [], financialAssessments: [], financialCases: []
         });
         orders.set(order.id, order);
         return order;
@@ -446,7 +453,7 @@ export function createCore({ authorize, verifyPayment, verifyEmail, verifyBookin
             ...order, options: [...order.options], events: [...order.events],
             revisions: [...order.revisions], notifications: [...order.notifications], reviews: [...order.reviews],
             deliveryReplans: [...order.deliveryReplans], financialAssessments: [...order.financialAssessments],
-            restorations: [...order.restorations]
+            restorations: [...order.restorations], financialCases: [...order.financialCases]
         };
         const inState = (...states) => requireThat(states.includes(order.state), "INVALID_TRANSITION");
         // Trusted server time for the transition; commands that read the clock fix it here once.
@@ -848,29 +855,61 @@ export function createCore({ authorize, verifyPayment, verifyEmail, verifyBookin
                         }
                     };
                 }
+                // Görev 159 (K-01 Faz 1): the financial cases this decision opens, known before the audit so that the
+                // decision names them. Every REFUND opens an ORDER_REFUND; a closing with accepted, undelivered
+                // revisions also opens one UNDELIVERED_REVISION over their assessments (today only a REFUND, D-3).
+                const closingOrder = record.outcome !== REVIEW_OUTCOMES.CONTINUE;
+                const pendingRevisions = closingOrder ? undeliveredRevisions() : [];
+                const caseTypes = [...(record.outcome === REVIEW_OUTCOMES.REFUND ? ["ORDER_REFUND"] : []),
+                    ...(pendingRevisions.length > 0 ? ["UNDELIVERED_REVISION"] : [])];
+                const caseIds = caseTypes.map((type, index) =>
+                    `case-${String(order.financialCases.length + index + 1).padStart(4, "0")}`);
                 audit = {
                     orderId: order.id, reviewId: openReview.reviewId, outcome: record.outcome,
                     ...humanActor(), reasonCode: record.reasonCode ?? null, ...closeAudit,
+                    ...(caseIds.length > 0 ? { financialCaseIds: caseIds } : {}),
                     authorizationRef: record.authorizationRef, at, policyReference: policy.reference,
                     idempotencyKey: command.requestId
                 };
                 // A REFUND outcome records the decision only: no money moves and no right is reset.
                 next.reviews = order.reviews.map(review => review === openReview
                     ? { ...review, status: "RESOLVED", resolution: { ...audit, moneyMovement: "NONE" } } : review);
-                next.state = record.outcome === REVIEW_OUTCOMES.CONTINUE ? openReview.resumeState : STATES.CLOSED;
-                if (next.state === STATES.CLOSED) {
-                    // Decision 134-B: accepted, undelivered revisions keep their record and right and are flagged
-                    // for an authorized financial review. No amount is computed and no money moves here. Since Görev
-                    // 148 only a REFUND reaches this with such revisions; a CLOSE is refused above.
-                    for (const revision of undeliveredRevisions()) {
-                        next.financialAssessments.push({
-                            assessmentId: `assessment-${String(next.financialAssessments.length + 1).padStart(4, "0")}`,
-                            orderId: order.id, reviewId: openReview.reviewId, revisionId: revision.revisionId,
-                            reason: "ACCEPTED_NOT_DELIVERED", status: "PENDING_FINANCIAL_REVIEW", amountKurus: null,
-                            moneyMovement: "NONE", createdAt: at
-                        });
-                    }
-                }
+                next.state = closingOrder ? STATES.CLOSED : openReview.resumeState;
+                // Decision 134-B: accepted, undelivered revisions keep their record and right and are flagged
+                // for an authorized financial review. No amount is computed and no money moves here. Since Görev
+                // 148 only a REFUND reaches this with such revisions; a CLOSE is refused above.
+                const assessmentIds = pendingRevisions.map(revision => {
+                    const assessmentId = `assessment-${String(next.financialAssessments.length + 1).padStart(4, "0")}`;
+                    next.financialAssessments.push({
+                        assessmentId, orderId: order.id, reviewId: openReview.reviewId, revisionId: revision.revisionId,
+                        reason: "ACCEPTED_NOT_DELIVERED", status: "PENDING_FINANCIAL_REVIEW", amountKurus: null,
+                        moneyMovement: "NONE", createdAt: at
+                    });
+                    return assessmentId;
+                });
+                caseTypes.forEach((caseType, index) => {
+                    // One case per order, review and type. The review resolves once, so this cannot repeat through
+                    // the API; the check keeps the rule explicit for a persistent store's unique key.
+                    const dedupKey = `${order.id}:${openReview.reviewId}:${caseType}`;
+                    requireThat(!order.financialCases.some(item => item.dedupKey === dedupKey), "FINANCIAL_CASE_EXISTS");
+                    const opening = {
+                        step: "OPENED", caseId: caseIds[index], orderId: order.id, caseType, ...humanActor(), at,
+                        authorizationRef: record.authorizationRef, idempotencyKey: command.requestId,
+                        policyVersion: FINANCIAL_CASE_POLICY.reference
+                    };
+                    next.financialCases.push({
+                        caseId: caseIds[index], orderId: order.id, caseType, dedupKey, status: "OPEN",
+                        origin: { kind: "REVIEW_RESOLUTION", reviewId: openReview.reviewId, reviewType: openReview.type,
+                            outcome: record.outcome, eventSequence: order.version + 1 },
+                        // The person who decided the review; policy item 5 bars them from approving this case later.
+                        originDeciderActorId: principal.actorId, createdAt: at,
+                        createdBy: { ...humanActor(), mechanism: "ON_REVIEW_RESOLUTION" }, assignedRole: "finance",
+                        assignedActorId: null, items: caseType === "UNDELIVERED_REVISION" ? assessmentIds : [],
+                        evidenceReferences: [], proposal: null, decisions: [], closure: null,
+                        policyVersion: FINANCIAL_CASE_POLICY.reference, reviewPolicyReference: policy.reference,
+                        moneyMovement: "NONE", auditTrail: [opening]
+                    });
+                });
                 break;
             }
             case "propose_delivery_date": {

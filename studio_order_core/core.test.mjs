@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { APPROVED_CLOSE_REASONS, APPROVED_REVIEW_POLICY, CLOSE_DECISION_FIELDS, CLOSE_EVIDENCE_FIELDS,
-    closeDecisionBinding, createCore, OrderError, PACKAGES, PROPOSAL_VISIBILITY, proposalVisibility, STATES }
+    closeDecisionBinding, createCore, FINANCIAL_CASE_POLICY, OrderError, PACKAGES, PROPOSAL_VISIBILITY, proposalVisibility, STATES }
     from "./core.mjs";
 import { loadCalendar } from "./calendar.mjs";
 
@@ -3525,4 +3525,188 @@ test("FA/5: concurrent CLOSEs sharing one principal object each keep their own s
     const winner = results.find(result => result.status === "fulfilled").value;
     assert.deepEqual([winner.events.at(-1).role, winner.events.at(-1).audit.actorId],
         ["finance", "synthetic-finance-decider"]);
+});
+
+// ---- Görev 159 (K-01 Faz 1): financial case creation ----
+
+const CASE_POLICY = "UNAI-FINANCIAL-CASE-v1.0";
+
+test("K1/1: a REFUND opens exactly one OPEN ORDER_REFUND case on the order, with no amount and no money moved", async () => {
+    let paymentChecks = 0;
+    const h = await producing("PLUS", {}, setup({
+        verifyPayment: proof => { paymentChecks += 1; return signatureMatches(proof.signature, sign(proof)); }
+    }));
+    const checksBefore = paymentChecks;
+    const reviewed = await h.openReview(h.order, "REFUND");
+    const refunded = await h.resolveReview(reviewed, "REFUND");
+    assert.equal(FINANCIAL_CASE_POLICY.reference, CASE_POLICY);
+    assert.deepEqual(FINANCIAL_CASE_POLICY.types, ["ORDER_REFUND", "UNDELIVERED_REVISION"]);
+    assert.equal(refunded.financialCases.length, 1);
+    const [item] = refunded.financialCases;
+    const event = refunded.events.at(-1);
+    assert.deepEqual(item, {
+        caseId: "case-0001", orderId: refunded.id, caseType: "ORDER_REFUND",
+        dedupKey: `${refunded.id}:review-0001:ORDER_REFUND`, status: "OPEN",
+        origin: { kind: "REVIEW_RESOLUTION", reviewId: "review-0001", reviewType: "REFUND", outcome: "REFUND",
+            eventSequence: event.sequence },
+        originDeciderActorId: "synthetic-finance-decider", createdAt: FIXED_TIME,
+        createdBy: { actorId: "synthetic-finance-decider", actorType: "HUMAN", role: "finance",
+            mechanism: "ON_REVIEW_RESOLUTION" },
+        assignedRole: "finance", assignedActorId: null, items: [], evidenceReferences: [], proposal: null,
+        decisions: [], closure: null, policyVersion: CASE_POLICY, reviewPolicyReference: POLICY_REFERENCE,
+        moneyMovement: "NONE", auditTrail: [{
+            step: "OPENED", caseId: "case-0001", orderId: refunded.id, caseType: "ORDER_REFUND",
+            actorId: "synthetic-finance-decider", actorType: "HUMAN", role: "finance", at: FIXED_TIME,
+            authorizationRef: refunded.reviews[0].resolution.authorizationRef, idempotencyKey: event.requestId,
+            policyVersion: CASE_POLICY
+        }]
+    });
+    assert.ok(Object.isFrozen(item) && Object.isFrozen(item.auditTrail[0]));
+    // No amount and no claim about payment: no money moved, nothing was charged, refunded or announced.
+    assert.ok(!JSON.stringify(item).includes("amount"));
+    assert.deepEqual([paymentChecks, refunded.paymentReference, refunded.reviews[0].resolution.moneyMovement,
+        refunded.notifications, refunded.financialAssessments],
+    [checksBefore, h.order.paymentReference, "NONE", h.order.notifications, []]);
+});
+
+test("K1/2: a REFUND with an accepted, undelivered revision opens two cases of different types", async () => {
+    for (const [type] of REVIEW_TYPES) {
+        const h = await pendingRevision("PLUS");
+        const refunded = await h.resolveReview(await h.openReview(h.order, type), "REFUND");
+        assert.deepEqual(refunded.financialCases.map(item => [item.caseId, item.caseType, item.status, item.items]), [
+            ["case-0001", "ORDER_REFUND", "OPEN", []],
+            ["case-0002", "UNDELIVERED_REVISION", "OPEN", ["assessment-0001"]]
+        ]);
+        // The assessment itself is unchanged in shape; the case refers to it.
+        assert.deepEqual(refunded.financialAssessments.map(item => [item.assessmentId, item.revisionId, item.status]),
+            [["assessment-0001", "revision-0001", "PENDING_FINANCIAL_REVIEW"]]);
+        assert.deepEqual(new Set(refunded.financialCases.map(item => item.dedupKey)).size, 2);
+        assert.deepEqual([refunded.revisionsUsed, refunded.revisions[0].status], [1, "ACCEPTED"]);
+    }
+});
+
+test("K1/3,4: a retried REFUND opens no new case; a second case for the same order, review and type cannot arise", async () => {
+    const h = await pendingRevision("PLUS");
+    const reviewed = await h.openReview(h.order, "REFUND");
+    const record = h.resolution(reviewed, reviewed.reviews[0].reviewId, "REFUND");
+    const options = { requestId: "synthetic-k1-refund", actorId: record.actorId };
+    const refunded = await h.send(reviewed, "resolve_review", "finance", { resolution: record }, options);
+    const retried = await h.send(reviewed, "resolve_review", "finance", { resolution: record }, options);
+    assert.strictEqual(retried, refunded);
+    assert.equal(refunded.financialCases.length, 2);
+    // The same request id with different content is a conflict, not a second set of cases.
+    await assert.rejects(h.send(refunded, "resolve_review", "finance",
+        { resolution: h.resolution(reviewed, reviewed.reviews[0].reviewId, "REFUND") }, options), /IDEMPOTENCY_CONFLICT/);
+    // A new request on the decided review, or a new review on the closed order, opens nothing.
+    await assert.rejects(h.resolveReview(refunded, "REFUND"), /INVALID_TRANSITION/);
+    await assert.rejects(h.openReview(refunded, "REFUND"), /INVALID_TRANSITION/);
+    // A CONTINUE opens no case, so a later REFUND on the same order opens its cases under its own review.
+    const c = await pendingRevision("PLUS");
+    const resumed = await c.resolveReview(await c.openReview(c.order, "DISPUTE"), "CONTINUE");
+    assert.deepEqual(resumed.financialCases, []);
+    const later = await c.resolveReview(await c.openReview(resumed, "REFUND"), "REFUND");
+    assert.deepEqual(later.financialCases.map(item => item.dedupKey), [
+        `${later.id}:review-0002:ORDER_REFUND`, `${later.id}:review-0002:UNDELIVERED_REVISION`]);
+});
+
+test("K1/5,7,8,9: refused REFUNDs open no case, consume nothing and leave the order as it was", async () => {
+    const h = await pendingRevision("PLUS");
+    const reviewed = await h.openReview(h.order, "REFUND");
+    const id = reviewed.reviews[0].reviewId;
+    const other = await pendingRevision("PLUS");
+    const otherReviewed = await other.openReview(other.order, "REFUND");
+    const authorizationRef = "synthetic-k1-kept-authorization";
+    const attempts = [
+        // Unauthorized: admin may not REFUND, and other roles may not decide at all.
+        [() => h.resolveReview(reviewed, "REFUND", h.resolution(reviewed, id, "REFUND", { ...ADMIN, authorizationRef }),
+            "admin"), /REVIEW_OUTCOME_NOT_PERMITTED/],
+        [() => h.resolveReview(reviewed, "REFUND", h.resolution(reviewed, id, "REFUND", { authorizationRef }), "creative"),
+            /UNAUTHORIZED/],
+        [() => h.resolveReview(reviewed, "REFUND", h.resolution(reviewed, id, "REFUND", { authorizationRef }), "customer"),
+            /UNAUTHORIZED/],
+        // Four eyes: the opener cannot decide.
+        [() => h.resolveReview(reviewed, "REFUND", h.resolution(reviewed, id, "REFUND",
+            { actorId: "synthetic-finance-opener", authorizationRef })), /FOUR_EYES_VIOLATION/],
+        // A decision for another order or another review.
+        [() => h.resolveReview(reviewed, "REFUND", h.resolution(otherReviewed, otherReviewed.reviews[0].reviewId, "REFUND",
+            { authorizationRef })), /INVALID_REVIEW/],
+        [() => h.resolveReview(reviewed, "REFUND", h.resolution(reviewed, "review-0002", "REFUND", { authorizationRef })),
+            /INVALID_REVIEW/],
+        // A forged signature.
+        [() => h.resolveReview(reviewed, "REFUND", { ...h.resolution(reviewed, id, "REFUND", { authorizationRef }),
+            signature: "0".repeat(64) }), /UNTRUSTED_REVIEW/]
+    ];
+    for (const [attempt, error] of attempts) await assert.rejects(attempt(), error);
+    // A backwards clock is refused before anything is written.
+    h.setNow("2026-10-28T08:00:00.000Z");
+    await assert.rejects(h.resolveReview(reviewed, "REFUND", h.resolution(reviewed, id, "REFUND", { authorizationRef })),
+        /CLOCK_REGRESSION/);
+    h.setNow(FIXED_TIME);
+    // The valid decision then commits at the same version, with the same authorization, on the same history:
+    // its cases are the first and only ones, so no refused attempt left a partial case behind.
+    const refunded = await h.resolveReview(reviewed, "REFUND", h.resolution(reviewed, id, "REFUND", { authorizationRef }));
+    assert.deepEqual([refunded.version, refunded.financialCases.map(item => item.caseId),
+        refunded.financialAssessments.length, refunded.reviews[0].resolution.authorizationRef],
+    [reviewed.version + 1, ["case-0001", "case-0002"], 1, authorizationRef]);
+    assert.deepEqual(refunded.events.slice(0, -1), reviewed.events);
+});
+
+test("K1/6: concurrent REFUNDs on one order open one set of cases; other orders keep their own", async () => {
+    const shared = setup();
+    const a = await pendingRevision("PLUS", shared);
+    const reviewed = await a.openReview(a.order, "REFUND");
+    const results = await Promise.allSettled([1, 2].map(() => a.resolveReview(reviewed, "REFUND")));
+    assert.deepEqual(results.map(r => (r.status === "fulfilled" ? "REFUNDED" : r.reason.code)).sort(),
+        ["REFUNDED", "VERSION_CONFLICT"]);
+    const winner = results.find(r => r.status === "fulfilled").value;
+    assert.deepEqual(winner.financialCases.map(item => item.caseId), ["case-0001", "case-0002"]);
+    // Two orders refunded at the same time each open their own cases, keyed by their own order.
+    const b = await producing("PLUS", {}, shared);
+    const c = await producing("PLUS", {}, shared);
+    const [rb, rc] = await Promise.all([b, c].map(async x => x.resolveReview(await x.openReview(x.order, "REFUND"),
+        "REFUND")));
+    assert.deepEqual([rb.financialCases[0].orderId, rc.financialCases[0].orderId], [rb.id, rc.id]);
+    assert.deepEqual([rb.financialCases.length, rc.financialCases.length], [1, 1]);
+});
+
+test("K1/10: CLOSE, CONTINUE and cancel behave as before and open no case", async () => {
+    // CLOSE (Görev 147/148 policy unchanged): no case, no case reference in the audit.
+    const p = await producing("PLUS");
+    const closed = await p.resolveReview(await p.openReview(p.order, "DISPUTE"), "CLOSE");
+    assert.deepEqual([closed.state, closed.financialCases, "financialCaseIds" in closed.reviews[0].resolution],
+        [STATES.CLOSED, [], false]);
+    // D-3 still refuses a CLOSE with an undelivered revision.
+    const d = await pendingRevision("PLUS");
+    await assert.rejects(d.resolveReview(await d.openReview(d.order, "CANCELLATION"), "CLOSE"), /FINANCIAL_CASE_REQUIRED/);
+    // CONTINUE resumes and opens nothing.
+    const r = await pendingRevision("PLUS");
+    const resumed = await r.resolveReview(await r.openReview(r.order, "REFUND"), "CONTINUE");
+    assert.deepEqual([resumed.state, resumed.financialCases], [STATES.REVISION_PENDING, []]);
+    // cancel is unchanged: a paid order before production is cancelled with no case (Faz 3, D158-4, not this task).
+    const shared = setup();
+    const paid = await paidOrder(shared, "START", "k1-cancel");
+    const cancelled = await shared.send(paid, "cancel", "finance");
+    assert.deepEqual([cancelled.state, cancelled.financialCases, cancelled.paymentReference !== null],
+        [STATES.CANCELLED, [], true]);
+});
+
+test("K1/11: the decision, its event and the case audit agree; the hash chain holds", async () => {
+    const h = await pendingRevision("PLUS");
+    const reviewed = await h.openReview(h.order, "CANCELLATION");
+    const refunded = await h.resolveReview(reviewed, "REFUND");
+    const event = refunded.events.at(-1);
+    const resolution = refunded.reviews[0].resolution;
+    assert.deepEqual(event.audit.financialCaseIds, ["case-0001", "case-0002"]);
+    assert.deepEqual(resolution, { ...event.audit, moneyMovement: "NONE" });
+    for (const item of refunded.financialCases) {
+        const [opening] = item.auditTrail;
+        assert.deepEqual([item.origin.eventSequence, item.origin.reviewId, opening.idempotencyKey, opening.at,
+            opening.actorId, opening.authorizationRef], [event.sequence, resolution.reviewId, event.requestId, event.at,
+            resolution.actorId, resolution.authorizationRef]);
+        // The decider is recorded; the review's opener is a different person.
+        assert.notEqual(item.originDeciderActorId, refunded.reviews[0].opening.actorId);
+    }
+    for (let i = 1; i < refunded.events.length; i++) {
+        assert.equal(refunded.events[i].previousHash, refunded.events[i - 1].hash);
+    }
 });
