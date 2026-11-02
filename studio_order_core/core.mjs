@@ -263,6 +263,9 @@ const RISK_FINDINGS = Object.freeze(["CONFIRMED", "SUSPECTED"]);
 export const CLOSE_EVIDENCE_FIELDS = Object.freeze(["evidenceId", "orderId", "reviewId", "evidenceKind", "source",
     "createdAt", "digest", "financialObligation", "linkedOrderId", "finding", "signature"]);
 const EVIDENCE_FIELDS = new Set(CLOSE_EVIDENCE_FIELDS);
+// Görev 185 (2B-2a, A178-04): the one format of every consumed evidence digest: a lowercase hex SHA-256, never
+// normalized. closeEvidence, the claim gate and the commit invariants all use this same rule.
+const EVIDENCE_DIGEST = /^[0-9a-f]{64}$/;
 
 /** Shape and binding of a close evidence reference. This is no proof that the evidence is genuine: only the
  * server's evidence service can tell, through verifyEvidence. The content itself never enters the core. */
@@ -270,7 +273,7 @@ function closeEvidence(evidence, rule, order, review) {
     requireThat(evidence && typeof evidence === "object", "EVIDENCE_REQUIRED");
     requireThat(Object.keys(evidence).every(key => EVIDENCE_FIELDS.has(key)) && opaque(evidence.evidenceId) &&
         evidence.orderId === order.id && evidence.reviewId === review.reviewId &&
-        typeof evidence.digest === "string" && /^[0-9a-f]{64}$/.test(evidence.digest) &&
+        typeof evidence.digest === "string" && EVIDENCE_DIGEST.test(evidence.digest) &&
         Number.isSafeInteger(zonedInstant(evidence.createdAt)) &&
         FINANCIAL_OBLIGATIONS.includes(evidence.financialObligation), "EVIDENCE_MISMATCH");
     requireThat(evidence.evidenceKind === rule.evidenceKind && evidence.source === rule.evidenceSource,
@@ -305,6 +308,35 @@ const ATTESTED_FIELDS = Object.freeze(["evidenceId", "evidenceKind", "source", "
     "digest", "financialObligation", "linkedOrderId", "finding", "closeReasonPolicy", "reasonCode", "decision",
     "decisionBinding"]);
 const EVIDENCE_VERIFIER_KINDS = Object.freeze(["PRODUCTION", "SYNTHETIC"]);
+// Görev 185 (2B-2a): what a claim consumes evidence for. Financial case evidence joins in a later phase (2B-2b/2B-3).
+const EVIDENCE_PURPOSES = Object.freeze(["CLOSE"]);
+const evidenceKey = (evidenceId, digest) => JSON.stringify([evidenceId ?? null, digest ?? null]);
+
+/** Görev 185 (2B-2a, A178-03): every evidence an order stores, as identity-and-digest keys: the close evidence of its
+ * resolved reviews and the evidence entries of its financial cases. Any new place that stores evidence must be added
+ * here; until it is, evidence stored there matches no claim and the transition is refused (EVIDENCE_NOT_CLAIMED). */
+function storedEvidenceKeys(snapshot) {
+    const keys = [];
+    for (const review of snapshot.reviews) {
+        const evidence = review.resolution?.evidence;
+        if (evidence) keys.push(evidenceKey(evidence.evidenceId, evidence.digest));
+    }
+    for (const item of snapshot.financialCases) {
+        for (const evidence of item.evidenceReferences ?? []) keys.push(evidenceKey(evidence.evidenceId, evidence.digest));
+    }
+    return keys;
+}
+
+/** Görev 185 (2B-2a, A178-03): true exactly when the evidence a transition newly stores (after minus before, counted
+ * as a multiset) is the evidence it claimed: nothing stored without a claim, no claim without stored evidence. */
+function claimsMatchStoredEvidence(before, after, claims) {
+    const added = new Map();
+    for (const key of storedEvidenceKeys(after)) added.set(key, (added.get(key) ?? 0) + 1);
+    for (const key of storedEvidenceKeys(before)) if (added.has(key)) added.set(key, added.get(key) - 1);
+    const stored = [...added].flatMap(([key, count]) => Array(Math.max(count, 0)).fill(key)).sort();
+    const claimed = claims.map(claim => evidenceKey(claim.evidenceId, claim.digest)).sort();
+    return stored.length === claimed.length && stored.every((key, index) => key === claimed[index]);
+}
 const DEPLOYMENT_ENVIRONMENTS = Object.freeze(["PRODUCTION", "STAGING", "TEST"]);
 
 /** Görev 159 (K-01 Faz 1): financial cases, creation only. A REFUND opens an ORDER_REFUND case; accepted, undelivered
@@ -376,8 +408,11 @@ function revisionId(sequence) {
  * service every CLOSE is refused (CLOSE_EVIDENCE_UNVERIFIABLE). The attested digest must be the lowercase hex SHA-256
  * the service computed itself from the stored evidence bytes, never an echo of the request: the core never sees the
  * content and cannot recompute it (Görev 176). Within this core instance one evidence id and one digest are each
- * consumed at most once, across CLOSE and financial cases (Görev 177, PA-1): a second use is EVIDENCE_REFERENCE_USED,
- * or EVIDENCE_DIGEST_USED for the same content under another id. A verifier of kind SYNTHETIC is refused unless the
+ * consumed at most once (Görev 177, PA-1): a second use is EVIDENCE_REFERENCE_USED, or EVIDENCE_DIGEST_USED for the
+ * same content under another id. Every command that stores evidence consumes it through the dispatch's single claim
+ * gate (Görev 185, Architecture C); evidence stored without a claim is refused (EVIDENCE_NOT_CLAIMED). Financial case
+ * evidence will share these registries once add_case_evidence exists; it is not implemented. Re-verifying evidence
+ * already stored (D165-09) is never a claim. A verifier of kind SYNTHETIC is refused unless the
  * core was created with allowSyntheticEvidence: true AND environment: "TEST" (Görev 152, F151-04). Both come from the
  * server's own configuration, never from a command or principal. A missing environment is PRODUCTION; an unknown one,
  * or the flag outside TEST, stops the core from being created. Both are read only from own data properties of the
@@ -431,6 +466,7 @@ export function createCore(config = {}) {
     // Görev 177 (PA-1, F151-05): evidence digest -> the evidence id that consumed it, shared by CLOSE and (later)
     // financial case evidence. Like every registry here it lives only as long as this core instance: a restart, a second
     // instance or a use outside this core is not seen, so this is no global or persistent uniqueness guarantee.
+    // Görev 185: both evidence registries are written in one place only, recordClaims, from claims made by claimEvidence.
     const evidenceDigests = new Map();
 
     function createOrder(packageId) {
@@ -506,8 +542,45 @@ export function createCore(config = {}) {
         let restorationRef = null;
         let reviewRef = null;
         let replanRef = null;
-        let evidenceRef = null;
-        let evidenceDigest = null;
+        // Görev 185 (2B-2a, Architecture C, A178-03): the evidence this transition consumes. Only claimEvidence adds to
+        // it; nothing is reserved in a registry before the commit, so a refused transition leaves no trace.
+        const evidenceClaims = [];
+        /** The single gate through which a command consumes evidence, called after the command's own validation and
+         * its verifier's full attestation check. Synchronous. In order: purpose; digest and id format; the minimum of a
+         * verified attestation for exactly this id and digest; the TEST-only synthetic boundary; a repeat within this
+         * transition; the registries, identity before digest. The returned claim is what the command stores. */
+        const claimEvidence = (purpose, request, attestation) => {
+            requireThat(EVIDENCE_PURPOSES.includes(purpose), "EVIDENCE_MISMATCH");
+            requireThat(request !== null && typeof request === "object" && opaque(request.evidenceId) &&
+                typeof request.digest === "string" && EVIDENCE_DIGEST.test(request.digest), "EVIDENCE_MISMATCH");
+            requireThat(attestation !== null && typeof attestation === "object" && attestation.verifier !== null &&
+                typeof attestation.verifier === "object", "UNTRUSTED_EVIDENCE");
+            const verifier = { kind: attestation.verifier.kind, id: attestation.verifier.id };
+            requireThat(attestation.status === "VERIFIED" && EVIDENCE_VERIFIER_KINDS.includes(verifier.kind) &&
+                opaque(verifier.id) && attestation.evidenceId === request.evidenceId &&
+                attestation.digest === request.digest, "UNTRUSTED_EVIDENCE");
+            requireThat(verifier.kind === "PRODUCTION" || syntheticEvidence, "SYNTHETIC_VERIFIER_NOT_ALLOWED");
+            requireThat(evidenceClaims.every(claim => claim.evidenceId !== request.evidenceId), "EVIDENCE_REFERENCE_USED");
+            requireThat(evidenceClaims.every(claim => claim.digest !== request.digest), "EVIDENCE_DIGEST_USED");
+            requireThat(!evidenceReferences.has(request.evidenceId), "EVIDENCE_REFERENCE_USED");
+            requireThat(!evidenceDigests.has(request.digest), "EVIDENCE_DIGEST_USED");
+            const claim = freezeDeep({ purpose, evidenceId: request.evidenceId, digest: request.digest,
+                orderId: order.id, caseId: null, verifier });
+            evidenceClaims.push(claim);
+            return claim;
+        };
+        // Commit-time re-check, after the last await and synchronous: every claim's identity first, then every digest.
+        function assertClaimsFree() {
+            requireThat(evidenceClaims.every(claim => !evidenceReferences.has(claim.evidenceId)), "EVIDENCE_REFERENCE_USED");
+            requireThat(evidenceClaims.every(claim => !evidenceDigests.has(claim.digest)), "EVIDENCE_DIGEST_USED");
+        }
+        // The only writes to the evidence registries, in the same synchronous block as assertClaimsFree.
+        function recordClaims() {
+            for (const claim of evidenceClaims) {
+                evidenceReferences.set(claim.evidenceId, claim.orderId);
+                evidenceDigests.set(claim.digest, claim.evidenceId);
+            }
+        }
         let linkedOrder = null;
         // Görev 164 (F160-03): set when this transition writes financial cases; the event then commits to their content.
         let casesChanged = false;
@@ -879,12 +952,9 @@ export function createCore(config = {}) {
                         attestation.status === "VERIFIED" && attestation.verifier && typeof attestation.verifier === "object" &&
                         EVIDENCE_VERIFIER_KINDS.includes(attestation.verifier.kind) && opaque(attestation.verifier.id) &&
                         ATTESTED_FIELDS.every(field => attestation[field] === request[field]), "UNTRUSTED_EVIDENCE");
-                    requireThat(attestation.verifier.kind === "PRODUCTION" || syntheticEvidence,
-                        "SYNTHETIC_VERIFIER_NOT_ALLOWED");
-                    verifier = { kind: attestation.verifier.kind, id: attestation.verifier.id };
-                    requireThat(!evidenceReferences.has(record.evidence.evidenceId), "EVIDENCE_REFERENCE_USED");
-                    // Görev 177 (PA-1): the same content may not be consumed again under another evidence id.
-                    requireThat(!evidenceDigests.has(record.evidence.digest), "EVIDENCE_DIGEST_USED");
+                    // Görev 185 (2B-2a): the TEST-only synthetic boundary and the identity-then-digest pre-check
+                    // (Görev 177, PA-1) are the claim gate's; the claim is consumed only when the decision commits.
+                    verifier = claimEvidence("CLOSE", request, attestation).verifier;
                 }
                 requireThat(!reviewReferences.has(record.authorizationRef), "REVIEW_REFERENCE_USED");
                 at = serverTime();
@@ -896,8 +966,6 @@ export function createCore(config = {}) {
                     const created = zonedInstant(record.evidence.createdAt);
                     requireThat(created <= instant(at, "INVALID_CLOCK") && created >= Date.parse(order.events[0].at),
                         "EVIDENCE_TIME_INVALID");
-                    evidenceRef = record.evidence.evidenceId;
-                    evidenceDigest = record.evidence.digest;
                     const { evidenceId, evidenceKind, source, digest, financialObligation, linkedOrderId, finding } =
                         record.evidence;
                     // Only the reference, kind, source, time, digest and stated outcome are kept; never the content.
@@ -1088,6 +1156,14 @@ export function createCore(config = {}) {
         // FINANCIAL_CASE_POLICY.transitions (and so without the gate above) is refused here before anything is committed.
         requireThat(caseCommand || (next.financialCases.length >= order.financialCases.length &&
             order.financialCases.every((entry, index) => next.financialCases[index] === entry)), "CASE_COMMAND_NOT_REGISTERED");
+        // Görev 185 (2B-2a, A178-03/04): every claim is a frozen, well-formed gate claim for this order, unique within
+        // the transition, and the claims are exactly the evidence this transition stores. Evidence stored without a
+        // claim, or a claim for evidence that is not stored, is refused before anything is committed.
+        requireThat(evidenceClaims.every((claim, index) => Object.isFrozen(claim) &&
+            EVIDENCE_PURPOSES.includes(claim.purpose) && opaque(claim.evidenceId) && typeof claim.digest === "string" &&
+            EVIDENCE_DIGEST.test(claim.digest) && claim.orderId === order.id && evidenceClaims.findIndex(other =>
+                other.evidenceId === claim.evidenceId || other.digest === claim.digest) === index), "EVIDENCE_MISMATCH");
+        requireThat(claimsMatchStoredEvidence(order, next, evidenceClaims), "EVIDENCE_NOT_CLAIMED");
         next.version += 1;
         const event = {
             sequence: next.version, requestId: command.requestId, kind: command.kind,
@@ -1112,8 +1188,7 @@ export function createCore(config = {}) {
         requireThat(!restorationRef || !restorationReferences.has(restorationRef), "RESTORATION_REFERENCE_USED");
         requireThat(!reviewRef || !reviewReferences.has(reviewRef), "REVIEW_REFERENCE_USED");
         requireThat(!replanRef || !replanReferences.has(replanRef), "REPLAN_REFERENCE_USED");
-        requireThat(!evidenceRef || !evidenceReferences.has(evidenceRef), "EVIDENCE_REFERENCE_USED");
-        requireThat(!evidenceDigest || !evidenceDigests.has(evidenceDigest), "EVIDENCE_DIGEST_USED");
+        assertClaimsFree();
         // Görev 150 (F-02): the linked order must be exactly the record that was checked; any change since is a refusal.
         requireThat(!linkedOrder || orders.get(linkedOrder.id) === linkedOrder, "LINKED_ORDER_CHANGED");
         const committed = freezeDeep(next);
@@ -1123,8 +1198,7 @@ export function createCore(config = {}) {
         if (restorationRef) restorationReferences.set(restorationRef, order.id);
         if (reviewRef) reviewReferences.set(reviewRef, order.id);
         if (replanRef) replanReferences.set(replanRef, order.id);
-        if (evidenceRef) evidenceReferences.set(evidenceRef, order.id);
-        if (evidenceDigest) evidenceDigests.set(evidenceDigest, evidenceRef);
+        recordClaims();
         return committed;
     }
     /** Decision 140: trusted server-side read of a proposal's visible state from the canonical record and the

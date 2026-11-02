@@ -4761,8 +4761,9 @@ test("DG/21: a used digest is refused before the evidence time is judged", async
 
 // DG/11: the registry is shared with the financial case evidence that does not exist yet. A probe copy of the sibling
 // core.mjs (outside the repository, removed after import) registers a case command that consumes an evidence id and
-// digest through the same commit path the future add_case_evidence will use (evidenceRef / evidenceDigest). If those
-// names or the shared commit block change, this test fails instead of being skipped.
+// digest through the single claim gate the future add_case_evidence must use (claimEvidence, Görev 185 Architecture C;
+// the probe copy adds the FINANCIAL_CASE_EVIDENCE purpose). If the gate or the shared commit block change, this test
+// fails instead of being skipped.
 let dgProbeLoad = null;
 function dgProbeCore() {
     dgProbeLoad ??= (async () => {
@@ -4776,6 +4777,7 @@ function dgProbeCore() {
             () => `from ${JSON.stringify(new URL("./calendar.mjs", import.meta.url).href)};`);
         source = inject(source, "transitions: {",
             ` probe_case_evidence: { from: "OPEN", to: "OPEN", roles: ["finance", "admin"] },`, "after");
+        source = inject(source, `const EVIDENCE_PURPOSES = Object.freeze(["CLOSE"`, `, "FINANCIAL_CASE_EVIDENCE"`, "after");
         source = inject(source, `            default: throw new OrderError("UNKNOWN_ACTION");`, `
             case "probe_case_evidence": {
                 // PROBE ONLY (Görev 177): a case evidence entry, reduced to what the shared registries see.
@@ -4784,8 +4786,8 @@ function dgProbeCore() {
                 const item = order.financialCases.find(entry => entry.caseId === data.caseRef?.caseId);
                 requireThat(item && data.caseRef.orderId === order.id, "UNKNOWN_CASE");
                 at = serverTime();
-                evidenceRef = data.evidenceId;
-                evidenceDigest = data.digest;
+                claimEvidence("FINANCIAL_CASE_EVIDENCE", { evidenceId: data.evidenceId, digest: data.digest }, { status: "VERIFIED",
+                    verifier: { kind: "SYNTHETIC", id: "synthetic-evidence-service" }, evidenceId: data.evidenceId, digest: data.digest });
                 next.financialCases = order.financialCases.map(entry => (entry === item ? { ...entry,
                     evidenceReferences: [...entry.evidenceReferences, { evidenceId: data.evidenceId, digest: data.digest }] }
                     : entry));
@@ -4911,4 +4913,506 @@ test("DG/22 (A178-01): same evidence id and digest raced past the pre-check: the
         assert.equal(after.events.filter(e => e.audit?.evidence?.digest === sharedDigest).length, 0);
         assert.equal(after.events.filter(e => e.audit?.evidence?.evidenceId === sharedId).length, 0);
     }
+});
+
+// ---- Görev 185 (Faz 2B-2a, Architecture C): the single evidence claim gate and its commit invariants ----
+//
+// The real core has one evidence consumer (CLOSE), whose own checks run before the gate's, so most gate and invariant
+// rules are unreachable through CLOSE. They are driven here through a probe copy of the sibling core.mjs (outside the
+// repository, removed after import; the Görev 170/177 technique). The probe registers one case command, probe_claim,
+// that claims (or deliberately does not claim) evidence and stores it on a financial case, and it adds the
+// FINANCIAL_CASE_EVIDENCE purpose that 2B-2b/2B-3 will bring. A missing anchor fails the tests; nothing is skipped.
+//   data.items          evidence { evidenceId, digest } to claim and store, in order
+//   data.attestations   explicit attestations per item (default: a synthetic VERIFIED one for exactly that item)
+//   data.mode           "claim_store" (default) | "store_only" | "claim_only" | "store_other" (store data.other instead)
+//   data.raw            claims pushed straight into the claim list, bypassing the gate (frozen when data.freezeRaw);
+//                       each is also stored when data.storeRaw
+//   data.wait           await the probe barrier (setProbeGate) before claiming: a deterministic race, no timers
+let ecProbeLoad = null;
+function ecProbeCore() {
+    ecProbeLoad ??= (async () => {
+        const { mkdtemp, readFile, writeFile, rm } = await import("node:fs/promises");
+        const { tmpdir } = await import("node:os");
+        const { join } = await import("node:path");
+        const { pathToFileURL } = await import("node:url");
+        let source = (await readFile(new URL("./core.mjs", import.meta.url), "utf8")).replaceAll("\r\n", "\n");
+        const calendarImport = `from "./calendar.mjs";`;
+        source = inject(source, calendarImport, "", "after").replace(calendarImport,
+            () => `from ${JSON.stringify(new URL("./calendar.mjs", import.meta.url).href)};`);
+        source = inject(source, "transitions: {",
+            ` probe_claim: { from: "OPEN", to: "OPEN", roles: ["finance", "admin"] },`, "after");
+        source = inject(source, `const EVIDENCE_PURPOSES = Object.freeze(["CLOSE"`, `, "FINANCIAL_CASE_EVIDENCE"`, "after");
+        source = inject(source, "export function createCore(config = {}) {", `// PROBE ONLY (Görev 185): a test barrier.
+let probeGate = async () => {};
+export function setProbeGate(gate) { probeGate = gate; }
+`, "before");
+        source = inject(source, `            default: throw new OrderError("UNKNOWN_ACTION");`, `
+            case "probe_claim": {
+                // PROBE ONLY (Görev 185): claims and stores case evidence exactly as data says.
+                inState(STATES.CLOSED);
+                requireHumanActor();
+                const item = order.financialCases.find(entry => entry.caseId === data.caseId);
+                requireThat(item, "UNKNOWN_CASE");
+                if (data.wait) await probeGate();
+                const mode = data.mode ?? "claim_store";
+                const stored = [];
+                for (const [index, entry] of (data.items ?? []).entries()) {
+                    const attestation = Object.hasOwn(data, "attestations") ? data.attestations[index]
+                        : { status: "VERIFIED", verifier: { kind: data.verifierKind ?? "SYNTHETIC", id: "synthetic-evidence-service" },
+                            evidenceId: entry.evidenceId, digest: entry.digest };
+                    if (mode !== "store_only") claimEvidence(data.purpose ?? "FINANCIAL_CASE_EVIDENCE", entry, attestation);
+                    if (mode === "store_other") stored.push({ ...data.other });
+                    else if (mode !== "claim_only") stored.push({ evidenceId: entry.evidenceId, digest: entry.digest });
+                }
+                for (const raw of data.raw ?? []) {
+                    evidenceClaims.push(data.freezeRaw ? freezeDeep({ ...raw }) : { ...raw });
+                    if (data.storeRaw) stored.push({ evidenceId: raw.evidenceId, digest: raw.digest });
+                }
+                at = serverTime();
+                next.financialCases = order.financialCases.map(entry => (entry === item
+                    ? { ...entry, evidenceReferences: [...entry.evidenceReferences, ...stored] } : entry));
+                casesChanged = true;
+                break;
+            }
+`, "before");
+        const dir = await mkdtemp(join(tmpdir(), "unai-claim-probe-"));
+        try {
+            await writeFile(join(dir, "core.mjs"), source);
+            return await import(pathToFileURL(join(dir, "core.mjs")).href);
+        } finally {
+            await rm(dir, { recursive: true, force: true });
+        }
+    })();
+    return ecProbeLoad;
+}
+
+const ecItem = (text, evidenceId = `synthetic-ec-${text}`) => ({ evidenceId, digest: dgDigest(`ec-${text}`) });
+
+/** A probe-core harness: a REFUND-ed order with two OPEN cases, and probe_claim on it. */
+async function ecSetup(overrides = {}) {
+    const probe = await ecProbeCore();
+    const h = setup(overrides, null, probe.createCore);
+    const { refunded } = await refundedCases(h);
+    let sequence = 0;
+    const claim = (order, data, caseId = "case-0001") => h.core.dispatch(order, {
+        kind: "probe_claim", requestId: `synthetic-ec-${++sequence}`, expectedVersion: order.version, data: { caseId, ...data }
+    }, h.actor("finance", order, SERVER, "synthetic-finance-ec"));
+    return { probe, h, refunded, claim };
+}
+
+/** After a refusal: the same snapshot still takes a valid claim as its very next version, on the same history. */
+async function ecCommitsCleanly(claim, order, items, caseId = "case-0001") {
+    const next = await claim(order, { items }, caseId);
+    assert.equal(next.version, order.version + 1);
+    assert.deepEqual(next.events.slice(0, -1), order.events);
+    assert.equal(next.events.at(-1).previousHash, order.events.at(-1).hash);
+    const stored = next.financialCases.find(entry => entry.caseId === caseId).evidenceReferences;
+    assert.deepEqual(stored.slice(-items.length), items);
+    return next;
+}
+
+test("EC/2: the gate refuses an empty, missing or malformed digest or id, and an unknown purpose; nothing is consumed", async () => {
+    const { refunded, claim } = await ecSetup();
+    const id = "synthetic-ec2-id";
+    const malformed = ["", "a".repeat(63), "a".repeat(65), "A".repeat(64), `${"a".repeat(63)}g`, ` ${"a".repeat(63)}`,
+        `${"a".repeat(64)}\n`, `0x${"a".repeat(62)}`];
+    for (const digest of malformed) {
+        await assert.rejects(claim(refunded, { items: [{ evidenceId: id, digest }] }), /EVIDENCE_MISMATCH/, JSON.stringify(digest));
+    }
+    for (const item of [{ evidenceId: id, digest: null }, { evidenceId: id }, { evidenceId: id, digest: 7 }]) {
+        await assert.rejects(claim(refunded, { items: [item] }), /EVIDENCE_MISMATCH/, JSON.stringify(item));
+    }
+    for (const evidenceId of ["", "short", "with space-1234", null, "x".repeat(81)]) {
+        await assert.rejects(claim(refunded, { items: [{ evidenceId, digest: dgDigest("ec2") }] }), /EVIDENCE_MISMATCH/);
+    }
+    await assert.rejects(claim(refunded, { items: [ecItem("ec2")], purpose: "OTHER_PURPOSE" }), /EVIDENCE_MISMATCH/);
+    // Nothing was consumed: the same id and a fresh digest close cleanly on the unchanged snapshot.
+    const next = await ecCommitsCleanly(claim, refunded, [{ evidenceId: id, digest: dgDigest("ec2") }]);
+    // The format is judged before the registries: a malformed claim never learns whether its id or digest was used.
+    await assert.rejects(claim(next, { items: [{ evidenceId: id, digest: "A".repeat(64) }] }, "case-0002"), /EVIDENCE_MISMATCH/);
+    await assert.rejects(claim(next, { items: [{ evidenceId: "bad id", digest: dgDigest("ec2") }] }, "case-0002"),
+        /EVIDENCE_MISMATCH/);
+});
+
+test("EC/3: claims that bypass the gate are refused at commit unless frozen, well-formed, of this order and unique", async () => {
+    const { refunded, claim } = await ecSetup();
+    const good = { purpose: "FINANCIAL_CASE_EVIDENCE", ...ecItem("ec3"), orderId: refunded.id, caseId: null,
+        verifier: { kind: "SYNTHETIC", id: "synthetic-evidence-service" } };
+    const refusals = [
+        { raw: [good], freezeRaw: false },                                          // not frozen: not made by the gate
+        { raw: [{ ...good, digest: "B".repeat(64) }], freezeRaw: true },
+        { raw: [{ ...good, digest: "" }], freezeRaw: true },
+        { raw: [{ ...good, evidenceId: "bad id" }], freezeRaw: true },
+        { raw: [{ ...good, purpose: "OTHER_PURPOSE" }], freezeRaw: true },
+        { raw: [{ ...good, orderId: "another-order-id" }], freezeRaw: true },
+        { raw: [good, { ...good, evidenceId: "synthetic-ec3-other" }], freezeRaw: true }  // one digest twice
+    ];
+    for (const data of refusals) {
+        await assert.rejects(claim(refunded, { ...data, storeRaw: true }), /EVIDENCE_MISMATCH/, JSON.stringify(data.raw));
+    }
+    await ecCommitsCleanly(claim, refunded, [ecItem("ec3")]);
+});
+
+test("EC/4,5: no claim without a verified attestation for exactly this evidence id and digest", async () => {
+    const { refunded, claim } = await ecSetup();
+    const item = ecItem("ec4");
+    const verified = { status: "VERIFIED", verifier: { kind: "SYNTHETIC", id: "synthetic-evidence-service" }, ...item };
+    const refused = [null, true, "VERIFIED", {}, { ...verified, status: "PENDING" }, { ...verified, status: undefined },
+        { ...verified, verifier: undefined }, { ...verified, verifier: null }, { ...verified, verifier: "SYNTHETIC" },
+        { ...verified, verifier: { kind: "OTHER", id: "synthetic-evidence-service" } },
+        { ...verified, verifier: { kind: "SYNTHETIC", id: "bad id" } },
+        // EC/5: the attestation is for other evidence
+        { ...verified, digest: dgDigest("ec5-other") }, { ...verified, digest: undefined },
+        { ...verified, evidenceId: "synthetic-ec5-other" }, { ...verified, evidenceId: undefined }];
+    for (const attestation of refused) {
+        await assert.rejects(claim(refunded, { items: [item], attestations: [attestation] }), /UNTRUSTED_EVIDENCE/,
+            JSON.stringify(attestation));
+    }
+    await ecCommitsCleanly(claim, refunded, [item]);
+});
+
+test("EC/6: the TEST-only synthetic boundary sits in the gate; a PRODUCTION verifier is accepted", async () => {
+    const off = await ecSetup({ allowSyntheticEvidence: false });
+    await assert.rejects(off.claim(off.refunded, { items: [ecItem("ec6-a")] }), /SYNTHETIC_VERIFIER_NOT_ALLOWED/);
+    const next = await off.claim(off.refunded, { items: [ecItem("ec6-a")], verifierKind: "PRODUCTION" });
+    assert.equal(next.version, off.refunded.version + 1);
+    const on = await ecSetup();
+    await ecCommitsCleanly(on.claim, on.refunded, [ecItem("ec6-b")]);
+});
+
+test("EC/7: a repeat within one transition is refused, identity first; two distinct items are both consumed", async () => {
+    const { h, refunded, claim } = await ecSetup();
+    const a = ecItem("ec7-a");
+    await assert.rejects(claim(refunded, { items: [a, a] }), /EVIDENCE_REFERENCE_USED/);
+    await assert.rejects(claim(refunded, { items: [a, { ...a, digest: dgDigest("ec7-x") }] }), /EVIDENCE_REFERENCE_USED/);
+    await assert.rejects(claim(refunded, { items: [a, { ...a, evidenceId: "synthetic-ec7-other" }] }), /EVIDENCE_DIGEST_USED/);
+    const b = ecItem("ec7-b");
+    const next = await ecCommitsCleanly(claim, refunded, [a, b]);
+    // Both are consumed, by id and by digest, for case evidence and for CLOSE alike.
+    for (const used of [a, b]) {
+        await assert.rejects(claim(next, { items: [{ ...used, digest: dgDigest("ec7-fresh") }] }, "case-0002"),
+            /EVIDENCE_REFERENCE_USED/);
+        await assert.rejects(claim(next, { items: [{ ...used, evidenceId: "synthetic-ec7-fresh" }] }, "case-0002"),
+            /EVIDENCE_DIGEST_USED/);
+        const p = await inReview("DISPUTE", h);
+        await assert.rejects(h.resolveReview(p.reviewed, "CLOSE", dgRecord(h, p, { digest: used.digest })), /EVIDENCE_DIGEST_USED/);
+    }
+});
+
+test("EC/8: evidence stored without a claim is EVIDENCE_NOT_CLAIMED and consumes nothing", async () => {
+    const { h, refunded, claim } = await ecSetup();
+    const item = ecItem("ec8");
+    await assert.rejects(claim(refunded, { items: [item], mode: "store_only" }), /EVIDENCE_NOT_CLAIMED/);
+    // Neither the id nor the digest was consumed: a CLOSE may use both.
+    const p = await inReview("DISPUTE", h);
+    await dgClosesCleanly(h, p, dgRecord(h, p, { evidenceId: item.evidenceId, digest: item.digest }));
+    await ecCommitsCleanly(claim, refunded, [ecItem("ec8-b")]);
+});
+
+test("EC/9: a claim without stored evidence, a stored key other than the claim, or an id-only claim is refused", async () => {
+    const { refunded, claim } = await ecSetup();
+    const item = ecItem("ec9");
+    await assert.rejects(claim(refunded, { items: [item], mode: "claim_only" }), /EVIDENCE_NOT_CLAIMED/);
+    await assert.rejects(claim(refunded, { items: [item], mode: "store_other", other: ecItem("ec9-other") }),
+        /EVIDENCE_NOT_CLAIMED/);
+    await assert.rejects(claim(refunded, { items: [item], mode: "store_other",
+        other: { evidenceId: item.evidenceId, digest: dgDigest("ec9-other") } }), /EVIDENCE_NOT_CLAIMED/);
+    // A178-03: an identity without a digest can no longer slip past the digest registry.
+    await assert.rejects(claim(refunded, { raw: [{ purpose: "FINANCIAL_CASE_EVIDENCE", evidenceId: item.evidenceId,
+        orderId: refunded.id }], freezeRaw: true, storeRaw: true }), /EVIDENCE_MISMATCH/);
+    await ecCommitsCleanly(claim, refunded, [item]);
+});
+
+test("EC/10: case evidence (two claims) raced with a CLOSE on one id and digest past the pre-check: loser gets EVIDENCE_REFERENCE_USED", async () => {
+    for (let round = 0; round < 6; round++) {
+        const log = [];
+        let arrived = 0;
+        let released = false;
+        let open;
+        const gate = new Promise(resolve => { open = resolve; });
+        const arrive = async () => {
+            if (released) return;
+            arrived += 1;
+            log.push("waiting");
+            if (arrived === 2) { released = true; open(); }
+            await gate;
+        };
+        const { probe, h, refunded, claim } = await ecSetup({
+            clock: () => { if (released) log.push("pre-check passed"); return FIXED_TIME; },
+            verifyEvidence: async (evidence, request) => { await arrive(); return syntheticAttestation(evidence, request); }
+        });
+        probe.setProbeGate(arrive);
+        try {
+            const p = await inReview("DISPUTE", h);
+            const shared = { evidenceId: `synthetic-ec10-shared-${round}`, digest: dgDigest(`ec10-${round}`) };
+            const other = ecItem(`ec10-other-${round}`);
+            const closing = () => h.resolveReview(p.reviewed, "CLOSE", dgRecord(h, p, shared));
+            const adding = () => claim(refunded, { items: [other, shared], wait: true });
+            const racers = round % 2 === 0 ? [closing, adding] : [adding, closing];
+            const results = await Promise.allSettled(racers.map(run => run().finally(() => log.push("settled"))));
+            assert.deepEqual(log, ["waiting", "waiting", "pre-check passed", "pre-check passed", "settled", "settled"],
+                `round ${round}`);
+            const codes = results.map(r => (r.status === "fulfilled" ? "COMMITTED" : r.reason.code));
+            assert.equal(codes.filter(code => code === "COMMITTED").length, 1, `round ${round}`);
+            const loser = codes.find(code => code !== "COMMITTED");
+            assert.notEqual(loser, "EVIDENCE_DIGEST_USED", `round ${round}: digest checked before identity`);
+            assert.equal(loser, "EVIDENCE_REFERENCE_USED", `round ${round}`);
+        } finally {
+            probe.setProbeGate(async () => {});
+        }
+    }
+});
+
+test("EC/11: CLOSE keeps its observed refusal order through the gate", async () => {
+    let kind = "PRODUCTION";
+    const h = setup({
+        allowSyntheticEvidence: false,
+        verifyEvidence: (evidence, request) => {
+            const attestation = syntheticAttestation(evidence, request);
+            return attestation && { ...attestation, verifier: { kind, id: "synthetic-evidence-service" } };
+        }
+    });
+    const first = await inReview("DISPUTE", h);
+    const firstRecord = dgRecord(h, first, { digest: dgDigest("ec11-used") });
+    await dgClosesCleanly(h, first, firstRecord);
+    const usedId = firstRecord.evidence.evidenceId;
+    const usedDigest = dgDigest("ec11-used");
+    const usedRef = firstRecord.authorizationRef;
+    const p = await inReview("DISPUTE", h);
+    const record = (evidence, extra = {}) =>
+        h.resolution(p.reviewed, p.id, "CLOSE", { ...h.closeFields(p.reviewed, p.id, DG_CODE, evidence), ...extra });
+    const cases = [
+        // [verifier kind, evidence, record extra, expected]
+        ["SYNTHETIC", { evidenceId: usedId, digest: usedDigest }, { authorizationRef: usedRef }, /SYNTHETIC_VERIFIER_NOT_ALLOWED/],
+        ["SYNTHETIC", { digest: usedDigest }, {}, /SYNTHETIC_VERIFIER_NOT_ALLOWED/],
+        ["PRODUCTION", { evidenceId: usedId, digest: usedDigest }, { authorizationRef: usedRef }, /EVIDENCE_REFERENCE_USED/],
+        ["PRODUCTION", { evidenceId: usedId, digest: dgDigest("ec11-fresh") }, { authorizationRef: usedRef }, /EVIDENCE_REFERENCE_USED/],
+        ["PRODUCTION", { digest: usedDigest }, { authorizationRef: usedRef }, /EVIDENCE_DIGEST_USED/],
+        ["PRODUCTION", { digest: usedDigest, createdAt: "2030-01-01T00:00:00.000Z" }, {}, /EVIDENCE_DIGEST_USED/],
+        ["PRODUCTION", { digest: dgDigest("ec11-fresh") }, { authorizationRef: usedRef }, /REVIEW_REFERENCE_USED/],
+        ["PRODUCTION", { digest: dgDigest("ec11-fresh"), createdAt: "2030-01-01T00:00:00.000Z" }, {}, /EVIDENCE_TIME_INVALID/]
+    ];
+    for (const [verifierKind, evidence, extra, expected] of cases) {
+        kind = verifierKind;
+        await assert.rejects(h.resolveReview(p.reviewed, "CLOSE", record(evidence, extra)), expected,
+            `${verifierKind} ${JSON.stringify(evidence)} ${JSON.stringify(extra)}`);
+    }
+    kind = "PRODUCTION";
+    // Refusals after the claim consumed nothing: another order may use that digest, then this one closes.
+    const q = await inReview("DISPUTE", h);
+    await dgClosesCleanly(h, q, dgRecord(h, q, { digest: dgDigest("ec11-fresh") }));
+    await dgClosesCleanly(h, p, record({ digest: dgDigest("ec11-other") }));
+});
+
+test("EC/12: the CLOSE audit evidence keeps its keys, order and verifier shape; the event hash covers it", async () => {
+    const h = setup();
+    const p = await inReview("DISPUTE", h);
+    const closed = await dgClosesCleanly(h, p, dgRecord(h, p, { digest: dgDigest("ec12") }));
+    const event = closed.events.at(-1);
+    const evidence = event.audit.evidence;
+    assert.deepEqual(Object.keys(evidence),
+        ["evidenceId", "evidenceKind", "source", "createdAt", "digest", "financialObligation", "verifier"]);
+    assert.deepEqual(Object.keys(evidence.verifier), ["kind", "id"]);
+    assert.deepEqual(evidence.verifier, { kind: "SYNTHETIC", id: "synthetic-evidence-service" });
+    assert.equal(evidence.digest, dgDigest("ec12"));
+    assert.deepEqual(closed.reviews.at(-1).resolution.evidence, evidence);
+    const { hash, ...hashed } = event;
+    assert.equal(createHash("sha256").update(JSON.stringify(hashed)).digest("hex"), hash);
+    assert.equal(Object.keys(event).at(-1), "hash");
+});
+
+// Structural locks: read the sibling core.mjs source (never changed by the tests).
+async function coreSource() {
+    const { readFile } = await import("node:fs/promises");
+    return (await readFile(new URL("./core.mjs", import.meta.url), "utf8")).replaceAll("\r\n", "\n");
+}
+function sourceBlock(source, start, end) {
+    const from = source.indexOf(start);
+    assert.ok(from >= 0, `missing ${start}`);
+    const to = source.indexOf(end, from + start.length);
+    assert.ok(to > from, `unterminated ${start}`);
+    return source.slice(from, to + end.length);
+}
+const occurrences = (text, needle) => text.split(needle).length - 1;
+
+test("T-S/1,5: the evidence registries are written in recordClaims only; claims are added in claimEvidence only", async () => {
+    const source = await coreSource();
+    const record = sourceBlock(source, "        function recordClaims() {", "\n        }\n");
+    const gate = sourceBlock(source, "        const claimEvidence = (purpose, request, attestation) => {", "\n        };\n");
+    for (const write of ["evidenceReferences.set(", "evidenceDigests.set("]) {
+        assert.equal(occurrences(source, write), 1, write);
+        assert.equal(occurrences(record, write), 1, write);
+    }
+    assert.equal(occurrences(source, "evidenceClaims.push("), 1);
+    assert.equal(occurrences(gate, "evidenceClaims.push("), 1);
+    // Nothing else deletes from or clears the evidence registries.
+    assert.doesNotMatch(source, /evidence(References|Digests)\.(delete|clear)\(/);
+});
+
+test("T-S/2: the scalar evidenceRef / evidenceDigest dispatch variables are gone (restoration's record.evidenceRef field stays)", async () => {
+    const source = await coreSource();
+    assert.doesNotMatch(source, /\blet\s+evidence(Ref|Digest)\b/);
+    assert.doesNotMatch(source, /\b(const|var)\s+evidence(Ref|Digest)\b/);
+    assert.doesNotMatch(source, /(^|[^.\w])evidenceRef\s*=(?!=)/m);
+    assert.doesNotMatch(source, /\bevidenceDigest\b/);
+    assert.match(source, /record\.evidenceRef/); // the restoration field (F184-02), a different thing
+});
+
+test("T-S/3: the gate and commit helpers are synchronous, and nothing is awaited between re-check and write", async () => {
+    const source = await coreSource();
+    const blocks = {
+        claimEvidence: sourceBlock(source, "        const claimEvidence = (purpose, request, attestation) => {", "\n        };\n"),
+        assertClaimsFree: sourceBlock(source, "        function assertClaimsFree() {", "\n        }\n"),
+        recordClaims: sourceBlock(source, "        function recordClaims() {", "\n        }\n"),
+        storedEvidenceKeys: sourceBlock(source, "function storedEvidenceKeys(snapshot) {", "\n}\n"),
+        claimsMatchStoredEvidence: sourceBlock(source, "function claimsMatchStoredEvidence(before, after, claims) {", "\n}\n")
+    };
+    for (const [name, block] of Object.entries(blocks)) {
+        assert.doesNotMatch(block, /\bawait\b|\basync\b|\.then\(/, name);
+    }
+    assert.doesNotMatch(source, /async\s+(function\s+)?(assertClaimsFree|recordClaims|claimEvidence)\b/);
+    assert.doesNotMatch(source, /claimEvidence\s*=\s*async\b/);
+    // The commit block: the re-check comes after the last await of the dispatch and the writes follow without one.
+    const commit = sourceBlock(source, "        event.hash = await digest(event);", "        recordClaims();");
+    assert.equal(occurrences(commit, "await"), 1, "only the hash await opens the block");
+    assert.equal(occurrences(commit, "assertClaimsFree();"), 1);
+    assert.ok(commit.indexOf("assertClaimsFree();") < commit.indexOf("orders.set(order.id, committed);"));
+});
+
+test("T-S/4 (A178-09): the contract says case evidence is not implemented and names the unclaimed refusal", async () => {
+    const source = await coreSource();
+    assert.doesNotMatch(source, /across CLOSE and\s+\*?\s*financial cases/);
+    assert.match(source, /add_case_evidence exists; it is not implemented/);
+    assert.match(source, /evidence stored without a claim is refused \(EVIDENCE_NOT_CLAIMED\)/);
+    assert.match(source, /Re-verifying evidence\s*\n?\s*\*?\s*already stored \(D165-09\) is never a claim/);
+});
+
+// ---- Görev 187 (A186-03): locks for the five gate/commit mutants the Görev 186 audit found unguarded ----
+// Each test pins an existing 2B-2a contract; none assumes new production behavior.
+//   EC/13  A10b  the CLOSE audit keeps exactly { kind, id } of the verifier, never the attestation's verifier object
+//   EC/14  A12a  the production purpose list is exactly ["CLOSE"]; case evidence is not a purpose yet
+//   EC/15  A12c  the gate judges the purpose before the registries
+//   EC/16  A15c  evidence an order already stores is not new evidence of a later transition (fail-closed mutant)
+//   EC/17  A15f  claims match stored evidence whatever their order (fail-closed mutant)
+
+test("EC/13 (A10b): the CLOSE audit keeps exactly the verifier's kind and id, never extra attestation fields", async () => {
+    const h = setup({
+        verifyEvidence: (evidence, request) => {
+            const attestation = syntheticAttestation(evidence, request);
+            return attestation && { ...attestation,
+                verifier: { kind: "PRODUCTION", id: "synthetic-evidence-service", extra: "synthetic-extra", note: { x: 1 } } };
+        }
+    });
+    const p = await inReview("DISPUTE", h);
+    const closed = await dgClosesCleanly(h, p, dgRecord(h, p, { digest: dgDigest("ec13") }));
+    const audited = closed.events.at(-1).audit.evidence.verifier;
+    assert.deepEqual(Object.keys(audited), ["kind", "id"]);
+    assert.deepEqual(audited, { kind: "PRODUCTION", id: "synthetic-evidence-service" });
+    assert.deepEqual(closed.reviews.at(-1).resolution.evidence.verifier, audited);
+});
+
+// A probe copy WITHOUT the purpose injection: the production purpose list is used exactly as written in core.mjs.
+let purposeProbeLoad = null;
+function purposeProbeCore() {
+    purposeProbeLoad ??= (async () => {
+        const { mkdtemp, readFile, writeFile, rm } = await import("node:fs/promises");
+        const { tmpdir } = await import("node:os");
+        const { join } = await import("node:path");
+        const { pathToFileURL } = await import("node:url");
+        let source = (await readFile(new URL("./core.mjs", import.meta.url), "utf8")).replaceAll("\r\n", "\n");
+        const calendarImport = `from "./calendar.mjs";`;
+        source = inject(source, calendarImport, "", "after").replace(calendarImport,
+            () => `from ${JSON.stringify(new URL("./calendar.mjs", import.meta.url).href)};`);
+        source = inject(source, "transitions: {",
+            ` probe_purpose_claim: { from: "OPEN", to: "OPEN", roles: ["finance", "admin"] },`, "after");
+        source = inject(source, `            default: throw new OrderError("UNKNOWN_ACTION");`, `
+            case "probe_purpose_claim": {
+                // PROBE ONLY (Görev 187): claims one evidence under data.purpose and stores it on case-0001.
+                inState(STATES.CLOSED);
+                requireHumanActor();
+                const item = order.financialCases[0];
+                const evidence = { evidenceId: data.evidenceId, digest: data.digest };
+                claimEvidence(data.purpose, evidence, { status: "VERIFIED",
+                    verifier: { kind: "SYNTHETIC", id: "synthetic-evidence-service" }, ...evidence });
+                at = serverTime();
+                next.financialCases = order.financialCases.map(entry => (entry === item
+                    ? { ...entry, evidenceReferences: [...entry.evidenceReferences, evidence] } : entry));
+                casesChanged = true;
+                break;
+            }
+`, "before");
+        const dir = await mkdtemp(join(tmpdir(), "unai-purpose-probe-"));
+        try {
+            await writeFile(join(dir, "core.mjs"), source);
+            return await import(pathToFileURL(join(dir, "core.mjs")).href);
+        } finally {
+            await rm(dir, { recursive: true, force: true });
+        }
+    })();
+    return purposeProbeLoad;
+}
+
+test("EC/14 (A12a): the production purpose list is exactly [\"CLOSE\"]; a case-evidence purpose is refused and consumes nothing", async () => {
+    const source = await coreSource();
+    assert.equal(occurrences(source, "const EVIDENCE_PURPOSES = "), 1);
+    assert.equal(occurrences(source, `const EVIDENCE_PURPOSES = Object.freeze(["CLOSE"]);`), 1);
+    const probe = await purposeProbeCore();
+    const h = setup({}, null, probe.createCore);
+    const { refunded } = await refundedCases(h);
+    let sequence = 0;
+    const claim = (order, purpose, evidenceId, digest) => h.core.dispatch(order, {
+        kind: "probe_purpose_claim", requestId: `synthetic-ec14-${++sequence}`, expectedVersion: order.version,
+        data: { purpose, evidenceId, digest }
+    }, h.actor("finance", order, SERVER, "synthetic-finance-ec14"));
+    for (const purpose of ["FINANCIAL_CASE_EVIDENCE", "close", "CLOSE ", "", null]) {
+        await assert.rejects(claim(refunded, purpose, "synthetic-ec14-a", dgDigest("ec14")), /EVIDENCE_MISMATCH/,
+            JSON.stringify(purpose));
+    }
+    // Nothing was consumed: the same evidence is still free under the one production purpose.
+    const next = await claim(refunded, "CLOSE", "synthetic-ec14-a", dgDigest("ec14"));
+    assert.equal(next.version, refunded.version + 1);
+    assert.deepEqual(next.events.slice(0, -1), refunded.events);
+});
+
+test("EC/15 (A12c): the gate judges the purpose before the registries: an unknown purpose with a used id or digest is EVIDENCE_MISMATCH", async () => {
+    const { refunded, claim } = await ecSetup();
+    const used = ecItem("ec15");
+    const next = await ecCommitsCleanly(claim, refunded, [used]);
+    for (const purpose of ["OTHER_PURPOSE", "close", ""]) {
+        await assert.rejects(claim(next, { items: [{ ...used, digest: dgDigest("ec15-fresh") }], purpose }, "case-0002"),
+            /EVIDENCE_MISMATCH/, `used id, ${JSON.stringify(purpose)}`);
+        await assert.rejects(claim(next, { items: [{ ...used, evidenceId: "synthetic-ec15-fresh" }], purpose }, "case-0002"),
+            /EVIDENCE_MISMATCH/, `used digest, ${JSON.stringify(purpose)}`);
+    }
+    // With a known purpose the same requests reach the registries, identity first.
+    await assert.rejects(claim(next, { items: [{ ...used, digest: dgDigest("ec15-fresh") }] }, "case-0002"),
+        /EVIDENCE_REFERENCE_USED/);
+    await assert.rejects(claim(next, { items: [{ ...used, evidenceId: "synthetic-ec15-fresh" }] }, "case-0002"),
+        /EVIDENCE_DIGEST_USED/);
+});
+
+test("EC/16 (A15c): evidence an order already stores is not new evidence of a later transition", async () => {
+    const { h, refunded, claim } = await ecSetup();
+    const first = await ecCommitsCleanly(claim, refunded, [ecItem("ec16-a")]);
+    // A later transition without evidence (the real take_case) and a later claim of other evidence both commit.
+    const taken = await takeCase(h, first, caseRef(first, "case-0002"));
+    assert.equal(taken.version, first.version + 1);
+    assert.deepEqual(taken.financialCases[0].evidenceReferences, [ecItem("ec16-a")]);
+    const second = await ecCommitsCleanly(claim, taken, [ecItem("ec16-b")], "case-0001");
+    assert.deepEqual(second.financialCases[0].evidenceReferences, [ecItem("ec16-a"), ecItem("ec16-b")]);
+    // A CLOSE on another order of the same core is unaffected by stored evidence elsewhere.
+    const p = await inReview("DISPUTE", h);
+    await dgClosesCleanly(h, p, dgRecord(h, p, { digest: dgDigest("ec16-close") }));
+});
+
+test("EC/17 (A15f): claims match the stored evidence whatever their order", async () => {
+    const { refunded, claim } = await ecSetup();
+    const low = ecItem("ec17-a", "synthetic-ec17-aaaa");
+    const high = ecItem("ec17-z", "synthetic-ec17-zzzz");
+    assert.ok(JSON.stringify([high.evidenceId, high.digest]) > JSON.stringify([low.evidenceId, low.digest]));
+    // Claimed and stored in descending key order, then three items in a mixed order.
+    const next = await ecCommitsCleanly(claim, refunded, [high, low]);
+    const mixed = [ecItem("ec17-m", "synthetic-ec17-mmmm"), ecItem("ec17-y", "synthetic-ec17-yyyy"),
+        ecItem("ec17-b", "synthetic-ec17-bbbb")];
+    await ecCommitsCleanly(claim, next, mixed, "case-0002");
 });
