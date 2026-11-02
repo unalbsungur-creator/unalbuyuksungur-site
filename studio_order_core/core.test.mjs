@@ -4432,3 +4432,483 @@ test("GL/4 (entry): unknown environments never start; TEST claims from the clien
         await assert.rejects(sendProbe(inherited, inherited.refunded, kind), /CASE_COMMAND_NOT_ENABLED/);
     }
 });
+
+// ---- Görev 177 (K-01 Faz 2B-1, PA-1, F151-05): one evidence digest is consumed at most once in this core ----
+//
+// The registry holds for one core instance only (a restart, a second instance or a use outside the core is not seen).
+// These tests use the CLOSE path; DG/11 locks the shared registry for the future case evidence command through a
+// probe copy of core.mjs outside the repository (the Görev 170 technique). Shared helpers:
+//   dgDigest(text)            a lowercase hex SHA-256, as the evidence service computes it from content
+//   dgRecord(h, p, evidence)  a signed DISPUTE CLOSE record whose evidence carries the given fields, re-signed by the
+//                             synthetic evidence service (so "same content under another id" is genuine, not forged)
+//   dgClosesCleanly(h, p, r)  closes p.reviewed with r and proves nothing was committed since p.reviewed: version + 1,
+//                             same events, same history; used after refusals to show they left no trace
+
+const dgDigest = text => createHash("sha256").update(`synthetic-dg-content-${text}`).digest("hex");
+const dgResign = evidence => ({ ...evidence, signature: signEvidence(evidence) });
+const DG_CODE = "DISPUTE_RESOLVED_BY_PROVIDER";
+
+function dgRecord(h, p, evidence = {}) {
+    return h.resolution(p.reviewed, p.id, "CLOSE", h.closeFields(p.reviewed, p.id, DG_CODE, evidence));
+}
+
+async function dgClosesCleanly(h, p, record, options = {}) {
+    const closed = await h.resolveReview(p.reviewed, "CLOSE", record, "finance", options);
+    assert.equal(closed.state, STATES.CLOSED);
+    assert.equal(closed.version, p.reviewed.version + 1);
+    assert.deepEqual(closed.events.slice(0, -1), p.reviewed.events);
+    assert.equal(closed.events.at(-1).previousHash, p.reviewed.events.at(-1).hash);
+    assert.equal(closed.reviews.at(-1).resolution.evidence.digest, record.evidence.digest);
+    return closed;
+}
+
+test("DG/1: a new, attested digest closes; the stored digest is the attested one; other digests stay free", async () => {
+    const shared = setup();
+    const a = await inReview("DISPUTE", shared);
+    const record = dgRecord(shared, a, { digest: dgDigest("dg1-a") });
+    const closed = await dgClosesCleanly(shared, a, record);
+    assert.deepEqual([closed.reviews[0].resolution.evidence.digest, closed.events.at(-1).audit.evidence.digest],
+        [dgDigest("dg1-a"), dgDigest("dg1-a")]);
+    const b = await inReview("DISPUTE", shared);
+    await dgClosesCleanly(shared, b, dgRecord(shared, b, { digest: dgDigest("dg1-b") }));
+});
+
+test("DG/2,3: a missing or malformed digest is EVIDENCE_MISMATCH and leaves nothing behind", async () => {
+    const h = await inReview("DISPUTE");
+    const fields = h.closeFields(h.reviewed, h.id, DG_CODE);
+    const { digest, signature, ...withoutDigest } = fields.evidence;
+    const good = dgDigest("dg2");
+    const malformed = [good.slice(1), `${good}0`, `sha256:${good}`, ` ${good}`, `${good}\n`, good.replace(/^./, "g"),
+        null, 12345, ["a".repeat(64)], { digest: good }];
+    const attempts = [dgResign(withoutDigest), dgResign({ ...withoutDigest, digest: undefined }),
+        ...malformed.map(value => dgResign({ ...withoutDigest, digest: value }))];
+    for (const [i, evidence] of attempts.entries()) {
+        await assert.rejects(h.resolveReview(h.reviewed, "CLOSE", h.resolution(h.reviewed, h.id, "CLOSE",
+            { ...fields, evidence })), /EVIDENCE_MISMATCH/, String(i));
+    }
+    // The same evidence id with a valid digest still closes: no refusal consumed anything.
+    await dgClosesCleanly(h, h, h.resolution(h.reviewed, h.id, "CLOSE",
+        { ...fields, evidence: dgResign({ ...withoutDigest, digest: good }) }));
+});
+
+test("DG/4: an uppercase digest is refused, never normalized into the registry", async () => {
+    const shared = setup();
+    const a = await inReview("DISPUTE", shared);
+    const lower = dgDigest("dg4");
+    await assert.rejects(shared.resolveReview(a.reviewed, "CLOSE", dgRecord(shared, a, { digest: lower.toUpperCase() })),
+        /EVIDENCE_MISMATCH/);
+    await dgClosesCleanly(shared, a, dgRecord(shared, a, { digest: lower }));
+    // Once the lowercase digest is used, its uppercase spelling is still a format error, not a second spelling.
+    const b = await inReview("DISPUTE", shared);
+    await assert.rejects(shared.resolveReview(b.reviewed, "CLOSE", dgRecord(shared, b, { digest: lower.toUpperCase() })),
+        /EVIDENCE_MISMATCH/);
+});
+
+test("DG/5: a client digest the evidence service did not vouch for is UNTRUSTED_EVIDENCE", async () => {
+    const h = await inReview("DISPUTE");
+    const record = dgRecord(h, h, { digest: dgDigest("dg5") });
+    const forged = { ...record, evidence: { ...record.evidence, digest: dgDigest("dg5-forged") } }; // not re-signed
+    const resigned = h.resolution(h.reviewed, h.id, "CLOSE", { reasonCode: record.reasonCode,
+        closeReasonPolicy: record.closeReasonPolicy, evidence: forged.evidence });
+    await assert.rejects(h.resolveReview(h.reviewed, "CLOSE", resigned), /UNTRUSTED_EVIDENCE/);
+    // Neither the forged nor the genuine digest was consumed.
+    await dgClosesCleanly(h, h, record);
+});
+
+test("DG/6: an attestation with another, a missing or an uppercase digest is UNTRUSTED_EVIDENCE", async () => {
+    const variants = {
+        other: attestation => ({ ...attestation, digest: dgDigest("dg6-attested-elsewhere") }),
+        missing: ({ digest, ...attestation }) => attestation,
+        uppercase: attestation => ({ ...attestation, digest: attestation.digest.toUpperCase() })
+    };
+    for (const [name, change] of Object.entries(variants)) {
+        let faulty = true;
+        const h = await inReview("DISPUTE", setup({
+            verifyEvidence: (evidence, request) => {
+                const attestation = syntheticAttestation(evidence, request);
+                return faulty && attestation ? change(attestation) : attestation;
+            }
+        }));
+        const record = dgRecord(h, h, { digest: dgDigest(`dg6-${name}`) });
+        await assert.rejects(h.resolveReview(h.reviewed, "CLOSE", record), /UNTRUSTED_EVIDENCE/, name);
+        faulty = false;
+        await dgClosesCleanly(h, h, record);
+    }
+});
+
+test("DG/7,10: the same digest under another evidence id is EVIDENCE_DIGEST_USED on any other order", async () => {
+    const shared = setup();
+    const a = await inReview("DISPUTE", shared);
+    const used = dgDigest("dg7");
+    const first = dgRecord(shared, a, { digest: used });
+    await dgClosesCleanly(shared, a, first);
+    for (const label of ["b", "c"]) {
+        const p = await inReview("DISPUTE", shared);
+        const again = dgRecord(shared, p, { digest: used }); // another evidence id, genuinely signed
+        assert.notEqual(again.evidence.evidenceId, first.evidence.evidenceId);
+        await assert.rejects(shared.resolveReview(p.reviewed, "CLOSE", again), /EVIDENCE_DIGEST_USED/, label);
+        // The refused evidence id was not consumed either: with fresh content it closes.
+        await dgClosesCleanly(shared, p, dgRecord(shared, p,
+            { evidenceId: again.evidence.evidenceId, digest: dgDigest(`dg7-${label}`) }));
+    }
+});
+
+test("DG/8: a reused evidence id keeps EVIDENCE_REFERENCE_USED precedence, whatever its digest", async () => {
+    const shared = setup();
+    const a = await inReview("DISPUTE", shared);
+    const first = dgRecord(shared, a, { digest: dgDigest("dg8") });
+    await dgClosesCleanly(shared, a, first);
+    const b = await inReview("DISPUTE", shared);
+    for (const digest of [dgDigest("dg8-other"), dgDigest("dg8")]) {
+        await assert.rejects(shared.resolveReview(b.reviewed, "CLOSE",
+            dgRecord(shared, b, { evidenceId: first.evidence.evidenceId, digest })), /EVIDENCE_REFERENCE_USED/);
+    }
+});
+
+test("DG/9: on the same order a used digest stays used across review cycles; a closed order takes no second CLOSE", async () => {
+    const shared = setup();
+    const a = await inReview("DISPUTE", shared);
+    const used = dgDigest("dg9");
+    await dgClosesCleanly(shared, a, dgRecord(shared, a, { digest: used }));
+    // The closed order cannot be closed again at all: its own evidence cannot come back through it.
+    await assert.rejects(shared.resolveReview(a.reviewed, "CLOSE", dgRecord(shared, a, { digest: dgDigest("dg9-x") }),
+        "finance", { version: a.reviewed.version + 1 }), /INVALID_TRANSITION/);
+    // Another order is refused in its first review, continues, opens a second review and is refused again.
+    const b = await inReview("DISPUTE", shared);
+    await assert.rejects(shared.resolveReview(b.reviewed, "CLOSE", dgRecord(shared, b, { digest: used })),
+        /EVIDENCE_DIGEST_USED/);
+    const resumed = await b.resolveReview(b.reviewed, "CONTINUE");
+    const again = await b.openReview(resumed, "DISPUTE");
+    const second = { ...b, reviewed: again, id: again.reviews.at(-1).reviewId };
+    await assert.rejects(shared.resolveReview(again, "CLOSE", dgRecord(shared, second, { digest: used })),
+        /EVIDENCE_DIGEST_USED/);
+    await dgClosesCleanly(shared, second, dgRecord(shared, second, { digest: dgDigest("dg9-b") }));
+});
+
+test("DG/12: an idempotent retry is no second consumption; a changed retry is IDEMPOTENCY_CONFLICT", async () => {
+    let calls = 0;
+    const shared = setup({ verifyEvidence: (evidence, request) => { calls += 1; return syntheticAttestation(evidence, request); } });
+    const a = await inReview("DISPUTE", shared);
+    const record = dgRecord(shared, a, { digest: dgDigest("dg12") });
+    const options = { requestId: "synthetic-dg12-close" };
+    const closed = await dgClosesCleanly(shared, a, record, options);
+    assert.equal(calls, 1);
+    assert.strictEqual(await shared.resolveReview(a.reviewed, "CLOSE", record, "finance", options), closed);
+    assert.equal(calls, 1); // the retry returns the commit; no verifier, no registry
+    await assert.rejects(shared.resolveReview(a.reviewed, "CLOSE", dgRecord(shared, a, { digest: dgDigest("dg12-b") }),
+        "finance", options), /IDEMPOTENCY_CONFLICT/);
+    // The digest was consumed exactly once and is still consumed.
+    const b = await inReview("DISPUTE", shared);
+    await assert.rejects(shared.resolveReview(b.reviewed, "CLOSE", dgRecord(shared, b, { digest: dgDigest("dg12") })),
+        /EVIDENCE_DIGEST_USED/);
+});
+
+test("DG/13: a stale expectedVersion is VERSION_CONFLICT and consumes neither id nor digest", async () => {
+    const h = await inReview("DISPUTE");
+    const record = dgRecord(h, h, { digest: dgDigest("dg13") });
+    for (const version of [h.reviewed.version - 1, h.reviewed.version + 1]) {
+        await assert.rejects(h.resolveReview(h.reviewed, "CLOSE", record, "finance", { version }), /VERSION_CONFLICT/);
+    }
+    await dgClosesCleanly(h, h, record);
+});
+
+test("DG/14: concurrent CLOSEs with one digest: exactly one consumes it; on one order exactly one commits", async () => {
+    // Several independent races, each between orders that share one digest under different evidence ids.
+    const shared = setup();
+    for (let round = 0; round < 6; round++) {
+        const racers = [];
+        for (let i = 0; i < 3; i++) racers.push(await inReview("DISPUTE", shared));
+        const digest = dgDigest(`dg14-${round}`);
+        const records = racers.map(p => dgRecord(shared, p, { digest }));
+        assert.equal(new Set(records.map(r => r.evidence.evidenceId)).size, 3);
+        const results = await Promise.allSettled(racers.map((p, i) => shared.resolveReview(p.reviewed, "CLOSE", records[i])));
+        assert.deepEqual(results.map(r => (r.status === "fulfilled" ? "CLOSED" : r.reason.code)).sort(),
+            ["CLOSED", "EVIDENCE_DIGEST_USED", "EVIDENCE_DIGEST_USED"], `round ${round}`);
+    }
+    // One order, two CLOSEs with different digests: one commits, the other is VERSION_CONFLICT.
+    const o = await inReview("DISPUTE", shared);
+    const pair = await Promise.allSettled(["dg14-x", "dg14-y"].map(text =>
+        shared.resolveReview(o.reviewed, "CLOSE", dgRecord(shared, o, { digest: dgDigest(text) }))));
+    assert.deepEqual(pair.map(r => (r.status === "fulfilled" ? "CLOSED" : r.reason.code)).sort(),
+        ["CLOSED", "VERSION_CONFLICT"]);
+    // The losing digest was not consumed.
+    const loser = pair.find(r => r.status === "rejected");
+    assert.ok(loser);
+    const winnerDigest = pair.find(r => r.status === "fulfilled").value.reviews[0].resolution.evidence.digest;
+    const freeDigest = [dgDigest("dg14-x"), dgDigest("dg14-y")].find(d => d !== winnerDigest);
+    const z = await inReview("DISPUTE", shared);
+    await dgClosesCleanly(shared, z, dgRecord(shared, z, { digest: freeDigest }));
+});
+
+test("DG/15,16: a failing verifier or an order changed while it waits leaves nothing; the same evidence then closes", async () => {
+    // A verifier that throws, rejects or times out; the same record afterwards succeeds.
+    let mode = "throw";
+    const h = await inReview("DISPUTE", setup({
+        verifyEvidence: async (evidence, request) => {
+            if (mode === "throw") throw new Error("synthetic-evidence-service-down");
+            if (mode === "reject") return Promise.reject(new Error("synthetic-evidence-service-rejected"));
+            if (mode === "timeout") {
+                await new Promise(resolve => setTimeout(resolve, 5));
+                throw new Error("synthetic-evidence-service-timeout");
+            }
+            return syntheticAttestation(evidence, request);
+        }
+    }));
+    const record = dgRecord(h, h, { digest: dgDigest("dg15") });
+    for (const failing of ["throw", "reject", "timeout"]) {
+        mode = failing;
+        await assert.rejects(h.resolveReview(h.reviewed, "CLOSE", record), new RegExp(`synthetic-evidence-service-`), failing);
+    }
+    mode = "ok";
+    await dgClosesCleanly(h, h, record);
+    // The order changes while the evidence service is awaited: refused at commit, nothing consumed.
+    const { h: hooked, hooks } = hookedSetup();
+    const o = await inReview("DISPUTE", hooked);
+    let resumed = null;
+    hooks.evidence = async () => { resumed = await o.resolveReview(o.reviewed, "CONTINUE"); };
+    const raced = dgRecord(hooked, o, { digest: dgDigest("dg15-hooked") });
+    await assert.rejects(hooked.resolveReview(o.reviewed, "CLOSE", raced), /VERSION_CONFLICT/);
+    const again = await o.openReview(resumed, "DISPUTE");
+    const second = { ...o, reviewed: again, id: again.reviews.at(-1).reviewId };
+    await dgClosesCleanly(hooked, second, dgRecord(hooked, second,
+        { evidenceId: raced.evidence.evidenceId, digest: dgDigest("dg15-hooked") }));
+});
+
+test("DG/17: the digest is in the audit, the review record and the hash chain; refusals leave the chain as it was", async () => {
+    const shared = setup();
+    const a = await inReview("DISPUTE", shared);
+    const record = dgRecord(shared, a, { digest: dgDigest("dg17") });
+    const closed = await dgClosesCleanly(shared, a, record);
+    const event = closed.events.at(-1);
+    const { moneyMovement, ...resolution } = closed.reviews[0].resolution;
+    assert.deepEqual([event.audit, event.audit.evidence.digest, moneyMovement], [resolution, dgDigest("dg17"), "NONE"]);
+    for (const [i, item] of closed.events.entries()) {
+        const { hash, ...rest } = item;
+        assert.equal(hash, createHash("sha256").update(JSON.stringify(rest)).digest("hex"), `event ${i}`);
+        if (i > 0) assert.equal(item.previousHash, closed.events[i - 1].hash);
+    }
+    // A refused reuse on another order leaves that order's chain untouched (dgClosesCleanly checks it after).
+    const b = await inReview("DISPUTE", shared);
+    await assert.rejects(shared.resolveReview(b.reviewed, "CLOSE", dgRecord(shared, b, { digest: dgDigest("dg17") })),
+        /EVIDENCE_DIGEST_USED/);
+    await dgClosesCleanly(shared, b, dgRecord(shared, b, { digest: dgDigest("dg17-b") }));
+});
+
+test("DG/18,19: CLOSE of every live code, REFUND cases and CONTINUE are unchanged beside the registry", async () => {
+    const shared = setup();
+    // DUPLICATE_ORDER (REFUND review, linked twin) and DISPUTE_RESOLVED_BY_PROVIDER, distinct digests: both close.
+    const dup = await inReview("REFUND", shared);
+    const dupClosed = await closeAs(shared, dup.reviewed, "DUPLICATE_ORDER", { evidence: { digest: dgDigest("dg18-dup") } });
+    assert.equal(dupClosed.reviews[0].resolution.evidence.linkedOrderId, dup.twin());
+    const dis = await inReview("DISPUTE", shared);
+    assert.equal((await closeAs(shared, dis.reviewed, DG_CODE, { evidence: { digest: dgDigest("dg18-dis") } })).state,
+        STATES.CLOSED);
+    // REFUND carries no evidence and opens its cases as before; CONTINUE consumes nothing.
+    const refunded = await refundedCases(shared);
+    assert.deepEqual(refunded.refunded.financialCases.map(entry => [entry.caseType, entry.status, entry.evidenceReferences]),
+        [["ORDER_REFUND", "OPEN", []], ["UNDELIVERED_REVISION", "OPEN", []]]);
+    assert.equal(refunded.refunded.reviews.at(-1).resolution.evidence, undefined);
+    const cont = await inReview("DISPUTE", shared);
+    assert.equal((await cont.resolveReview(cont.reviewed, "CONTINUE")).state, STATES.IN_PRODUCTION);
+    // A digest used by a CLOSE of one code is used for every code.
+    const other = await inReview("DISPUTE", shared);
+    await assert.rejects(closeAs(shared, other.reviewed, DG_CODE, { evidence: { digest: dgDigest("dg18-dup") } }),
+        /EVIDENCE_DIGEST_USED/);
+});
+
+test("DG/20: the registry holds in PRODUCTION, STAGING and TEST alike; a refused synthetic verifier consumes nothing", async () => {
+    for (const environment of ["PRODUCTION", "STAGING", "TEST", undefined]) {
+        let verifier = "production";
+        const shared = setup({ allowSyntheticEvidence: false, ...(environment === undefined ? {} : { environment }),
+            verifyEvidence: (evidence, request) => (verifier === "production"
+                ? productionShaped(evidence, request) : syntheticAttestation(evidence, request)) },
+        environment === undefined ? { environment: undefined } : null);
+        const a = await inReview("DISPUTE", shared);
+        const used = dgDigest(`dg20-${environment}`);
+        // A synthetic verifier is refused outside an allowed TEST core and leaves the digest free.
+        verifier = "synthetic";
+        await assert.rejects(shared.resolveReview(a.reviewed, "CLOSE", dgRecord(shared, a, { digest: used })),
+            /SYNTHETIC_VERIFIER_NOT_ALLOWED/, String(environment));
+        verifier = "production";
+        await dgClosesCleanly(shared, a, dgRecord(shared, a, { digest: used }));
+        const b = await inReview("DISPUTE", shared);
+        await assert.rejects(shared.resolveReview(b.reviewed, "CLOSE", dgRecord(shared, b, { digest: used })),
+            /EVIDENCE_DIGEST_USED/, String(environment));
+    }
+    // CLOSE is not a case command: the TEST-only case gate never applies to it (CG/4 is unchanged).
+    assert.ok(!Object.hasOwn(FINANCIAL_CASE_POLICY.transitions, "resolve_review"));
+});
+
+test("DG/21: a used digest is refused before the evidence time is judged", async () => {
+    const shared = setup();
+    const a = await inReview("DISPUTE", shared);
+    await dgClosesCleanly(shared, a, dgRecord(shared, a, { digest: dgDigest("dg21") }));
+    const future = "2026-10-29T09:00:00.000Z"; // after the fixed server time
+    const b = await inReview("DISPUTE", shared);
+    // Control: a fresh digest with a future time is a time error.
+    await assert.rejects(shared.resolveReview(b.reviewed, "CLOSE",
+        dgRecord(shared, b, { digest: dgDigest("dg21-fresh"), createdAt: future })), /EVIDENCE_TIME_INVALID/);
+    await assert.rejects(shared.resolveReview(b.reviewed, "CLOSE",
+        dgRecord(shared, b, { digest: dgDigest("dg21"), createdAt: future })), /EVIDENCE_DIGEST_USED/);
+    // Same id and same digest a second time: identity still comes first.
+    const c = await inReview("DISPUTE", shared);
+    const used = (await dgClosesCleanly(shared, c, dgRecord(shared, c, { digest: dgDigest("dg21-c") })))
+        .reviews[0].resolution.evidence;
+    const d = await inReview("DISPUTE", shared);
+    await assert.rejects(shared.resolveReview(d.reviewed, "CLOSE",
+        dgRecord(shared, d, { evidenceId: used.evidenceId, digest: used.digest })), /EVIDENCE_REFERENCE_USED/);
+});
+
+// DG/11: the registry is shared with the financial case evidence that does not exist yet. A probe copy of the sibling
+// core.mjs (outside the repository, removed after import) registers a case command that consumes an evidence id and
+// digest through the same commit path the future add_case_evidence will use (evidenceRef / evidenceDigest). If those
+// names or the shared commit block change, this test fails instead of being skipped.
+let dgProbeLoad = null;
+function dgProbeCore() {
+    dgProbeLoad ??= (async () => {
+        const { mkdtemp, readFile, writeFile, rm } = await import("node:fs/promises");
+        const { tmpdir } = await import("node:os");
+        const { join } = await import("node:path");
+        const { pathToFileURL } = await import("node:url");
+        let source = (await readFile(new URL("./core.mjs", import.meta.url), "utf8")).replaceAll("\r\n", "\n");
+        const calendarImport = `from "./calendar.mjs";`;
+        source = inject(source, calendarImport, "", "after").replace(calendarImport,
+            () => `from ${JSON.stringify(new URL("./calendar.mjs", import.meta.url).href)};`);
+        source = inject(source, "transitions: {",
+            ` probe_case_evidence: { from: "OPEN", to: "OPEN", roles: ["finance", "admin"] },`, "after");
+        source = inject(source, `            default: throw new OrderError("UNKNOWN_ACTION");`, `
+            case "probe_case_evidence": {
+                // PROBE ONLY (Görev 177): a case evidence entry, reduced to what the shared registries see.
+                inState(STATES.CLOSED);
+                requireHumanActor();
+                const item = order.financialCases.find(entry => entry.caseId === data.caseRef?.caseId);
+                requireThat(item && data.caseRef.orderId === order.id, "UNKNOWN_CASE");
+                at = serverTime();
+                evidenceRef = data.evidenceId;
+                evidenceDigest = data.digest;
+                next.financialCases = order.financialCases.map(entry => (entry === item ? { ...entry,
+                    evidenceReferences: [...entry.evidenceReferences, { evidenceId: data.evidenceId, digest: data.digest }] }
+                    : entry));
+                casesChanged = true;
+                break;
+            }
+`, "before");
+        const dir = await mkdtemp(join(tmpdir(), "unai-digest-probe-"));
+        try {
+            await writeFile(join(dir, "core.mjs"), source);
+            return await import(pathToFileURL(join(dir, "core.mjs")).href);
+        } finally {
+            await rm(dir, { recursive: true, force: true });
+        }
+    })();
+    return dgProbeLoad;
+}
+
+test("DG/11: CLOSE and (future) case evidence share one registry, both ways, and two cases of one order share it too", async () => {
+    // The real core has no such command.
+    const real = await refundedCases(liveSetup("TEST"));
+    await assert.rejects(real.core.dispatch(real.refunded, { kind: "probe_case_evidence", requestId: "synthetic-dg11-real",
+        expectedVersion: real.refunded.version, data: {} }, real.actor("finance", real.refunded, SERVER, "synthetic-finance-x")),
+    /UNKNOWN_ACTION/);
+    const probe = await dgProbeCore();
+    const h = setup({}, null, probe.createCore);
+    let sequence = 0;
+    const addEvidence = (order, caseId, evidenceId, digest) => h.core.dispatch(order, {
+        kind: "probe_case_evidence", requestId: `synthetic-dg11-${++sequence}`, expectedVersion: order.version,
+        data: { caseRef: { orderId: order.id, caseId }, evidenceId, digest }
+    }, h.actor("finance", order, SERVER, "synthetic-finance-dg11"));
+    const { refunded } = await refundedCases(h);
+    // A CLOSE consumes D1; the case may use neither its content under another id nor its id.
+    const a = await inReview("DISPUTE", h);
+    const closeRecord = dgRecord(h, a, { digest: dgDigest("dg11-close") });
+    await dgClosesCleanly(h, a, closeRecord);
+    await assert.rejects(addEvidence(refunded, "case-0001", "synthetic-dg11-case-a", dgDigest("dg11-close")),
+        /EVIDENCE_DIGEST_USED/);
+    await assert.rejects(addEvidence(refunded, "case-0001", closeRecord.evidence.evidenceId, dgDigest("dg11-fresh")),
+        /EVIDENCE_REFERENCE_USED/);
+    // The case consumes D2 (refusals above left the version and registry as they were); the other case of the same
+    // order cannot use D2 again (D165-05), and neither can a later CLOSE.
+    const added = await addEvidence(refunded, "case-0001", "synthetic-dg11-case-b", dgDigest("dg11-case"));
+    assert.equal(added.version, refunded.version + 1);
+    assert.deepEqual(added.financialCases[0].evidenceReferences,
+        [{ evidenceId: "synthetic-dg11-case-b", digest: dgDigest("dg11-case") }]);
+    await assert.rejects(addEvidence(added, "case-0002", "synthetic-dg11-case-c", dgDigest("dg11-case")),
+        /EVIDENCE_DIGEST_USED/);
+    const q = await inReview("DISPUTE", h);
+    await assert.rejects(h.resolveReview(q.reviewed, "CLOSE", dgRecord(h, q, { digest: dgDigest("dg11-case") })),
+        /EVIDENCE_DIGEST_USED/);
+    await assert.rejects(h.resolveReview(q.reviewed, "CLOSE",
+        dgRecord(h, q, { evidenceId: "synthetic-dg11-case-b", digest: dgDigest("dg11-q") })), /EVIDENCE_REFERENCE_USED/);
+    await dgClosesCleanly(h, q, dgRecord(h, q, { digest: dgDigest("dg11-q") }));
+});
+
+// ---- Görev 179 (A178-01): at commit, the evidence identity is checked before the digest ----
+// Two orders send CLOSE with the same evidence id and the same digest. A deterministic barrier (no timer, no sleep)
+// holds both in the evidence verifier until both have arrived, then releases them together, so both pass the
+// pre-check before either commits and the loser is refused only by the commit-time checks. The clock is read exactly
+// once per CLOSE, right after the pre-check (core.mjs `at = serverTime()`), which makes that order observable.
+test("DG/22 (A178-01): same evidence id and digest raced past the pre-check: the loser gets EVIDENCE_REFERENCE_USED", async () => {
+    for (let round = 0; round < 6; round++) {
+        const log = [];
+        let arrived = 0;
+        let released = false;
+        let open;
+        const gate = new Promise(resolve => { open = resolve; });
+        const h = setup({
+            clock: () => { if (released) log.push("pre-check passed"); return FIXED_TIME; },
+            verifyEvidence: async (evidence, request) => {
+                if (!released) {
+                    arrived += 1;
+                    log.push("verifier");
+                    if (arrived === 2) { released = true; open(); }
+                    await gate;
+                }
+                return syntheticAttestation(evidence, request);
+            }
+        });
+        const a = await inReview("DISPUTE", h);
+        const b = await inReview("DISPUTE", h);
+        const sharedId = `synthetic-dg22-shared-id-${round}`;
+        const sharedDigest = dgDigest(`dg22-${round}`);
+        const racers = round % 2 === 0 ? [a, b] : [b, a];
+        const records = racers.map(p => dgRecord(h, p, { evidenceId: sharedId, digest: sharedDigest }));
+        assert.notEqual(records[0].authorizationRef, records[1].authorizationRef);
+        const results = await Promise.allSettled(racers.map((p, i) => h.resolveReview(p.reviewed, "CLOSE", records[i])
+            .finally(() => log.push("settled"))));
+        // Both waited in the verifier, then both passed the pre-check before either settled.
+        assert.deepEqual(log, ["verifier", "verifier", "pre-check passed", "pre-check passed", "settled", "settled"],
+            `round ${round}`);
+        const winners = results.filter(r => r.status === "fulfilled");
+        const losers = results.filter(r => r.status === "rejected");
+        assert.equal(winners.length, 1, `round ${round}`);
+        assert.equal(losers.length, 1, `round ${round}`);
+        assert.notEqual(losers[0].reason.code, "EVIDENCE_DIGEST_USED", `round ${round}: digest checked before identity`);
+        assert.equal(losers[0].reason.code, "EVIDENCE_REFERENCE_USED", `round ${round}`);
+
+        // The winner made exactly one consumption: one new event carrying the shared id and digest.
+        const winner = winners[0].value;
+        const winnerRacer = racers[results.indexOf(winners[0])];
+        const loserRacer = racers[results.indexOf(losers[0])];
+        assert.equal(winner.id, winnerRacer.reviewed.id);
+        assert.equal(winner.state, STATES.CLOSED);
+        assert.equal(winner.version, winnerRacer.reviewed.version + 1);
+        assert.deepEqual(winner.events.slice(0, -1), winnerRacer.reviewed.events);
+        assert.deepEqual([winner.events.at(-1).audit.evidence.evidenceId, winner.events.at(-1).audit.evidence.digest],
+            [sharedId, sharedDigest]);
+        assert.equal(winner.events.filter(e => e.audit?.evidence?.digest === sharedDigest).length, 1);
+
+        // Registry: the identity and the digest are held by the winner, both refused to any later order.
+        const c = await inReview("DISPUTE", h);
+        await assert.rejects(h.resolveReview(c.reviewed, "CLOSE",
+            dgRecord(h, c, { evidenceId: sharedId, digest: dgDigest(`dg22-${round}-other`) })), /EVIDENCE_REFERENCE_USED/);
+        await assert.rejects(h.resolveReview(c.reviewed, "CLOSE", dgRecord(h, c, { digest: sharedDigest })),
+            /EVIDENCE_DIGEST_USED/);
+
+        // The loser left no trace: its order, version, events and audit chain are unchanged (dgClosesCleanly closes
+        // from the pre-race snapshot), and its own review reference was not consumed.
+        const after = await dgClosesCleanly(h, loserRacer, dgRecord(h, loserRacer,
+            { evidenceId: `synthetic-dg22-loser-id-${round}`, digest: dgDigest(`dg22-${round}-loser`) }));
+        assert.equal(after.events.filter(e => e.audit?.evidence?.digest === sharedDigest).length, 0);
+        assert.equal(after.events.filter(e => e.audit?.evidence?.evidenceId === sharedId).length, 0);
+    }
+});

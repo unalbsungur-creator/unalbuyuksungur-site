@@ -373,7 +373,11 @@ function revisionId(sequence) {
  * source, order, review, creation time (UTC), content digest, money outcome, linked order and fraud finding (null
  * where not applicable), and that it vouches for this evidence under the given close-reason policy, reason code,
  * decision and decision binding. Anything else, including `true`, is a refusal (UNTRUSTED_EVIDENCE); without the
- * service every CLOSE is refused (CLOSE_EVIDENCE_UNVERIFIABLE). A verifier of kind SYNTHETIC is refused unless the
+ * service every CLOSE is refused (CLOSE_EVIDENCE_UNVERIFIABLE). The attested digest must be the lowercase hex SHA-256
+ * the service computed itself from the stored evidence bytes, never an echo of the request: the core never sees the
+ * content and cannot recompute it (Görev 176). Within this core instance one evidence id and one digest are each
+ * consumed at most once, across CLOSE and financial cases (Görev 177, PA-1): a second use is EVIDENCE_REFERENCE_USED,
+ * or EVIDENCE_DIGEST_USED for the same content under another id. A verifier of kind SYNTHETIC is refused unless the
  * core was created with allowSyntheticEvidence: true AND environment: "TEST" (Görev 152, F151-04). Both come from the
  * server's own configuration, never from a command or principal. A missing environment is PRODUCTION; an unknown one,
  * or the flag outside TEST, stops the core from being created. Both are read only from own data properties of the
@@ -424,6 +428,10 @@ export function createCore(config = {}) {
     const reviewReferences = new Map();
     const replanReferences = new Map();
     const evidenceReferences = new Map();
+    // Görev 177 (PA-1, F151-05): evidence digest -> the evidence id that consumed it, shared by CLOSE and (later)
+    // financial case evidence. Like every registry here it lives only as long as this core instance: a restart, a second
+    // instance or a use outside this core is not seen, so this is no global or persistent uniqueness guarantee.
+    const evidenceDigests = new Map();
 
     function createOrder(packageId) {
         requireThat(Object.hasOwn(PACKAGES, packageId), "INVALID_PACKAGE");
@@ -499,6 +507,7 @@ export function createCore(config = {}) {
         let reviewRef = null;
         let replanRef = null;
         let evidenceRef = null;
+        let evidenceDigest = null;
         let linkedOrder = null;
         // Görev 164 (F160-03): set when this transition writes financial cases; the event then commits to their content.
         let casesChanged = false;
@@ -874,6 +883,8 @@ export function createCore(config = {}) {
                         "SYNTHETIC_VERIFIER_NOT_ALLOWED");
                     verifier = { kind: attestation.verifier.kind, id: attestation.verifier.id };
                     requireThat(!evidenceReferences.has(record.evidence.evidenceId), "EVIDENCE_REFERENCE_USED");
+                    // Görev 177 (PA-1): the same content may not be consumed again under another evidence id.
+                    requireThat(!evidenceDigests.has(record.evidence.digest), "EVIDENCE_DIGEST_USED");
                 }
                 requireThat(!reviewReferences.has(record.authorizationRef), "REVIEW_REFERENCE_USED");
                 at = serverTime();
@@ -886,6 +897,7 @@ export function createCore(config = {}) {
                     requireThat(created <= instant(at, "INVALID_CLOCK") && created >= Date.parse(order.events[0].at),
                         "EVIDENCE_TIME_INVALID");
                     evidenceRef = record.evidence.evidenceId;
+                    evidenceDigest = record.evidence.digest;
                     const { evidenceId, evidenceKind, source, digest, financialObligation, linkedOrderId, finding } =
                         record.evidence;
                     // Only the reference, kind, source, time, digest and stated outcome are kept; never the content.
@@ -1101,6 +1113,7 @@ export function createCore(config = {}) {
         requireThat(!reviewRef || !reviewReferences.has(reviewRef), "REVIEW_REFERENCE_USED");
         requireThat(!replanRef || !replanReferences.has(replanRef), "REPLAN_REFERENCE_USED");
         requireThat(!evidenceRef || !evidenceReferences.has(evidenceRef), "EVIDENCE_REFERENCE_USED");
+        requireThat(!evidenceDigest || !evidenceDigests.has(evidenceDigest), "EVIDENCE_DIGEST_USED");
         // Görev 150 (F-02): the linked order must be exactly the record that was checked; any change since is a refusal.
         requireThat(!linkedOrder || orders.get(linkedOrder.id) === linkedOrder, "LINKED_ORDER_CHANGED");
         const committed = freezeDeep(next);
@@ -1111,6 +1124,7 @@ export function createCore(config = {}) {
         if (reviewRef) reviewReferences.set(reviewRef, order.id);
         if (replanRef) replanReferences.set(replanRef, order.id);
         if (evidenceRef) evidenceReferences.set(evidenceRef, order.id);
+        if (evidenceDigest) evidenceDigests.set(evidenceDigest, evidenceRef);
         return committed;
     }
     /** Decision 140: trusted server-side read of a proposal's visible state from the canonical record and the
