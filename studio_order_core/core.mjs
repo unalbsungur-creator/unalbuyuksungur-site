@@ -178,9 +178,12 @@ function roleFor(kind, principal) {
         propose_delivery_date: ["creative", "admin"], confirm_delivery_date: "customer",
         expire_delivery_proposal: ["creative", "admin"]
     };
-    if (!Object.hasOwn(roles, kind)) return null;
+    // Görev 169 (F168-01): financial case commands are never listed above; their roles come only from the central
+    // registry FINANCIAL_CASE_POLICY.transitions, so a case command exists only once it is registered (and gated) there.
+    const role = isCaseCommand(kind) ? FINANCIAL_CASE_POLICY.transitions[kind].roles
+        : Object.hasOwn(roles, kind) ? roles[kind] : null;
+    if (role === null) return null;
     // A multi-role command resolves to the caller's role only when that role is allowed.
-    const role = roles[kind];
     return Array.isArray(role) ? (role.includes(principal?.role) ? principal.role : role[0]) : role;
 }
 
@@ -308,8 +311,31 @@ const DEPLOYMENT_ENVIRONMENTS = Object.freeze(["PRODUCTION", "STAGING", "TEST"])
  * revisions open one UNDELIVERED_REVISION case over their assessments. Cases are opened inside the deciding
  * transaction, start OPEN and carry no amount: approving, closing, paying and reconciling come in later phases. */
 export const FINANCIAL_CASE_POLICY = freezeDeep({
-    reference: "UNAI-FINANCIAL-CASE-v1.0", types: ["ORDER_REFUND", "UNDELIVERED_REVISION"]
+    reference: "UNAI-FINANCIAL-CASE-v1.0", types: ["ORDER_REFUND", "UNDELIVERED_REVISION"],
+    // Görev 164 (K-01 Faz 2, D158-1): finance and admin may take an OPEN case for review. Proposing, approving,
+    // rejecting and closing wait for verified case evidence (Görev 158 T2/T3) and are not active.
+    transitions: { take_case: { from: "OPEN", to: "UNDER_REVIEW", roles: ["finance", "admin"] } },
+    // Approved design contract (D164-A, D164-B), not yet enforced by any command: only finance gives the final
+    // approval, and never the person who opened or resolved the review or proposed the decision.
+    approval: {
+        status: "NOT_ACTIVE", roles: ["finance"], excludedActors: ["REVIEW_OPENER", "REVIEW_RESOLVER", "PROPOSER"]
+    }
 });
+
+/** Görev 169 (F168-01): the one classification of financial case management commands. A command is a case command
+ * exactly when it is an own key of FINANCIAL_CASE_POLICY.transitions (never by name prefix or prototype). */
+function isCaseCommand(kind) {
+    return typeof kind === "string" && Object.hasOwn(FINANCIAL_CASE_POLICY.transitions, kind);
+}
+
+/** Görev 169 (F168-02): a trusted server setting is read only from an own data property of the configuration object.
+ * An inherited value (prototype pollution) or an accessor is never taken; an absent or undefined value is the default. */
+function ownSetting(config, key, fallback, code) {
+    const descriptor = Object.getOwnPropertyDescriptor(config, key);
+    if (!descriptor) return fallback;
+    requireThat(Object.hasOwn(descriptor, "value"), code);
+    return descriptor.value === undefined ? fallback : descriptor.value;
+}
 
 const REASON_CODE = /^[A-Z][A-Z0-9_]{2,63}$/;
 // Decision 141: SYSTEM is not a role and no principal can claim it. It only labels the narrow automatic
@@ -350,7 +376,10 @@ function revisionId(sequence) {
  * service every CLOSE is refused (CLOSE_EVIDENCE_UNVERIFIABLE). A verifier of kind SYNTHETIC is refused unless the
  * core was created with allowSyntheticEvidence: true AND environment: "TEST" (Görev 152, F151-04). Both come from the
  * server's own configuration, never from a command or principal. A missing environment is PRODUCTION; an unknown one,
- * or the flag outside TEST, stops the core from being created. `reviewPolicy` is the active review
+ * or the flag outside TEST, stops the core from being created. Both are read only from own data properties of the
+ * configuration (Görev 169, F168-02). Financial case commands, i.e. the keys of FINANCIAL_CASE_POLICY.transitions,
+ * are refused outside TEST with CASE_COMMAND_NOT_ENABLED by one central gate in dispatch (Görev 167/169), and no
+ * other command may change an existing case (CASE_COMMAND_NOT_REGISTERED). `reviewPolicy` is the active review
  * outcome matrix (default APPROVED_REVIEW_POLICY; an injected one may only narrow it). For review,
  * restoration, delivery-proposal and manual expiry commands authorize() must also bind principal.actorId to
  * the authenticated session: that id is the trusted actor identity for the audit and the four-eyes rules,
@@ -363,15 +392,22 @@ function revisionId(sequence) {
  * nothing is sent, and the event log is not a persistent or tamper-proof audit store.
  * Never expose this core instance or its callbacks to a client.
  */
-export function createCore({ authorize, verifyPayment, verifyEmail, verifyBooking, verifyRestoration, verifyReview,
-    verifyReplan, verifyEvidence, allowSyntheticEvidence = false, environment = "PRODUCTION",
-    reviewPolicy = APPROVED_REVIEW_POLICY, calendar, clock = () => new Date().toISOString() } = {}) {
+export function createCore(config = {}) {
+    const { authorize, verifyPayment, verifyEmail, verifyBooking, verifyRestoration, verifyReview, verifyReplan,
+        verifyEvidence, reviewPolicy = APPROVED_REVIEW_POLICY, calendar, clock = () => new Date().toISOString() } = config;
+    // Görev 169 (F168-02): the two security settings are own data properties only; an inherited value is not seen.
+    const environment = ownSetting(config, "environment", "PRODUCTION", "INVALID_ENVIRONMENT");
+    const allowSyntheticEvidence = ownSetting(config, "allowSyntheticEvidence", false, "SYNTHETIC_EVIDENCE_NOT_ALLOWED");
     requireThat(typeof clock === "function", "INVALID_CLOCK");
     // Görev 152 (F151-04): synthetic evidence is a test-fixture facility. It is refused at creation anywhere but an
     // explicitly declared TEST environment, so a production or staging core can never be started with it.
-    requireThat(DEPLOYMENT_ENVIRONMENTS.includes(environment), "INVALID_ENVIRONMENT");
+    requireThat(typeof environment === "string" && DEPLOYMENT_ENVIRONMENTS.includes(environment), "INVALID_ENVIRONMENT");
     requireThat(allowSyntheticEvidence !== true || environment === "TEST", "SYNTHETIC_EVIDENCE_NOT_ALLOWED");
     const syntheticEvidence = allowSyntheticEvidence === true && environment === "TEST";
+    // Görev 167 (F166-01): financial case commands carry no signed console record or single-use authorization yet
+    // (Görev 164 P-6), so they run only in a core the server configured as TEST. A missing environment is
+    // PRODUCTION and an unknown one never starts; nothing in a command or principal can open this.
+    const caseCommandsEnabled = environment === "TEST";
     const policy = loadReviewPolicy(reviewPolicy);
     // Decision 140: every trusted time is validated and stored as UTC ISO; a zone-less clock value is refused.
     const serverTime = () => new Date(instant(clock(), "INVALID_CLOCK")).toISOString();
@@ -425,7 +461,7 @@ export function createCore({ authorize, verifyPayment, verifyEmail, verifyBookin
         // Only the fingerprint is logged; no raw proof or contact is persisted.
         const intent = [command.kind, data.options, data.selectedOption, data.mp3Ref,
         data.wavRef, data.wavFeasible, data.proof, data.booking, data.revisionId, data.restoration, data.review,
-        data.resolution, data.proposal, data.confirmation, data.restorationId, data.decision];
+        data.resolution, data.proposal, data.confirmation, data.restorationId, data.decision, data.caseRef];
         const fingerprint = await digest(intent);
         const prior = order.events.find(event => event.requestId === command.requestId);
         if (prior) {
@@ -464,6 +500,12 @@ export function createCore({ authorize, verifyPayment, verifyEmail, verifyBookin
         let replanRef = null;
         let evidenceRef = null;
         let linkedOrder = null;
+        // Görev 164 (F160-03): set when this transition writes financial cases; the event then commits to their content.
+        let casesChanged = false;
+        // Görev 169 (F168-01): the central, fail-closed case gate. Every registered case command, present or future,
+        // passes here after the role, authorization, version and review checks and before any of its own code runs.
+        const caseCommand = isCaseCommand(command.kind);
+        requireThat(!caseCommand || caseCommandsEnabled, "CASE_COMMAND_NOT_ENABLED");
         const openRevision = () => order.revisions.findLast(revision => revision.status === "ACCEPTED");
         // Accepted, undelivered revisions: each needs a financial assessment when the order closes (Decision 134-B).
         const undeliveredRevisions = () => order.revisions.filter(revision => revision.status === "ACCEPTED");
@@ -910,6 +952,33 @@ export function createCore({ authorize, verifyPayment, verifyEmail, verifyBookin
                         moneyMovement: "NONE", auditTrail: [opening]
                     });
                 });
+                casesChanged = caseTypes.length > 0;
+                break;
+            }
+            case "take_case": {
+                // Görev 164 (K-01 Faz 2, T1): a verified finance or admin person takes an OPEN case for review. The
+                // case is found in the canonical order only; the request names it with its order, never as a bare id,
+                // because case ids are per-order sequences (F160-01). Nothing is decided and no money moves.
+                inState(STATES.CLOSED);
+                requireHumanActor();
+                const ref = data.caseRef;
+                requireThat(ref && typeof ref === "object" && ref.orderId === order.id && typeof ref.caseId === "string",
+                    "INVALID_CASE_REFERENCE");
+                const item = order.financialCases.find(entry => entry.caseId === ref.caseId);
+                requireThat(item, "UNKNOWN_CASE");
+                const transition = FINANCIAL_CASE_POLICY.transitions.take_case;
+                requireThat(item.status === transition.from, "CASE_STATE_INVALID");
+                at = serverTime();
+                audit = {
+                    step: "TAKEN_FOR_REVIEW", caseId: item.caseId, orderId: order.id, caseType: item.caseType,
+                    from: transition.from, to: transition.to, ...humanActor(), at, idempotencyKey: command.requestId,
+                    policyVersion: FINANCIAL_CASE_POLICY.reference
+                };
+                next.financialCases = order.financialCases.map(entry => entry === item ? {
+                    ...entry, status: transition.to, assignedActorId: principal.actorId,
+                    auditTrail: [...entry.auditTrail, audit]
+                } : entry);
+                casesChanged = true;
                 break;
             }
             case "propose_delivery_date": {
@@ -1002,6 +1071,11 @@ export function createCore({ authorize, verifyPayment, verifyEmail, verifyBookin
             }
             default: throw new OrderError("UNKNOWN_ACTION");
         }
+        // Görev 169 (F168-01): a command outside the case registry may only append new cases (case creation); it can
+        // never replace, reorder, drop or change an existing one. A case command added without registering it in
+        // FINANCIAL_CASE_POLICY.transitions (and so without the gate above) is refused here before anything is committed.
+        requireThat(caseCommand || (next.financialCases.length >= order.financialCases.length &&
+            order.financialCases.every((entry, index) => next.financialCases[index] === entry)), "CASE_COMMAND_NOT_REGISTERED");
         next.version += 1;
         const event = {
             sequence: next.version, requestId: command.requestId, kind: command.kind,
@@ -1009,6 +1083,9 @@ export function createCore({ authorize, verifyPayment, verifyEmail, verifyBookin
             previousHash: order.events.at(-1)?.hash || null
         };
         if (audit) event.audit = audit;
+        // Görev 164 (F160-03): an event that writes financial cases carries the digest of all of them, so the hash
+        // chain covers case content, not only case ids. The same SHA-256 digest as the chain; no new trust assumption.
+        if (casesChanged) event.financialCasesDigest = await digest(next.financialCases);
         requireThat(typeof event.at === "string" && !Number.isNaN(Date.parse(event.at)), "INVALID_CLOCK");
         // Checked before anything is committed: a refused transition changes no state, right or reference.
         notBefore(order, event.at);

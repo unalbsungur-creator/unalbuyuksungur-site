@@ -96,9 +96,12 @@ const CLOSE_EVIDENCE = {
         finding: "CONFIRMED" }
 };
 
-function setup(overrides = {}) {
+// `inherited` (Görev 169, F168-02): settings moved off the configuration object onto its prototype, as a polluted
+// prototype would supply them; they are removed from the own configuration first. `factory` (Görev 170): the core
+// to build; the central-gate lock passes a temporary probe copy of core.mjs, every other test the real createCore.
+function setup(overrides = {}, inherited = null, factory = createCore) {
     let now = FIXED_TIME;
-    const core = createCore({
+    const config = {
         authorize: (principal) => principal.auth === SERVER && (principal.actorId === undefined ||
             signatureMatches(principal.session, session(principal.actorId, principal.role))),
         verifyPayment: (proof) => signatureMatches(proof.signature, sign(proof)),
@@ -116,7 +119,9 @@ function setup(overrides = {}) {
         calendar: CALENDAR,
         clock: () => now,
         ...overrides
-    });
+    };
+    if (inherited) for (const key of Object.keys(inherited)) delete config[key];
+    const core = factory(inherited ? Object.assign(Object.create(inherited), config) : config);
     let counter = 0;
     function actor(role, order, auth = SERVER, actorId = undefined) {
         return actorId === undefined ? { role, orderId: order.id, auth }
@@ -3708,5 +3713,722 @@ test("K1/11: the decision, its event and the case audit agree; the hash chain ho
     }
     for (let i = 1; i < refunded.events.length; i++) {
         assert.equal(refunded.events[i].previousHash, refunded.events[i - 1].hash);
+    }
+});
+
+// ---- Görev 164 (K-01 Faz 2): taking a financial case for review (OPEN → UNDER_REVIEW only) ----
+
+const caseRef = (order, caseId = "case-0001") => ({ orderId: order.id, caseId });
+const caseDigest = cases => createHash("sha256").update(JSON.stringify(cases)).digest("hex");
+
+/** A REFUND with an accepted, undelivered revision: an ORDER_REFUND and an UNDELIVERED_REVISION case, both OPEN. */
+async function refundedCases(h = setup()) {
+    const p = await pendingRevision("PLUS", h);
+    const refunded = await p.resolveReview(await p.openReview(p.order, "REFUND"), "REFUND");
+    return { ...p, refunded };
+}
+
+function takeCase(h, order, ref = caseRef(order), role = "finance", options = {}) {
+    return h.send(order, "take_case", role, { caseRef: ref },
+        { ...options, actorId: Object.hasOwn(options, "actorId") ? options.actorId : `synthetic-${role}-case-reviewer` });
+}
+
+test("K2/1: finance takes an OPEN case for review; only that case changes and nothing is decided or paid", async () => {
+    const h = await refundedCases();
+    const taken = await takeCase(h, h.refunded);
+    const [item, other] = taken.financialCases;
+    const event = taken.events.at(-1);
+    assert.deepEqual([item.status, item.assignedActorId, item.assignedRole],
+        ["UNDER_REVIEW", "synthetic-finance-case-reviewer", "finance"]);
+    assert.deepEqual(item.auditTrail, [h.refunded.financialCases[0].auditTrail[0], {
+        step: "TAKEN_FOR_REVIEW", caseId: "case-0001", orderId: taken.id, caseType: "ORDER_REFUND", from: "OPEN",
+        to: "UNDER_REVIEW", actorId: "synthetic-finance-case-reviewer", actorType: "HUMAN", role: "finance", at: FIXED_TIME,
+        idempotencyKey: event.requestId, policyVersion: CASE_POLICY
+    }]);
+    assert.deepEqual(event.audit, item.auditTrail[1]);
+    assert.deepEqual([event.kind, event.role, event.from, event.to, taken.version],
+        ["take_case", "finance", STATES.CLOSED, STATES.CLOSED, h.refunded.version + 1]);
+    // Everything except the taken case's status, assignee and trail is as it was.
+    assert.deepEqual(other, h.refunded.financialCases[1]);
+    const strip = ({ status, assignedActorId, auditTrail, ...rest }) => rest;
+    assert.deepEqual(strip(item), strip(h.refunded.financialCases[0]));
+    assert.deepEqual([taken.state, taken.reviews, taken.revisions, taken.revisionsUsed, taken.financialAssessments,
+        taken.notifications, taken.paymentReference], [h.refunded.state, h.refunded.reviews, h.refunded.revisions,
+        h.refunded.revisionsUsed, h.refunded.financialAssessments, h.refunded.notifications, h.refunded.paymentReference]);
+    assert.ok(taken.financialCases.every(entry => entry.moneyMovement === "NONE" && entry.proposal === null &&
+        entry.decisions.length === 0 && entry.closure === null));
+    assert.ok(Object.isFrozen(item) && Object.isFrozen(item.auditTrail[1]));
+    // The second case is taken separately.
+    const both = await takeCase(h, taken, caseRef(taken, "case-0002"));
+    assert.deepEqual(both.financialCases.map(entry => entry.status), ["UNDER_REVIEW", "UNDER_REVIEW"]);
+});
+
+test("K2/2: admin may take a case (D158-1); other roles, missing, forged and SYSTEM identities are refused", async () => {
+    const h = await refundedCases();
+    const attempts = [
+        [() => takeCase(h, h.refunded, caseRef(h.refunded), "creative"), /UNAUTHORIZED/],
+        [() => takeCase(h, h.refunded, caseRef(h.refunded), "scheduler"), /UNAUTHORIZED/],
+        [() => takeCase(h, h.refunded, caseRef(h.refunded), "customer"), /UNAUTHORIZED/],
+        [() => takeCase(h, h.refunded, caseRef(h.refunded), "finance", { actorId: undefined }), /ACTOR_REQUIRED/],
+        [() => takeCase(h, h.refunded, caseRef(h.refunded), "finance", { actorId: "SYSTEM-case-reviewer" }),
+            /RESERVED_ACTOR/],
+        [() => takeCase(h, h.refunded, caseRef(h.refunded), "finance", { actorId: "short" }), /ACTOR_REQUIRED/],
+        [() => takeCase(h, h.refunded, caseRef(h.refunded), "finance",
+            { session: session("synthetic-other", "finance") }), /UNAUTHORIZED/],
+        [() => takeCase(h, h.refunded, caseRef(h.refunded), "finance", { auth: Symbol("browser") }), /UNAUTHORIZED/]
+    ];
+    for (const [attempt, error] of attempts) await assert.rejects(attempt(), error);
+    const byAdmin = await takeCase(h, h.refunded, caseRef(h.refunded), "admin");
+    assert.deepEqual([byAdmin.financialCases[0].status, byAdmin.financialCases[0].assignedActorId,
+        byAdmin.events.at(-1).audit.role], ["UNDER_REVIEW", "synthetic-admin-case-reviewer", "admin"]);
+});
+
+test("K2/3: proposing, approving, rejecting and closing are not active; the approval rules stay a design contract", async () => {
+    assert.deepEqual(FINANCIAL_CASE_POLICY.transitions, {
+        take_case: { from: "OPEN", to: "UNDER_REVIEW", roles: ["finance", "admin"] }
+    });
+    assert.deepEqual(FINANCIAL_CASE_POLICY.approval, {
+        status: "NOT_ACTIVE", roles: ["finance"], excludedActors: ["REVIEW_OPENER", "REVIEW_RESOLVER", "PROPOSER"]
+    });
+    assert.ok(Object.isFrozen(FINANCIAL_CASE_POLICY.approval.excludedActors));
+    const h = await refundedCases();
+    const taken = await takeCase(h, h.refunded);
+    for (const kind of ["propose_case_decision", "decide_case", "approve_case", "reject_case", "rework_case",
+        "close_case", "supersede_case", "add_case_evidence"]) {
+        for (const role of ["finance", "admin"]) {
+            await assert.rejects(h.send(taken, kind, role, { caseRef: caseRef(taken) },
+                { actorId: "synthetic-finance-approver" }), /UNKNOWN_ACTION/);
+        }
+    }
+    // No case can reach DECISION_PENDING, APPROVED, REJECTED or CLOSED, so APPROVED can never be read as a payment.
+    assert.deepEqual(taken.financialCases.map(entry => entry.status), ["UNDER_REVIEW", "OPEN"]);
+});
+
+test("K2/4: the case is found in the canonical order only; a wrong order or case reference is refused", async () => {
+    const shared = setup();
+    const a = await refundedCases(shared);
+    const b = await refundedCases(shared);
+    // Both orders have a case-0001 (F160-01): the reference must name its own order.
+    const attempts = [
+        [caseRef(b.refunded), /INVALID_CASE_REFERENCE/],
+        [{ caseId: "case-0001" }, /INVALID_CASE_REFERENCE/],
+        [{ orderId: a.refunded.id, caseId: 1 }, /INVALID_CASE_REFERENCE/],
+        [null, /INVALID_CASE_REFERENCE/],
+        [caseRef(a.refunded, "case-0003"), /UNKNOWN_CASE/],
+        [caseRef(a.refunded, "__proto__"), /UNKNOWN_CASE/]
+    ];
+    for (const [ref, error] of attempts) await assert.rejects(takeCase(a, a.refunded, ref), error);
+    // A forged snapshot cannot add a case: only the canonical record is read.
+    const forged = { ...a.refunded, financialCases: [{ caseId: "case-0009", status: "OPEN" }] };
+    await assert.rejects(takeCase(a, forged, caseRef(a.refunded, "case-0009")), /UNKNOWN_CASE/);
+    // An order with no case: a live order is refused by state, a CLOSE-d one has no case to take.
+    const live = await producing("PLUS", {}, shared);
+    await assert.rejects(takeCase(live, live.order), /INVALID_TRANSITION/);
+    const closed = await live.resolveReview(await live.openReview(live.order, "DISPUTE"), "CLOSE");
+    await assert.rejects(takeCase(live, closed), /UNKNOWN_CASE/);
+    // None of this touched either order: each takes its own case-0001 now, on an unchanged version.
+    const takenA = await takeCase(a, a.refunded);
+    const takenB = await takeCase(b, b.refunded);
+    assert.deepEqual([takenA.version, takenB.version], [a.refunded.version + 1, b.refunded.version + 1]);
+    assert.deepEqual([takenA.financialCases[0].orderId, takenB.financialCases[0].orderId], [a.refunded.id, b.refunded.id]);
+});
+
+test("K2/5: a case under review cannot be taken again, by the same or another person or role", async () => {
+    const h = await refundedCases();
+    const taken = await takeCase(h, h.refunded);
+    for (const [role, actorId] of [["finance", "synthetic-finance-case-reviewer"], ["finance", "synthetic-finance-other"],
+        ["admin", "synthetic-admin-case-reviewer"]]) {
+        await assert.rejects(takeCase(h, taken, caseRef(taken), role, { actorId }), /CASE_STATE_INVALID/);
+    }
+});
+
+test("K2/6: version, retry and request conflicts are enforced", async () => {
+    const h = await refundedCases();
+    await assert.rejects(takeCase(h, h.refunded, caseRef(h.refunded), "finance", { version: h.refunded.version - 1 }),
+        /VERSION_CONFLICT/);
+    const options = { requestId: "synthetic-k2-take" };
+    const taken = await takeCase(h, h.refunded, caseRef(h.refunded), "finance", options);
+    // The same request again returns the committed order: no second audit entry and no version step.
+    const retried = await takeCase(h, h.refunded, caseRef(h.refunded), "finance", options);
+    assert.strictEqual(retried, taken);
+    assert.equal(taken.financialCases[0].auditTrail.length, 2);
+    // The same request id for another case is a conflict, not a second take.
+    await assert.rejects(takeCase(h, taken, caseRef(taken, "case-0002"), "finance", options), /IDEMPOTENCY_CONFLICT/);
+    // A stale order after the take is refused.
+    await assert.rejects(takeCase(h, h.refunded, caseRef(h.refunded, "case-0002")), /VERSION_CONFLICT/);
+});
+
+test("K2/7: concurrent takes commit once; the loser changes nothing", async () => {
+    for (const refs of [["case-0001", "case-0001"], ["case-0001", "case-0002"]]) {
+        const base = await refundedCases();
+        const results = await Promise.allSettled(refs.map((caseId, i) => takeCase(base, base.refunded,
+            caseRef(base.refunded, caseId), i === 0 ? "finance" : "admin")));
+        assert.deepEqual(results.map(r => (r.status === "fulfilled" ? "TAKEN" : r.reason.code)).sort(),
+            ["TAKEN", "VERSION_CONFLICT"]);
+        const winner = results.find(r => r.status === "fulfilled").value;
+        assert.equal(winner.financialCases.filter(entry => entry.status === "UNDER_REVIEW").length, 1);
+        assert.equal(winner.version, base.refunded.version + 1);
+    }
+});
+
+test("K2/8: refused takes leave no partial change; the valid take then commits on the same history", async () => {
+    const h = await refundedCases();
+    h.setNow("2026-10-28T08:00:00.000Z");
+    await assert.rejects(takeCase(h, h.refunded), /CLOCK_REGRESSION/);
+    h.setNow(FIXED_TIME);
+    await assert.rejects(takeCase(h, h.refunded, caseRef(h.refunded), "creative"), /UNAUTHORIZED/);
+    await assert.rejects(takeCase(h, h.refunded, caseRef(h.refunded, "case-0007")), /UNKNOWN_CASE/);
+    const taken = await takeCase(h, h.refunded);
+    assert.equal(taken.version, h.refunded.version + 1);
+    assert.deepEqual(taken.events.slice(0, -1), h.refunded.events);
+    assert.deepEqual([taken.financialCases[0].auditTrail.length, taken.financialCases[1]],
+        [2, h.refunded.financialCases[1]]);
+});
+
+test("K2/9: the principal and data are fixed before authorize; later changes cannot reach the case", async () => {
+    const { h: base, hooks } = hookedSetup();
+    const h = await refundedCases(base);
+    const principal = h.actor("finance", h.refunded, SERVER, "synthetic-finance-case-reviewer");
+    const command = { kind: "take_case", requestId: "synthetic-k2-snapshot", expectedVersion: h.refunded.version,
+        data: { caseRef: caseRef(h.refunded) } };
+    hooks.authorize = async () => {
+        principal.actorId = "synthetic-finance-decider"; principal.role = "admin";
+        command.data.caseRef.caseId = "case-0002"; command.requestId = "synthetic-other";
+    };
+    const taken = await h.core.dispatch(h.refunded, command, principal);
+    assert.deepEqual([taken.financialCases.map(entry => entry.status), taken.financialCases[0].assignedActorId,
+        taken.events.at(-1).role, taken.events.at(-1).requestId],
+    [["UNDER_REVIEW", "OPEN"], "synthetic-finance-case-reviewer", "finance", "synthetic-k2-snapshot"]);
+});
+
+test("K2/10 (F160-03): every event that writes cases commits to their full content in the hash chain", async () => {
+    const h = await refundedCases();
+    const taken = await takeCase(h, h.refunded);
+    assert.equal(h.refunded.events.at(-1).financialCasesDigest, caseDigest(h.refunded.financialCases));
+    assert.equal(taken.events.at(-1).financialCasesDigest, caseDigest(taken.financialCases));
+    // Events that write no case carry no digest.
+    assert.ok(h.refunded.events.slice(0, -1).every(event => !("financialCasesDigest" in event)));
+    // The digest is inside the hashed event, and the chain still links.
+    for (const event of taken.events) {
+        const { hash, ...body } = event;
+        assert.equal(hash, createHash("sha256").update(JSON.stringify(body)).digest("hex"));
+    }
+    for (let i = 1; i < taken.events.length; i++) assert.equal(taken.events[i].previousHash, taken.events[i - 1].hash);
+    // A change to any field of any case no longer matches the committed digest.
+    const altered = taken.financialCases.map((entry, i) => i === 1 ? { ...entry, assignedActorId: "synthetic-x" } : entry);
+    assert.notEqual(caseDigest(altered), taken.events.at(-1).financialCasesDigest);
+});
+
+test("K2/11: REFUND case creation, CLOSE, D-3 and cancel are unchanged; no money moves", async () => {
+    const h = await refundedCases();
+    assert.deepEqual(h.refunded.financialCases.map(entry => [entry.caseId, entry.caseType, entry.status]),
+        [["case-0001", "ORDER_REFUND", "OPEN"], ["case-0002", "UNDELIVERED_REVISION", "OPEN"]]);
+    assert.deepEqual(h.refunded.reviews[0].resolution.financialCaseIds, ["case-0001", "case-0002"]);
+    const d = await pendingRevision("PLUS");
+    await assert.rejects(d.resolveReview(await d.openReview(d.order, "CANCELLATION"), "CLOSE"), /FINANCIAL_CASE_REQUIRED/);
+    const shared = setup();
+    const paid = await paidOrder(shared, "START", "k2-cancel");
+    const cancelled = await shared.send(paid, "cancel", "finance");
+    assert.deepEqual([cancelled.state, cancelled.financialCases], [STATES.CANCELLED, []]);
+    await assert.rejects(takeCase(shared, cancelled), /INVALID_TRANSITION/);
+    const taken = await takeCase(h, h.refunded);
+    assert.ok(!JSON.stringify(taken.financialCases).includes("amount"));
+    assert.deepEqual([taken.reviews[0].resolution.moneyMovement, taken.notifications], ["NONE", h.refunded.notifications]);
+});
+
+// ---- Görev 167 (F166-01): case commands run only in a core the server configured as TEST ----
+
+// A core as a live server would start it: no synthetic evidence, and the environment given (or left out).
+const liveSetup = environment => setup({ allowSyntheticEvidence: false, environment });
+
+test("K3/1: TEST accepts take_case; PRODUCTION, STAGING and a missing environment refuse it", async () => {
+    const inTest = await refundedCases(liveSetup("TEST"));
+    assert.equal((await takeCase(inTest, inTest.refunded)).financialCases[0].status, "UNDER_REVIEW");
+    for (const environment of ["PRODUCTION", "STAGING", undefined]) {
+        const h = await refundedCases(liveSetup(environment));
+        // Case creation itself is unchanged in every environment.
+        assert.deepEqual(h.refunded.financialCases.map(entry => [entry.caseType, entry.status]),
+            [["ORDER_REFUND", "OPEN"], ["UNDELIVERED_REVISION", "OPEN"]]);
+        for (const role of ["finance", "admin"]) {
+            await assert.rejects(takeCase(h, h.refunded, caseRef(h.refunded), role), /CASE_COMMAND_NOT_ENABLED/,
+                String(environment));
+        }
+    }
+});
+
+test("K3/2: an unknown environment never starts a core, so no case command can run in it", () => {
+    for (const environment of ["test", "Test", "prod", "", null, 1, true, {}, ["TEST"], "TEST "]) {
+        assert.throws(() => createCore({ environment }), /INVALID_ENVIRONMENT/, String(environment));
+    }
+});
+
+test("K3/3: a TEST claim in the command, its data or the principal cannot open the gate", async () => {
+    const h = await refundedCases(liveSetup("PRODUCTION"));
+    const claims = { environment: "TEST", allowSyntheticEvidence: true, caseCommandsEnabled: true };
+    const attempts = [
+        // In the command envelope and in the data next to the case reference.
+        { command: { ...claims }, data: { caseRef: caseRef(h.refunded), ...claims }, principal: {} },
+        // Inside the case reference itself.
+        { command: {}, data: { caseRef: { ...caseRef(h.refunded), ...claims } }, principal: {} },
+        // On the authenticated principal.
+        { command: {}, data: { caseRef: caseRef(h.refunded) }, principal: { ...claims } }
+    ];
+    for (const [i, { command, data, principal }] of attempts.entries()) {
+        await assert.rejects(h.core.dispatch(h.refunded, {
+            kind: "take_case", requestId: `synthetic-k3-claim-${i}`, expectedVersion: h.refunded.version, data, ...command
+        }, { ...h.actor("finance", h.refunded, SERVER, "synthetic-finance-case-reviewer"), ...principal }),
+        /CASE_COMMAND_NOT_ENABLED/);
+    }
+});
+
+test("K3/4: role, identity and version are still checked first; the gate adds a refusal, never an opening", async () => {
+    const h = await refundedCases(liveSetup("PRODUCTION"));
+    await assert.rejects(takeCase(h, h.refunded, caseRef(h.refunded), "creative"), /UNAUTHORIZED/);
+    await assert.rejects(takeCase(h, h.refunded, caseRef(h.refunded), "customer"), /UNAUTHORIZED/);
+    await assert.rejects(takeCase(h, h.refunded, caseRef(h.refunded), "finance",
+        { session: session("synthetic-other", "finance") }),
+        /UNAUTHORIZED/);
+    await assert.rejects(takeCase(h, h.refunded, caseRef(h.refunded), "finance", { version: h.refunded.version - 1 }),
+        /VERSION_CONFLICT/);
+    // Wrong order or case: refused by the gate before the reference is read; nothing is learnt about other orders.
+    const other = await refundedCases(liveSetup("PRODUCTION"));
+    for (const ref of [caseRef(other.refunded), caseRef(h.refunded, "case-0009"), null]) {
+        await assert.rejects(takeCase(h, h.refunded, ref), /CASE_COMMAND_NOT_ENABLED/);
+    }
+    // In TEST the same wrong references keep their own codes.
+    const t = await refundedCases(liveSetup("TEST"));
+    await assert.rejects(takeCase(t, t.refunded, caseRef(other.refunded)), /INVALID_CASE_REFERENCE/);
+    await assert.rejects(takeCase(t, t.refunded, caseRef(t.refunded, "case-0009")), /UNKNOWN_CASE/);
+});
+
+test("K3/5: a refused take changes nothing, records no request id and leaves the version usable", async () => {
+    const h = await refundedCases(liveSetup("PRODUCTION"));
+    const before = h.refunded;
+    const options = { requestId: "synthetic-k3-refused" };
+    // The same request twice, and two at once: each is refused on its own; no event, audit or idempotency entry is left.
+    await assert.rejects(takeCase(h, before, caseRef(before), "finance", options), /CASE_COMMAND_NOT_ENABLED/);
+    await assert.rejects(takeCase(h, before, caseRef(before), "finance", options), /CASE_COMMAND_NOT_ENABLED/);
+    const concurrent = await Promise.allSettled([1, 2].map(i => takeCase(h, before, caseRef(before, `case-000${i}`),
+        i === 1 ? "finance" : "admin")));
+    assert.deepEqual(concurrent.map(r => r.reason?.code), ["CASE_COMMAND_NOT_ENABLED", "CASE_COMMAND_NOT_ENABLED"]);
+    // Still the same version: a stale attempt would say VERSION_CONFLICT instead.
+    await assert.rejects(takeCase(h, before, caseRef(before), "finance", { version: before.version }),
+        /CASE_COMMAND_NOT_ENABLED/);
+    assert.ok(Object.isFrozen(before));
+    assert.deepEqual([before.financialCases.map(entry => [entry.status, entry.assignedActorId, entry.auditTrail.length]),
+        before.events.at(-1).kind, before.events.at(-1).financialCasesDigest],
+    [[["OPEN", null, 1], ["OPEN", null, 1]], "resolve_review", caseDigest(before.financialCases)]);
+    for (let i = 1; i < before.events.length; i++) assert.equal(before.events[i].previousHash, before.events[i - 1].hash);
+});
+
+test("K3/6: in TEST the gate changes nothing for retries and concurrency", async () => {
+    const h = await refundedCases(liveSetup("TEST"));
+    const options = { requestId: "synthetic-k3-take" };
+    const taken = await takeCase(h, h.refunded, caseRef(h.refunded), "finance", options);
+    assert.strictEqual(await takeCase(h, h.refunded, caseRef(h.refunded), "finance", options), taken);
+    const base = await refundedCases(liveSetup("TEST"));
+    const results = await Promise.allSettled(["finance", "admin"].map(role => takeCase(base, base.refunded,
+        caseRef(base.refunded), role)));
+    assert.deepEqual(results.map(r => (r.status === "fulfilled" ? "TAKEN" : r.reason.code)).sort(),
+        ["TAKEN", "VERSION_CONFLICT"]);
+    assert.equal(taken.events.at(-1).financialCasesDigest, caseDigest(taken.financialCases));
+});
+
+test("K3/7: REFUND cases, CLOSE and cancel behave as before in a PRODUCTION core; no money moves", async () => {
+    const h = await refundedCases(liveSetup("PRODUCTION"));
+    assert.deepEqual([h.refunded.state, h.refunded.reviews[0].resolution.financialCaseIds,
+        h.refunded.reviews[0].resolution.moneyMovement], [STATES.CLOSED, ["case-0001", "case-0002"], "NONE"]);
+    assert.ok(h.refunded.financialCases.every(entry => entry.moneyMovement === "NONE" && !("amountKurus" in entry)));
+    const d = await pendingRevision("PLUS", liveSetup("PRODUCTION"));
+    await assert.rejects(d.resolveReview(await d.openReview(d.order, "CANCELLATION"), "CLOSE"), /FINANCIAL_CASE_REQUIRED/);
+    const shared = liveSetup("PRODUCTION");
+    const paid = await paidOrder(shared, "START", "k3-cancel");
+    const cancelled = await shared.send(paid, "cancel", "finance");
+    assert.deepEqual([cancelled.state, cancelled.financialCases, cancelled.paymentReference], [STATES.CANCELLED, [],
+        paid.paymentReference]);
+});
+
+// ---- Görev 169 (F168-01): one central case gate; (F168-02): trusted settings are own data properties only ----
+
+const CASE_COMMANDS = Object.keys(FINANCIAL_CASE_POLICY.transitions);
+
+/** Dispatches a case command of any registered kind with a valid finance/admin identity, as take_case would be sent. */
+function sendCase(h, order, kind, role, requestId) {
+    return h.core.dispatch(order, { kind, requestId, expectedVersion: order.version, data: { caseRef: caseRef(order) } },
+        h.actor(role, order, SERVER, `synthetic-${role}-case-reviewer`));
+}
+
+let probes = 0;
+/** Nothing was committed since `snapshot`: the canonical version is still exactly snapshot.version. One version
+ * ahead is stale (VERSION_CONFLICT); in a non-TEST core the snapshot's own version passes on to the gate. */
+async function assertNoCommit(h, snapshot, gated = true) {
+    assert.ok(Object.isFrozen(snapshot));
+    const ahead = { ...snapshot, version: snapshot.version + 1 };
+    await assert.rejects(sendCase(h, ahead, "take_case", "finance", `synthetic-probe-${++probes}`), /VERSION_CONFLICT/);
+    if (gated) {
+        await assert.rejects(sendCase(h, snapshot, "take_case", "finance", `synthetic-probe-${++probes}`),
+            /CASE_COMMAND_NOT_ENABLED/);
+    }
+}
+
+test("CG/1: the gate is driven by the registry: every registered case command, for every role, is refused outside TEST", async () => {
+    assert.deepEqual(CASE_COMMANDS, ["take_case"]);
+    for (const environment of ["PRODUCTION", "STAGING", undefined]) {
+        const h = await refundedCases(liveSetup(environment));
+        for (const kind of CASE_COMMANDS) {
+            for (const role of FINANCIAL_CASE_POLICY.transitions[kind].roles) {
+                await assert.rejects(sendCase(h, h.refunded, kind, role, `synthetic-cg1-${kind}-${role}`),
+                    /CASE_COMMAND_NOT_ENABLED/, `${kind}/${role}/${environment}`);
+            }
+        }
+        await assertNoCommit(h, h.refunded);
+    }
+    // In TEST every registered command reaches its own code (it is not refused by the gate).
+    for (const kind of CASE_COMMANDS) {
+        const t = await refundedCases(liveSetup("TEST"));
+        const role = FINANCIAL_CASE_POLICY.transitions[kind].roles[0];
+        const done = await sendCase(t, t.refunded, kind, role, `synthetic-cg1-test-${kind}`);
+        assert.equal(done.events.at(-1).kind, kind);
+    }
+});
+
+test("CG/2: the registry is the only door: it is frozen, read by own key only, and look-alike names stay unknown", async () => {
+    assert.ok(Object.isFrozen(FINANCIAL_CASE_POLICY.transitions));
+    assert.ok(CASE_COMMANDS.every(kind => Object.isFrozen(FINANCIAL_CASE_POLICY.transitions[kind])));
+    assert.throws(() => {
+        FINANCIAL_CASE_POLICY.transitions.reassign_case = { from: "OPEN", to: "OPEN", roles: ["finance"] };
+    }, TypeError);
+    assert.ok(!Object.hasOwn(FINANCIAL_CASE_POLICY.transitions, "reassign_case"));
+    for (const environment of ["TEST", "PRODUCTION"]) {
+        const h = await refundedCases(liveSetup(environment));
+        // Name-prefix or suffix look-alikes and prototype keys are not case commands and not commands at all.
+        for (const kind of ["reassign_case", "take_case_now", "case_take", "propose_case", "approve_case", "close_case",
+            "__proto__", "constructor", "toString", "hasOwnProperty", "TAKE_CASE", ""]) {
+            await assert.rejects(sendCase(h, h.refunded, kind, "finance", `synthetic-cg2-${environment}-${kind || "empty"}`),
+                /UNKNOWN_ACTION/, `${environment}/${kind}`);
+        }
+        // A command polluted onto Object.prototype is not registered and stays unknown.
+        Object.prototype.reassign_case = { from: "OPEN", to: "UNDER_REVIEW", roles: ["finance", "admin"] };
+        try {
+            await assert.rejects(sendCase(h, h.refunded, "reassign_case", "finance", `synthetic-cg2-${environment}-polluted`),
+                /UNKNOWN_ACTION/);
+        } finally {
+            delete Object.prototype.reassign_case;
+        }
+        await assertNoCommit(h, h.refunded, environment !== "TEST");
+    }
+});
+
+test("CG/3: refused case commands leave state, events, audit and the hash chain untouched; the version stays usable", async () => {
+    const h = await refundedCases(liveSetup("PRODUCTION"));
+    const before = h.refunded;
+    const digestBefore = caseDigest(before.financialCases);
+    const attempts = [
+        [() => takeCase(h, before), /CASE_COMMAND_NOT_ENABLED/],
+        [() => takeCase(h, before, caseRef(before), "creative"), /UNAUTHORIZED/],
+        [() => takeCase(h, before, caseRef(before), "customer"), /UNAUTHORIZED/],
+        [() => takeCase(h, before, caseRef(before), "finance", { version: before.version + 1 }), /VERSION_CONFLICT/],
+        [() => takeCase(h, before, { orderId: "synthetic-other-order", caseId: "case-0001" }), /CASE_COMMAND_NOT_ENABLED/]
+    ];
+    for (const [attempt, code] of attempts) await assert.rejects(attempt(), code);
+    await assertNoCommit(h, before);
+    assert.equal(caseDigest(before.financialCases), digestBefore);
+    assert.equal(before.events.at(-1).financialCasesDigest, digestBefore);
+    for (let i = 1; i < before.events.length; i++) assert.equal(before.events[i].previousHash, before.events[i - 1].hash);
+    // In TEST: unauthorized roles and a wrong order or case id are still refused, and a valid take then commits on top.
+    const t = await refundedCases(liveSetup("TEST"));
+    const other = await refundedCases(liveSetup("TEST"));
+    await assert.rejects(takeCase(t, t.refunded, caseRef(t.refunded), "scheduler"), /UNAUTHORIZED/);
+    await assert.rejects(takeCase(t, t.refunded, caseRef(other.refunded)), /INVALID_CASE_REFERENCE/);
+    await assert.rejects(takeCase(t, t.refunded, { orderId: t.refunded.id, caseId: "case-0099" }), /UNKNOWN_CASE/);
+    await assertNoCommit(t, t.refunded, false);
+    const taken = await takeCase(t, t.refunded);
+    assert.equal(taken.version, t.refunded.version + 1);
+    assert.equal(taken.events.at(-1).previousHash, t.refunded.events.at(-1).hash);
+    assert.equal(taken.events.at(-1).financialCasesDigest, caseDigest(taken.financialCases));
+});
+
+test("CG/4: REFUND case creation, CLOSE and cancel pass the gate in every environment, as before", async () => {
+    for (const environment of ["PRODUCTION", "STAGING", undefined, "TEST"]) {
+        const h = await refundedCases(liveSetup(environment));
+        assert.deepEqual(h.refunded.financialCases.map(entry => [entry.caseId, entry.caseType, entry.status]),
+            [["case-0001", "ORDER_REFUND", "OPEN"], ["case-0002", "UNDELIVERED_REVISION", "OPEN"]]);
+        assert.equal(h.refunded.events.at(-1).financialCasesDigest, caseDigest(h.refunded.financialCases));
+        const shared = liveSetup(environment);
+        const paid = await paidOrder(shared, "START", `cg4-cancel-${environment}`);
+        const cancelled = await shared.send(paid, "cancel", "finance");
+        assert.deepEqual([cancelled.state, cancelled.financialCases], [STATES.CANCELLED, []]);
+    }
+    const prod = await inReview("DISPUTE", setup({ allowSyntheticEvidence: false, environment: "PRODUCTION",
+        verifyEvidence: productionShaped }));
+    const closed = await closeAs(prod, prod.reviewed, "DISPUTE_RESOLVED_BY_PROVIDER");
+    assert.deepEqual([closed.state, closed.financialCases], [STATES.CLOSED, []]);
+});
+
+test("OC/1: an environment or synthetic flag inherited from the configuration's prototype is never taken (F168-02)", async () => {
+    // Inherited TEST: the core is PRODUCTION, so case commands are refused.
+    const h = await refundedCases(setup({ allowSyntheticEvidence: false }, { environment: "TEST" }));
+    await assert.rejects(takeCase(h, h.refunded), /CASE_COMMAND_NOT_ENABLED/);
+    await assertNoCommit(h, h.refunded);
+    // Inherited flag with an own TEST environment: the synthetic verifier is still not allowed.
+    const s = await inReview("DISPUTE", setup({ environment: "TEST" }, { allowSyntheticEvidence: true }));
+    await assert.rejects(closeAs(s, s.reviewed, "DISPUTE_RESOLVED_BY_PROVIDER"), /SYNTHETIC_VERIFIER_NOT_ALLOWED/);
+    await assertCanonicalUnchanged(s, s.reviewed);
+    // Both inherited: a PRODUCTION core without the flag (no creation error, nothing enabled).
+    const both = await refundedCases(setup({ verifyEvidence: productionShaped }, { environment: "TEST",
+        allowSyntheticEvidence: true }));
+    await assert.rejects(takeCase(both, both.refunded), /CASE_COMMAND_NOT_ENABLED/);
+    // Global Object.prototype pollution: same result; nothing is read through the prototype chain.
+    Object.prototype.environment = "TEST";
+    Object.prototype.allowSyntheticEvidence = true;
+    try {
+        assert.doesNotThrow(() => createCore({}));
+        const g = await refundedCases(setup({ allowSyntheticEvidence: false }, { environment: "PRODUCTION" }));
+        await assert.rejects(takeCase(g, g.refunded), /CASE_COMMAND_NOT_ENABLED/);
+        const gs = await inReview("DISPUTE", setup({ environment: "TEST" }, { allowSyntheticEvidence: false }));
+        await assert.rejects(closeAs(gs, gs.reviewed, "DISPUTE_RESOLVED_BY_PROVIDER"), /SYNTHETIC_VERIFIER_NOT_ALLOWED/);
+    } finally {
+        delete Object.prototype.environment;
+        delete Object.prototype.allowSyntheticEvidence;
+    }
+});
+
+test("OC/2: only an own, primitive TEST opens TEST; boxed, accessor and unknown values are refused (F168-02)", async () => {
+    // Own-property TEST is accepted.
+    const own = await refundedCases(setup({ allowSyntheticEvidence: false, environment: "TEST" }));
+    assert.equal((await takeCase(own, own.refunded)).financialCases[0].status, "UNDER_REVIEW");
+    // Missing or undefined is PRODUCTION.
+    assert.doesNotThrow(() => createCore({}));
+    assert.doesNotThrow(() => createCore({ environment: undefined }));
+    assert.throws(() => createCore({ environment: undefined, allowSyntheticEvidence: true }), /SYNTHETIC_EVIDENCE_NOT_ALLOWED/);
+    // Boxed strings and other look-alikes never start a core.
+    for (const environment of [new String("TEST"), Object("PRODUCTION"), { toString: () => "TEST" },
+        { valueOf: () => "TEST" }, ["TEST"], "TEST\u0000", "ＴＥＳＴ", "TEST ", " TEST", "test", "QA",
+        "DEV", "LOCAL"]) {
+        assert.throws(() => createCore({ environment }), /INVALID_ENVIRONMENT/, String(environment));
+    }
+    // A boxed true flag is not true: the core starts without synthetic evidence.
+    const flagged = await inReview("DISPUTE", setup({ environment: "TEST", allowSyntheticEvidence: new Boolean(true) }));
+    await assert.rejects(closeAs(flagged, flagged.reviewed, "DISPUTE_RESOLVED_BY_PROVIDER"), /SYNTHETIC_VERIFIER_NOT_ALLOWED/);
+    // An own accessor is not a data value: it is refused, and its getter is never called.
+    let reads = 0;
+    assert.throws(() => createCore(Object.defineProperty({}, "environment",
+        { enumerable: true, get: () => { reads += 1; return "TEST"; } })), /INVALID_ENVIRONMENT/);
+    assert.throws(() => createCore(Object.defineProperty({ environment: "TEST" }, "allowSyntheticEvidence",
+        { enumerable: true, get: () => { reads += 1; return true; } })), /SYNTHETIC_EVIDENCE_NOT_ALLOWED/);
+    assert.equal(reads, 0);
+});
+
+// ---- Görev 170: regression lock for the central case gate (entry: CASE_COMMAND_NOT_ENABLED, exit: _NOT_REGISTERED) ----
+//
+// The production core has one case command and no command that rewrites existing cases, so the two central checks can
+// only be exercised by commands that do not exist yet. These tests build a temporary copy of the core that sits next to
+// this file, OUTSIDE the repository (os.tmpdir()), add controlled probe commands to it, and drive them through the
+// public createCore/dispatch API. Because the copy is made from the sibling core.mjs at run time, removing or weakening
+// either central check in core.mjs makes these tests fail. core.mjs itself is never changed.
+//   - probe_rewrite_cases: an UNREGISTERED command (plain roles table + switch) that modifies, deletes, reorders,
+//     replaces or appends financial cases according to data.mode. Only "append" (case creation) may commit.
+//   - assign_reviewer, reassign_case: REGISTERED case commands (FINANCIAL_CASE_POLICY.transitions) whose bodies carry
+//     no gate of their own. "assign_reviewer" deliberately has no "case" or "take" in its name.
+
+const PROBE_KINDS = Object.freeze({ unregistered: "probe_rewrite_cases", registered: ["assign_reviewer", "reassign_case"] });
+const REWRITE_MODES = Object.freeze(["modify", "delete", "reorder", "replace", "modify_append", "delete_append"]);
+let probeCoreLoad = null;
+
+function inject(source, anchor, insert, where) {
+    const count = source.split(anchor).length - 1;
+    // A missing or ambiguous anchor is a failure, never a skip: the lock must not silently stop testing.
+    assert.equal(count, 1, `probe injection anchor must occur exactly once: ${JSON.stringify(anchor)}`);
+    return source.replace(anchor, () => (where === "before" ? insert + anchor : anchor + insert));
+}
+
+/** Loads the probe copy of the sibling core.mjs from a fresh temporary directory outside the repository. */
+function probeCore() {
+    probeCoreLoad ??= (async () => {
+        const { mkdtemp, readFile, writeFile, rm } = await import("node:fs/promises");
+        const { tmpdir } = await import("node:os");
+        const { join } = await import("node:path");
+        const { pathToFileURL } = await import("node:url");
+        let source = (await readFile(new URL("./core.mjs", import.meta.url), "utf8")).replaceAll("\r\n", "\n");
+        // The copy shares the real calendar module (the fixtures' calendar instances), never a second copy of it.
+        const calendarImport = `from "./calendar.mjs";`;
+        source = inject(source, calendarImport, "", "after").replace(calendarImport,
+            () => `from ${JSON.stringify(new URL("./calendar.mjs", import.meta.url).href)};`);
+        source = inject(source, "function roleFor(kind, principal) {\n    const roles = {",
+            `\n        ${PROBE_KINDS.unregistered}: ["finance", "admin"],`, "after");
+        source = inject(source, "transitions: {", PROBE_KINDS.registered.map(kind =>
+            ` ${kind}: { from: "OPEN", to: "UNDER_REVIEW", roles: ["finance", "admin"] },`).join(""), "after");
+        source = inject(source, `            default: throw new OrderError("UNKNOWN_ACTION");`, `
+            case "${PROBE_KINDS.unregistered}": ${PROBE_KINDS.registered.map(kind => `case "${kind}":`).join(" ")} {
+                // PROBE ONLY (Görev 170): rewrites cases with no gate of its own.
+                const mode = command.kind === "${PROBE_KINDS.unregistered}" ? data.mode : "modify";
+                const cases = order.financialCases;
+                requireThat(cases.length > 0, "PROBE_NO_CASES");
+                const changed = entry => ({ ...entry, status: "UNDER_REVIEW", assignedActorId: principal.actorId ?? "probe" });
+                const extra = { ...cases[0], caseId: "case-probe", status: "OPEN" };
+                at = serverTime();
+                if (mode === "modify") next.financialCases = cases.map((entry, i) => (i === 0 ? changed(entry) : entry));
+                else if (mode === "delete") next.financialCases = cases.slice(1);
+                else if (mode === "reorder") next.financialCases = [...cases].reverse();
+                else if (mode === "replace") next.financialCases = cases.map(entry => structuredClone(entry));
+                else if (mode === "append") next.financialCases = [...cases, extra];
+                else if (mode === "modify_append") next.financialCases = [...cases.map((entry, i) => (i === 0 ? changed(entry) : entry)), extra];
+                else if (mode === "delete_append") next.financialCases = [...cases.slice(1), extra, extra];
+                else throw new OrderError("PROBE_MODE");
+                casesChanged = true;
+                break;
+            }
+`, "before");
+        const dir = await mkdtemp(join(tmpdir(), "unai-case-gate-probe-"));
+        try {
+            await writeFile(join(dir, "core.mjs"), source);
+            return await import(pathToFileURL(join(dir, "core.mjs")).href);
+        } finally {
+            // Once imported, the module lives in memory; nothing is left on disk.
+            await rm(dir, { recursive: true, force: true });
+        }
+    })();
+    return probeCoreLoad;
+}
+
+/** A REFUND-ed order (two OPEN cases) on a probe core configured with `environment` (undefined = left out). */
+async function probeCases(environment, inherited = null) {
+    const probe = await probeCore();
+    const overrides = { allowSyntheticEvidence: false };
+    if (environment !== "LEAVE_OUT") overrides.environment = environment;
+    // LEAVE_OUT removes the key from the configuration altogether (an undefined on the prototype is never read).
+    else inherited ??= { environment: undefined };
+    return refundedCases(setup(overrides, inherited, probe.createCore));
+}
+
+function sendProbe(h, order, kind, { role = "finance", mode, requestId, extra = {}, principal = {} } = {}) {
+    return h.core.dispatch(order, { kind, requestId: requestId ?? `synthetic-probe-${kind}-${mode ?? "x"}-${role}`,
+        expectedVersion: order.version, data: { caseRef: caseRef(order), ...(mode ? { mode } : {}) }, ...extra },
+    { ...h.actor(role, order, SERVER, `synthetic-${role}-probe-actor`), ...principal });
+}
+
+/** Proves nothing was committed since `snapshot`: an append (allowed case creation) at exactly snapshot.version, reusing
+ * a refused request id, commits as the very next event on top of unchanged state, events, cases and audit trails. */
+async function assertUntouchedThenAppend(h, snapshot, reusedRequestId) {
+    assert.ok(Object.isFrozen(snapshot));
+    const appended = await sendProbe(h, snapshot, PROBE_KINDS.unregistered, { mode: "append", requestId: reusedRequestId });
+    assert.equal(appended.version, snapshot.version + 1);
+    assert.deepEqual(appended.events.slice(0, -1), snapshot.events);
+    assert.equal(appended.events.at(-1).previousHash, snapshot.events.at(-1).hash);
+    assert.equal(appended.events.at(-1).requestId, reusedRequestId);
+    assert.deepEqual([appended.state, appended.reviews, appended.revisions, appended.financialAssessments,
+        appended.notifications, appended.paymentReference], [snapshot.state, snapshot.reviews, snapshot.revisions,
+        snapshot.financialAssessments, snapshot.notifications, snapshot.paymentReference]);
+    // Existing cases are the very same records (content, status, assignee and audit trail); one case was appended.
+    assert.equal(appended.financialCases.length, snapshot.financialCases.length + 1);
+    snapshot.financialCases.forEach((entry, i) => assert.strictEqual(appended.financialCases[i], entry));
+    assert.equal(appended.events.at(-1).financialCasesDigest, caseDigest(appended.financialCases));
+    return appended;
+}
+
+test("GL/0: the probe commands exist only in the temporary copy; the real core does not know them", async () => {
+    const h = await refundedCases(liveSetup("TEST"));
+    for (const kind of [PROBE_KINDS.unregistered, ...PROBE_KINDS.registered]) {
+        await assert.rejects(sendProbe(h, h.refunded, kind, { mode: "append" }), /UNKNOWN_ACTION/, kind);
+    }
+    assert.ok(!PROBE_KINDS.registered.some(kind => Object.hasOwn(FINANCIAL_CASE_POLICY.transitions, kind)));
+    const probe = await probeCore();
+    assert.deepEqual(Object.keys(probe.FINANCIAL_CASE_POLICY.transitions).sort(),
+        [...Object.keys(FINANCIAL_CASE_POLICY.transitions), ...PROBE_KINDS.registered].sort());
+});
+
+test("GL/1 (exit): an unregistered command can never modify, delete, reorder or replace existing cases, in any environment", async () => {
+    for (const environment of ["PRODUCTION", "STAGING", "LEAVE_OUT", undefined, "TEST"]) {
+        const h = await probeCases(environment);
+        const before = h.refunded;
+        // REFUND case creation still works on this core.
+        assert.deepEqual(before.financialCases.map(entry => [entry.caseId, entry.caseType, entry.status]),
+            [["case-0001", "ORDER_REFUND", "OPEN"], ["case-0002", "UNDELIVERED_REVISION", "OPEN"]]);
+        assert.equal(before.events.at(-1).financialCasesDigest, caseDigest(before.financialCases));
+        const digestBefore = caseDigest(before.financialCases);
+        for (const mode of REWRITE_MODES) {
+            for (const role of ["finance", "admin"]) {
+                await assert.rejects(sendProbe(h, before, PROBE_KINDS.unregistered, { mode, role,
+                    requestId: `synthetic-gl1-${mode}-${role}` }), /CASE_COMMAND_NOT_REGISTERED/, `${environment}/${mode}/${role}`);
+            }
+        }
+        // Concurrent rewrite attempts are each refused alone.
+        const concurrent = await Promise.allSettled(REWRITE_MODES.map(mode => sendProbe(h, before, PROBE_KINDS.unregistered,
+            { mode, requestId: `synthetic-gl1-concurrent-${mode}` })));
+        assert.ok(concurrent.every(r => r.status === "rejected" && r.reason.code === "CASE_COMMAND_NOT_REGISTERED"));
+        assert.equal(caseDigest(before.financialCases), digestBefore);
+        // Nothing was committed and no refused request id was recorded: the next commit is v+1 on the same history.
+        const appended = await assertUntouchedThenAppend(h, before, "synthetic-gl1-modify-finance");
+        // Also after a later commit, existing cases stay protected.
+        await assert.rejects(sendProbe(h, appended, PROBE_KINDS.unregistered, { mode: "modify", requestId: "synthetic-gl1-late" }),
+            /CASE_COMMAND_NOT_REGISTERED/);
+    }
+});
+
+test("GL/2 (exit): the exit check sits behind role, authorization and version checks and never blocks REFUND, CLOSE or cancel", async () => {
+    const h = await probeCases("PRODUCTION");
+    await assert.rejects(sendProbe(h, h.refunded, PROBE_KINDS.unregistered, { mode: "modify", role: "creative" }), /UNAUTHORIZED/);
+    await assert.rejects(sendProbe(h, h.refunded, PROBE_KINDS.unregistered, { mode: "modify", role: "customer" }), /UNAUTHORIZED/);
+    await assert.rejects(sendProbe(h, { ...h.refunded, version: h.refunded.version + 1 }, PROBE_KINDS.unregistered,
+        { mode: "modify" }), /VERSION_CONFLICT/);
+    await assertUntouchedThenAppend(h, h.refunded, "synthetic-gl2-append");
+    const probe = await probeCore();
+    // CLOSE (no case) and cancel on the probe core, in PRODUCTION, behave as on the real core.
+    const prod = await inReview("DISPUTE", setup({ allowSyntheticEvidence: false, environment: "PRODUCTION",
+        verifyEvidence: productionShaped }, null, probe.createCore));
+    const closed = await closeAs(prod, prod.reviewed, "DISPUTE_RESOLVED_BY_PROVIDER");
+    assert.deepEqual([closed.state, closed.financialCases], [STATES.CLOSED, []]);
+    const shared = setup({ allowSyntheticEvidence: false, environment: "PRODUCTION" }, null, probe.createCore);
+    const cancelled = await shared.send(await paidOrder(shared, "START", "gl2-cancel"), "cancel", "finance");
+    assert.deepEqual([cancelled.state, cancelled.financialCases], [STATES.CANCELLED, []]);
+});
+
+test("GL/3 (entry): registered case commands inherit the gate: refused outside TEST, whatever their name", async () => {
+    for (const environment of ["PRODUCTION", "STAGING", "LEAVE_OUT", undefined]) {
+        const h = await probeCases(environment);
+        for (const kind of PROBE_KINDS.registered) {
+            for (const role of ["finance", "admin"]) {
+                await assert.rejects(sendProbe(h, h.refunded, kind, { role, requestId: `synthetic-gl3-${kind}-${role}` }),
+                    /CASE_COMMAND_NOT_ENABLED/, `${environment}/${kind}/${role}`);
+            }
+        }
+        await assertUntouchedThenAppend(h, h.refunded, `synthetic-gl3-${PROBE_KINDS.registered[0]}-finance`);
+    }
+    // Positive control: in TEST the same bodies run and really change a case, so the refusals above are the gate's.
+    for (const kind of PROBE_KINDS.registered) {
+        const t = await probeCases("TEST");
+        const done = await sendProbe(t, t.refunded, kind);
+        assert.deepEqual([done.financialCases[0].status, done.financialCases[0].assignedActorId, done.events.at(-1).kind],
+            ["UNDER_REVIEW", "synthetic-finance-probe-actor", kind]);
+        assert.strictEqual(done.financialCases[1], t.refunded.financialCases[1]);
+    }
+});
+
+test("GL/4 (entry): unknown environments never start; TEST claims from the client, principal or prototype never open the gate", async () => {
+    const probe = await probeCore();
+    for (const environment of ["test", "Test", "QA", "DEV", "", null, 1, true, {}, ["TEST"], new String("TEST"), "TEST "]) {
+        assert.throws(() => probe.createCore({ environment }), /INVALID_ENVIRONMENT/, String(environment));
+    }
+    const h = await probeCases("PRODUCTION");
+    const claims = { environment: "TEST", allowSyntheticEvidence: true, caseCommandsEnabled: true };
+    for (const kind of PROBE_KINDS.registered) {
+        const attempts = [
+            { extra: { ...claims }, principal: {} },
+            { extra: { data: { caseRef: { ...caseRef(h.refunded), ...claims }, ...claims } }, principal: {} },
+            { extra: {}, principal: { ...claims } }
+        ];
+        for (const [i, attempt] of attempts.entries()) {
+            await assert.rejects(sendProbe(h, h.refunded, kind, { ...attempt, requestId: `synthetic-gl4-${kind}-${i}` }),
+                /CASE_COMMAND_NOT_ENABLED/, `${kind}/${i}`);
+        }
+        // Role and version are still checked first.
+        await assert.rejects(sendProbe(h, h.refunded, kind, { role: "creative" }), /UNAUTHORIZED/);
+        await assert.rejects(sendProbe(h, { ...h.refunded, version: h.refunded.version - 1 }, kind), /VERSION_CONFLICT/);
+    }
+    await assertUntouchedThenAppend(h, h.refunded, `synthetic-gl4-${PROBE_KINDS.registered[1]}-0`);
+    // A TEST inherited from the configuration's prototype is not TEST.
+    const inherited = await probeCases("LEAVE_OUT", { environment: "TEST" });
+    for (const kind of PROBE_KINDS.registered) {
+        await assert.rejects(sendProbe(inherited, inherited.refunded, kind), /CASE_COMMAND_NOT_ENABLED/);
     }
 });
