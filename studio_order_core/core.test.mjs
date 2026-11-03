@@ -4764,6 +4764,23 @@ test("DG/21: a used digest is refused before the evidence time is judged", async
 // digest through the single claim gate the future add_case_evidence must use (claimEvidence, Görev 185 Architecture C;
 // the probe copy adds the FINANCIAL_CASE_EVIDENCE purpose). If the gate or the shared commit block change, this test
 // fails instead of being skipped.
+// Görev 193 (Faz 2B-2b, DQ-191-01): probe-copy helper. A case evidence claim now carries the case, the kind and source
+// of the closed policy, the evidence policy version and the expected digest basis, and its attestation states them with
+// the case evidence purpose. Injected into the dgProbeCore and ecProbeCore copies only, never into core.mjs.
+// Görev 197 (A194-03, DQ-196-01 item 1): the request and its attestation carry all CASE_ATTESTED_FIELDS, bound to the
+// case's own order and review, as checkCaseEvidence would return them (also injected into the scProbeCore copy).
+const PROBE_CASE_EVIDENCE_HELPER = `// PROBE ONLY (Görev 193, Görev 197): a policy-conforming case evidence request and attestation.
+function probeCaseEvidence(item, entry, verifierKind = "SYNTHETIC") {
+    const [evidenceKind, rule] = Object.entries(CASE_EVIDENCE_POLICY.kinds[item.caseType])[0];
+    const request = { purpose: "FINANCIAL_CASE_EVIDENCE", ...entry, caseId: item.caseId, caseType: item.caseType,
+        evidenceKind, source: rule.source, evidencePolicyVersion: CASE_EVIDENCE_POLICY.reference,
+        digestBasis: rule.digestBasis, orderId: item.orderId, reviewId: item.origin.reviewId, createdAt: item.createdAt,
+        decisionBinding: "synthetic-probe-decision-binding" };
+    const attestation = { status: "VERIFIED", verifier: { kind: verifierKind, id: "synthetic-evidence-service" },
+        purpose: "FINANCIAL_CASE_EVIDENCE", ...request };
+    return { request, attestation };
+}
+`;
 let dgProbeLoad = null;
 function dgProbeCore() {
     dgProbeLoad ??= (async () => {
@@ -4777,7 +4794,9 @@ function dgProbeCore() {
             () => `from ${JSON.stringify(new URL("./calendar.mjs", import.meta.url).href)};`);
         source = inject(source, "transitions: {",
             ` probe_case_evidence: { from: "OPEN", to: "OPEN", roles: ["finance", "admin"] },`, "after");
-        source = inject(source, `const EVIDENCE_PURPOSES = Object.freeze(["CLOSE"`, `, "FINANCIAL_CASE_EVIDENCE"`, "after");
+        // Görev 193 (DQ-191-01): bind the probe command to the case evidence purpose in this copy only.
+        source = inject(source, `commands: ["add_case_evidence"`, `, "probe_case_evidence"`, "after");
+        source = inject(source, "export function createCore(config = {}) {", PROBE_CASE_EVIDENCE_HELPER, "before");
         source = inject(source, `            default: throw new OrderError("UNKNOWN_ACTION");`, `
             case "probe_case_evidence": {
                 // PROBE ONLY (Görev 177): a case evidence entry, reduced to what the shared registries see.
@@ -4786,8 +4805,8 @@ function dgProbeCore() {
                 const item = order.financialCases.find(entry => entry.caseId === data.caseRef?.caseId);
                 requireThat(item && data.caseRef.orderId === order.id, "UNKNOWN_CASE");
                 at = serverTime();
-                claimEvidence("FINANCIAL_CASE_EVIDENCE", { evidenceId: data.evidenceId, digest: data.digest }, { status: "VERIFIED",
-                    verifier: { kind: "SYNTHETIC", id: "synthetic-evidence-service" }, evidenceId: data.evidenceId, digest: data.digest });
+                const evidence = probeCaseEvidence(item, { evidenceId: data.evidenceId, digest: data.digest });
+                claimEvidence("FINANCIAL_CASE_EVIDENCE", evidence.request, evidence.attestation);
                 next.financialCases = order.financialCases.map(entry => (entry === item ? { ...entry,
                     evidenceReferences: [...entry.evidenceReferences, { evidenceId: data.evidenceId, digest: data.digest }] }
                     : entry));
@@ -4941,7 +4960,9 @@ function ecProbeCore() {
             () => `from ${JSON.stringify(new URL("./calendar.mjs", import.meta.url).href)};`);
         source = inject(source, "transitions: {",
             ` probe_claim: { from: "OPEN", to: "OPEN", roles: ["finance", "admin"] },`, "after");
-        source = inject(source, `const EVIDENCE_PURPOSES = Object.freeze(["CLOSE"`, `, "FINANCIAL_CASE_EVIDENCE"`, "after");
+        // Görev 193 (DQ-191-01): bind the probe command to the case evidence purpose in this copy only.
+        source = inject(source, `commands: ["add_case_evidence"`, `, "probe_claim"`, "after");
+        source = inject(source, "export function createCore(config = {}) {", PROBE_CASE_EVIDENCE_HELPER, "before");
         source = inject(source, "export function createCore(config = {}) {", `// PROBE ONLY (Görev 185): a test barrier.
 let probeGate = async () => {};
 export function setProbeGate(gate) { probeGate = gate; }
@@ -4957,10 +4978,9 @@ export function setProbeGate(gate) { probeGate = gate; }
                 const mode = data.mode ?? "claim_store";
                 const stored = [];
                 for (const [index, entry] of (data.items ?? []).entries()) {
-                    const attestation = Object.hasOwn(data, "attestations") ? data.attestations[index]
-                        : { status: "VERIFIED", verifier: { kind: data.verifierKind ?? "SYNTHETIC", id: "synthetic-evidence-service" },
-                            evidenceId: entry.evidenceId, digest: entry.digest };
-                    if (mode !== "store_only") claimEvidence(data.purpose ?? "FINANCIAL_CASE_EVIDENCE", entry, attestation);
+                    const evidence = probeCaseEvidence(item, entry, data.verifierKind ?? "SYNTHETIC");
+                    const attestation = Object.hasOwn(data, "attestations") ? data.attestations[index] : evidence.attestation;
+                    if (mode !== "store_only") claimEvidence(data.purpose ?? "FINANCIAL_CASE_EVIDENCE", evidence.request, attestation);
                     if (mode === "store_other") stored.push({ ...data.other });
                     else if (mode !== "claim_only") stored.push({ evidenceId: entry.evidenceId, digest: entry.digest });
                 }
@@ -5352,10 +5372,24 @@ function purposeProbeCore() {
     return purposeProbeLoad;
 }
 
-test("EC/14 (A12a): the production purpose list is exactly [\"CLOSE\"]; a case-evidence purpose is refused and consumes nothing", async () => {
+// Görev 193 (DQ-191-02): EC/14 now pins the approved production purpose policy. Its probe copy stays un-injected
+// (DQ-191-01, F192-01), so the probe command is bound to no purpose, exactly as any unknown command in production.
+test("EC/14 (A12a, DQ-191-02): the production purpose policy is exactly the approved table; an unbound or unknown purpose is refused and consumes nothing", async () => {
+    const { EVIDENCE_PURPOSE_POLICY: policy, FINANCIAL_CASE_POLICY: casePolicy } = await import("./core.mjs");
     const source = await coreSource();
     assert.equal(occurrences(source, "const EVIDENCE_PURPOSES = "), 1);
-    assert.equal(occurrences(source, `const EVIDENCE_PURPOSES = Object.freeze(["CLOSE"]);`), 1);
+    assert.equal(occurrences(source, "const EVIDENCE_PURPOSES = Object.freeze(Object.keys(EVIDENCE_PURPOSE_POLICY));"), 1);
+    assert.equal(occurrences(source, "export const EVIDENCE_PURPOSE_POLICY = "), 1);
+    assert.ok(Object.isFrozen(policy) && Object.values(policy).every(entry => Object.isFrozen(entry) &&
+        Object.isFrozen(entry.commands)));
+    assert.deepEqual(policy, {
+        CLOSE: { commands: ["resolve_review"], storage: "REVIEW_RESOLUTION", attestedPurpose: null,
+            evidencePolicyVersion: null },
+        FINANCIAL_CASE_EVIDENCE: { commands: ["add_case_evidence"], storage: "CASE_EVIDENCE",
+            attestedPurpose: "FINANCIAL_CASE_EVIDENCE", evidencePolicyVersion: "UNAI-FINANCIAL-CASE-EVIDENCE-v1.1" }
+    });
+    // add_case_evidence is bound but not registered: no command can claim case evidence in this phase.
+    assert.equal(Object.hasOwn(casePolicy.transitions, "add_case_evidence"), false);
     const probe = await purposeProbeCore();
     const h = setup({}, null, probe.createCore);
     const { refunded } = await refundedCases(h);
@@ -5364,14 +5398,23 @@ test("EC/14 (A12a): the production purpose list is exactly [\"CLOSE\"]; a case-e
         kind: "probe_purpose_claim", requestId: `synthetic-ec14-${++sequence}`, expectedVersion: order.version,
         data: { purpose, evidenceId, digest }
     }, h.actor("finance", order, SERVER, "synthetic-finance-ec14"));
-    for (const purpose of ["FINANCIAL_CASE_EVIDENCE", "close", "CLOSE ", "", null]) {
+    // Known purposes the probe command is not bound to: CLOSE belongs to resolve_review only.
+    for (const purpose of ["FINANCIAL_CASE_EVIDENCE", "CLOSE"]) {
+        await assert.rejects(claim(refunded, purpose, "synthetic-ec14-a", dgDigest("ec14")), /EVIDENCE_PURPOSE_MISMATCH/,
+            JSON.stringify(purpose));
+    }
+    // Unknown or malformed purposes, prototype names included.
+    for (const purpose of ["close", "CLOSE ", "", null, "OTHER_PURPOSE", "__proto__", "toString"]) {
         await assert.rejects(claim(refunded, purpose, "synthetic-ec14-a", dgDigest("ec14")), /EVIDENCE_MISMATCH/,
             JSON.stringify(purpose));
     }
-    // Nothing was consumed: the same evidence is still free under the one production purpose.
-    const next = await claim(refunded, "CLOSE", "synthetic-ec14-a", dgDigest("ec14"));
-    assert.equal(next.version, refunded.version + 1);
-    assert.deepEqual(next.events.slice(0, -1), refunded.events);
+    // Nothing was consumed: the one command bound to CLOSE uses the same id and digest, and the refused order still
+    // takes its next transition on its unchanged version.
+    const p = await inReview("DISPUTE", h);
+    await dgClosesCleanly(h, p, dgRecord(h, p, { evidenceId: "synthetic-ec14-a", digest: dgDigest("ec14") }));
+    const taken = await takeCase(h, refunded);
+    assert.equal(taken.version, refunded.version + 1);
+    assert.deepEqual(taken.events.slice(0, -1), refunded.events);
 });
 
 test("EC/15 (A12c): the gate judges the purpose before the registries: an unknown purpose with a used id or digest is EVIDENCE_MISMATCH", async () => {
@@ -5415,4 +5458,1122 @@ test("EC/17 (A15f): claims match the stored evidence whatever their order", asyn
     const mixed = [ecItem("ec17-m", "synthetic-ec17-mmmm"), ecItem("ec17-y", "synthetic-ec17-yyyy"),
         ecItem("ec17-b", "synthetic-ec17-bbbb")];
     await ecCommitsCleanly(claim, next, mixed, "case-0002");
+});
+
+// ---- Görev 193 (Faz 2B-2b): purpose binding, storage integrity, the case evidence contract, CLOSE compatibility ----
+//
+// No case evidence command exists. Storage and history rules are driven through a probe copy of the sibling core.mjs
+// (outside the repository, removed after import) whose one registered command, probe_store, is bound to the case
+// evidence purpose in the copy only. data.claims: evidence to claim (default case "case-0001", or claim.caseId);
+// data.request / data.attestation: fields overriding the policy-conforming claim; data.put: what to store (default:
+// the claimed evidence); data.mode: where and how it is stored, or which stored history it changes.
+// Görev 197 (DQ-196-01): data.inherit (attestation fields moved to its prototype); modes for the eight mutants, the
+// event log, the scan limits and non-plain data; an await hook (setProbeAwaitHook) and the scan itself exported from
+// the copy (probeFindEvidence, probeEvidenceOnly, PROBE_SCAN_LIMITS). core.mjs itself is never changed.
+function replaceOnce(source, anchor, replacement) {
+    assert.equal(source.split(anchor).length - 1, 1, `probe replacement anchor must occur exactly once: ${anchor}`);
+    return source.replace(anchor, () => replacement);
+}
+const PROBE_STORAGE_HELPER = `// PROBE ONLY (Görev 197): scan access, an await hook and non-plain values built inside the copy.
+export const PROBE_SCAN_LIMITS = Object.freeze({ depth: EVIDENCE_SCAN_MAX_DEPTH, nodes: EVIDENCE_SCAN_MAX_NODES });
+export function probeFindEvidence(root, nodes = EVIDENCE_SCAN_MAX_NODES) {
+    const budget = { nodes };
+    const found = findEvidence(root, [], budget);
+    return { found, used: nodes - budget.nodes };
+}
+export function probeEvidenceOnly(before, after, audit, claims) {
+    return evidenceOnlyInRegisteredPlaces(before, after, audit, claims);
+}
+let probeAwaitHook = null;
+export function setProbeAwaitHook(hook) { probeAwaitHook = hook; }
+async function probeAround(stage, pending, scope) {
+    const value = await pending;
+    if (probeAwaitHook) probeAwaitHook(stage, scope);
+    return value;
+}
+function probeShape(shape, evidence) {
+    const inner = evidence ?? { step: "PROBE" };
+    switch (shape) {
+        case "map": return new Map([["inner", inner]]);
+        case "set": return new Set([inner]);
+        case "date": return new Date(0);
+        case "instance": return new (class ProbeRecord { constructor() { this.inner = inner; } })();
+        case "symbol_key": return { [Symbol("probe")]: inner };
+        case "accessor": return Object.defineProperty({}, "inner", { get: () => inner, enumerable: true });
+        case "hidden": return Object.defineProperty({}, "inner", { value: inner, enumerable: false });
+        case "array_key": return Object.assign([{ step: "PROBE" }], { inner });
+        case "function": return { inner: () => inner };
+        case "symbol_value": return { inner: Symbol("probe") };
+        case "bigint": return { inner: 1n };
+        case "cycle": { const loop = { inner }; loop.self = loop; return loop; }
+        case "array_cycle": { const loop = [inner]; loop.push(loop); return loop; }
+        case "shared": { const once = { step: "PROBE" }; return { a: once, b: [once, { c: once }] }; }
+        case "null_proto": return Object.assign(Object.create(null), { inner });
+        case "plain": return { inner };
+        default: throw new OrderError("PROBE_MODE");
+    }
+}
+`;
+let scProbeLoad = null;
+function scProbeCore() {
+    scProbeLoad ??= (async () => {
+        const { mkdtemp, readFile, writeFile, rm } = await import("node:fs/promises");
+        const { tmpdir } = await import("node:os");
+        const { join } = await import("node:path");
+        const { pathToFileURL } = await import("node:url");
+        let source = (await readFile(new URL("./core.mjs", import.meta.url), "utf8")).replaceAll("\r\n", "\n");
+        const calendarImport = `from "./calendar.mjs";`;
+        source = inject(source, calendarImport, "", "after").replace(calendarImport,
+            () => `from ${JSON.stringify(new URL("./calendar.mjs", import.meta.url).href)};`);
+        source = inject(source, "transitions: {",
+            ` probe_store: { from: "OPEN", to: "OPEN", roles: ["finance", "admin"] },`, "after");
+        source = inject(source, `commands: ["add_case_evidence"`, `, "probe_store"`, "after");
+        source = inject(source, "export function createCore(config = {}) {", PROBE_CASE_EVIDENCE_HELPER, "before");
+        source = inject(source, "export function createCore(config = {}) {", PROBE_STORAGE_HELPER, "before");
+        // Görev 197 (A194-05, DQ-196-01 item 4): in this copy only, both awaits of the commit block call the probe hook
+        // once their value has arrived, i.e. while the dispatch is suspended between the pre-check and the commit.
+        source = replaceOnce(source, "if (casesChanged) event.financialCasesDigest = await digest(next.financialCases);",
+            `if (casesChanged) event.financialCasesDigest = await probeAround("cases", digest(next.financialCases),
+            { next, audit, event, evidenceClaims });`);
+        source = replaceOnce(source, "event.hash = await digest(event);",
+            `event.hash = await probeAround("hash", digest(event), { next, audit, event, evidenceClaims });`);
+        source = inject(source, `            default: throw new OrderError("UNKNOWN_ACTION");`, `
+            case "probe_store": {
+                // PROBE ONLY (Görev 193): claims case evidence and stores or rewrites evidence exactly as data says.
+                inState(STATES.CLOSED);
+                requireHumanActor();
+                const mode = data.mode ?? "append";
+                const caseOf = id => order.financialCases.find(entry => entry.caseId === id);
+                const target = caseOf(data.caseId ?? "case-0001");
+                const other = caseOf(data.otherCaseId ?? "case-0002");
+                const claimed = [];
+                for (const entry of data.claims ?? []) {
+                    const evidence = probeCaseEvidence(caseOf(entry.caseId ?? target.caseId),
+                        { evidenceId: entry.evidenceId, digest: entry.digest });
+                    let attestation = { ...evidence.attestation, ...(data.attestation ?? {}) };
+                    // Görev 197 (A194-03/A194-10): data.inherit moves the named attestation fields to its prototype.
+                    if (data.inherit) {
+                        const inherited = {};
+                        for (const field of data.inherit) {
+                            inherited[field] = attestation[field];
+                            delete attestation[field];
+                        }
+                        attestation = Object.assign(Object.create(inherited), attestation);
+                    }
+                    claimEvidence("FINANCIAL_CASE_EVIDENCE", { ...evidence.request, ...(data.request ?? {}) }, attestation);
+                    claimed.push({ evidenceId: entry.evidenceId, digest: entry.digest });
+                }
+                const put = data.put ?? claimed;
+                const withCase = (item, change) => { next.financialCases = next.financialCases.map(entry =>
+                    (entry.caseId === item.caseId ? change(entry) : entry)); };
+                const refs = item => item.evidenceReferences;
+                if (mode === "append" || mode === "audit" || mode === "trail") {
+                    withCase(target, entry => ({ ...entry, evidenceReferences: [...refs(entry), ...put] }));
+                    if (mode === "audit") audit = { step: "PROBE", evidence: data.mirror };
+                    if (mode === "trail") withCase(target, entry => ({ ...entry,
+                        auditTrail: [...entry.auditTrail, { step: "PROBE", evidence: data.mirror }] }));
+                } else if (mode === "other_case") {
+                    withCase(other, entry => ({ ...entry, evidenceReferences: [...refs(entry), ...put] }));
+                } else if (mode === "resolution") {
+                    next.reviews = order.reviews.map((review, index) => (index === 0
+                        ? { ...review, resolution: { ...review.resolution, evidence: put[0] } } : review));
+                } else if (mode === "decisions") {
+                    withCase(target, entry => ({ ...entry, decisions: [...entry.decisions, ...put] }));
+                } else if (mode === "proposal" || mode === "closure") {
+                    withCase(target, entry => ({ ...entry, [mode]: put[0] }));
+                } else if (mode === "assessment") {
+                    next.financialAssessments = [...order.financialAssessments, ...put];
+                } else if (mode === "nested") {
+                    withCase(target, entry => ({ ...entry, origin: { ...entry.origin, note: { inner: put[0] } } }));
+                } else if (mode === "delete") {
+                    withCase(target, entry => ({ ...entry, evidenceReferences: refs(entry).slice(1) }));
+                } else if (mode === "modify") {
+                    withCase(target, entry => ({ ...entry, evidenceReferences: refs(entry).map(item => ({ ...item })) }));
+                } else if (mode === "reorder") {
+                    withCase(target, entry => ({ ...entry, evidenceReferences: [...refs(entry)].reverse() }));
+                } else if (mode === "move") {
+                    withCase(other, entry => ({ ...entry, evidenceReferences: [...refs(entry), ...refs(target)] }));
+                    withCase(target, entry => ({ ...entry, evidenceReferences: [] }));
+                } else if (mode === "copy") {
+                    withCase(other, entry => ({ ...entry, evidenceReferences: [...refs(entry), ...refs(target)] }));
+                } else if (mode === "drop_case") {
+                    next.financialCases = order.financialCases.filter(entry => entry !== target);
+                } else if (mode === "resolution_modify") {
+                    next.reviews = order.reviews.map(review => (review.resolution?.evidence
+                        ? { ...review, resolution: { ...review.resolution, evidence: { ...review.resolution.evidence } } }
+                        : review));
+                // Görev 197 (DQ-196-01): the modes below serve the eight mutants (rename, non_array,
+                // delete_and_decisions), the event log (event_*), the scan limits (deep, wide) and non-plain data
+                // (shape); "noop" changes nothing, for an order that holds evidence outside the cases.
+                } else if (mode === "rename") {
+                    withCase(target, entry => ({ ...entry, caseId: "case-0099" }));
+                } else if (mode === "non_array") {
+                    withCase(target, entry => ({ ...entry, evidenceReferences: { ...refs(entry) } }));
+                } else if (mode === "delete_and_decisions") {
+                    withCase(target, entry => ({ ...entry, evidenceReferences: refs(entry).slice(1),
+                        decisions: [...entry.decisions, ...put] }));
+                } else if (mode === "event_drop") {
+                    next.events = order.events.slice(1);
+                } else if (mode === "event_pop") {
+                    next.events = order.events.slice(0, -1);
+                } else if (mode === "event_reorder") {
+                    next.events = [...order.events].reverse();
+                } else if (mode === "event_replace") {
+                    next.events = order.events.map((event, index) => (index === 0 ? { ...event } : event));
+                } else if (mode === "event_append") {
+                    next.events = [...order.events, { sequence: 0, kind: "probe", audit: { evidence: put[0] ?? null } }];
+                } else if (mode === "event_evidence") {
+                    next.events = order.events.map((event, index) => (index === order.events.length - 1
+                        ? { ...event, audit: { ...(event.audit ?? {}), evidence: put[0] } } : event));
+                } else if (mode === "shape") {
+                    withCase(target, entry => ({ ...entry, note: probeShape(data.shape, put[0]) }));
+                } else if (mode === "deep") {
+                    let value = {};
+                    for (let level = 1; level < data.objects; level += 1) value = { d: value };
+                    withCase(target, entry => ({ ...entry, note: value }));
+                } else if (mode === "wide") {
+                    withCase(target, entry => ({ ...entry, note: Array.from({ length: data.count }, () => ({})) }));
+                } else if (mode !== "noop") throw new OrderError("PROBE_MODE");
+                at = serverTime();
+                casesChanged = true;
+                break;
+            }
+`, "before");
+        const dir = await mkdtemp(join(tmpdir(), "unai-storage-probe-"));
+        try {
+            await writeFile(join(dir, "core.mjs"), source);
+            return await import(pathToFileURL(join(dir, "core.mjs")).href);
+        } finally {
+            await rm(dir, { recursive: true, force: true });
+        }
+    })();
+    return scProbeLoad;
+}
+
+async function scSetup(overrides = {}) {
+    const probe = await scProbeCore();
+    const h = setup(overrides, null, probe.createCore);
+    const { refunded } = await refundedCases(h);
+    let sequence = 0;
+    const store = (order, data) => h.core.dispatch(order, {
+        kind: "probe_store", requestId: `synthetic-sc-${++sequence}`, expectedVersion: order.version, data
+    }, h.actor("finance", order, SERVER, "synthetic-finance-sc"));
+    return { h, refunded, store };
+}
+const scItem = text => ({ evidenceId: `synthetic-sc-${text}`, digest: dgDigest(`sc-${text}`) });
+
+/** After a refusal: nothing was consumed and the snapshot still takes a clean claim as its next version. */
+async function scCleanAfter(store, order, item) {
+    const next = await store(order, { claims: [item] });
+    assert.equal(next.version, order.version + 1);
+    assert.deepEqual(next.events.slice(0, -1), order.events);
+    assert.deepEqual(next.financialCases[0].evidenceReferences.at(-1), item);
+    return next;
+}
+
+test("PB/3,5: a purpose is claimed only by its bound command and stored only in its place", async () => {
+    const { h, refunded, store } = await scSetup();
+    const a = scItem("pb5-a");
+    // A command bound to case evidence only cannot claim CLOSE, whatever the evidence: refused before format and registry.
+    const ec = await ecSetup();
+    await assert.rejects(ec.claim(ec.refunded, { items: [ecItem("pb3")], purpose: "CLOSE" }), /EVIDENCE_PURPOSE_MISMATCH/);
+    await assert.rejects(ec.claim(ec.refunded, { items: [{ evidenceId: "bad id", digest: "x" }], purpose: "CLOSE" }),
+        /EVIDENCE_PURPOSE_MISMATCH/);
+    // Claimed for case-0001, stored in case-0002: wrong case.
+    await assert.rejects(store(refunded, { claims: [a], mode: "other_case" }), /EVIDENCE_STORAGE_INVALID/);
+    // Claimed as case evidence, stored as a review's close evidence: wrong storage.
+    await assert.rejects(store(refunded, { claims: [a], mode: "resolution" }), /EVIDENCE_STORAGE_INVALID/);
+    // Claimed for case-0002 (its own kind), stored in case-0001.
+    await assert.rejects(store(refunded, { claims: [{ ...a, caseId: "case-0002" }] }), /EVIDENCE_STORAGE_INVALID/);
+    await scCleanAfter(store, refunded, a);
+    // CLOSE keeps its own place.
+    const p = await inReview("DISPUTE", h);
+    await dgClosesCleanly(h, p, dgRecord(h, p, { digest: dgDigest("pb5-close") }));
+});
+
+test("PB/6,7: evidence-shaped objects outside the registered places are EVIDENCE_STORAGE_INVALID, claimed or not", async () => {
+    const { refunded, store } = await scSetup();
+    const a = scItem("pb6-a");
+    for (const mode of ["decisions", "proposal", "closure", "assessment", "nested"]) {
+        await assert.rejects(store(refunded, { claims: [a], mode }), /EVIDENCE_STORAGE_INVALID/, `${mode} claimed`);
+        await assert.rejects(store(refunded, { put: [a], mode }), /EVIDENCE_STORAGE_INVALID/, `${mode} unclaimed`);
+    }
+    // An object carrying only a digest, or only an id, is evidence-shaped too.
+    await assert.rejects(store(refunded, { put: [{ digest: a.digest }], mode: "decisions" }), /EVIDENCE_STORAGE_INVALID/);
+    await assert.rejects(store(refunded, { put: [{ evidenceId: a.evidenceId }], mode: "proposal" }), /EVIDENCE_STORAGE_INVALID/);
+    // Mirrors (the transition's audit, a case audit trail entry) may only repeat evidence stored before or claimed now.
+    const b = scItem("pb7-b");
+    await assert.rejects(store(refunded, { claims: [a], mode: "audit", mirror: b }), /EVIDENCE_STORAGE_INVALID/);
+    await assert.rejects(store(refunded, { claims: [a], mode: "trail", mirror: b }), /EVIDENCE_STORAGE_INVALID/);
+    const mirrored = await store(refunded, { claims: [a], mode: "trail", mirror: a });
+    assert.deepEqual(mirrored.financialCases[0].auditTrail.at(-1).evidence, a);
+    const audited = await store(mirrored, { claims: [b], mode: "audit", mirror: b });
+    assert.deepEqual(audited.events.at(-1).audit.evidence, b);
+});
+
+test("PB/8: stored evidence is append-only: delete, modify, reorder, move and dropping a case are EVIDENCE_HISTORY_CHANGED", async () => {
+    const { refunded, store } = await scSetup();
+    const a = scItem("pb8-a");
+    const b = scItem("pb8-b");
+    const held = await store(refunded, { claims: [a, b] });
+    for (const mode of ["delete", "modify", "reorder", "move", "drop_case"]) {
+        await assert.rejects(store(held, { mode }), /EVIDENCE_HISTORY_CHANGED/, mode);
+    }
+    // Copying stored evidence into another case is new, unclaimed evidence.
+    await assert.rejects(store(held, { mode: "copy" }), /EVIDENCE_NOT_CLAIMED/);
+    // The history is intact: appending a third entry keeps the first two as the same objects.
+    const c = scItem("pb8-c");
+    const next = await store(held, { claims: [c] });
+    assert.equal(next.financialCases[0].evidenceReferences[0], held.financialCases[0].evidenceReferences[0]);
+    assert.deepEqual(next.financialCases[0].evidenceReferences, [a, b, c]);
+});
+
+test("PB/8 (close): a resolved review's close evidence cannot be changed by a later transition", async () => {
+    const probe = await scProbeCore();
+    const h = setup({}, null, probe.createCore);
+    const p = await inReview("DISPUTE", h);
+    const closed = await dgClosesCleanly(h, p, dgRecord(h, p, { digest: dgDigest("pb8-close") }));
+    await assert.rejects(h.core.dispatch(closed, { kind: "probe_store", requestId: "synthetic-pb8-close",
+        expectedVersion: closed.version, data: { mode: "resolution_modify" } },
+    h.actor("finance", closed, SERVER, "synthetic-finance-pb8")), /EVIDENCE_HISTORY_CHANGED/);
+});
+
+test("PB/9,10,13 (gate): case evidence is claimed only for its canonical case, policy version, kind, source and digest basis", async () => {
+    const { refunded, store } = await scSetup();
+    const a = scItem("pb9-a");
+    const requestRefusals = [
+        [{ evidencePolicyVersion: "UNAI-FINANCIAL-CASE-EVIDENCE-v1.0" }, /CASE_EVIDENCE_POLICY_MISMATCH/],
+        [{ evidencePolicyVersion: "UNAI-FINANCIAL-CASE-v1.0" }, /CASE_EVIDENCE_POLICY_MISMATCH/],
+        [{ evidencePolicyVersion: undefined }, /CASE_EVIDENCE_POLICY_MISMATCH/],
+        [{ evidenceKind: "CUSTOMER_CLOSURE_CONFIRMATION", source: "customer_confirmation_service" }, /EVIDENCE_KIND_NOT_ALLOWED/],
+        [{ evidenceKind: "REVISION_DELIVERY_RECORD", source: "producer_console" }, /EVIDENCE_KIND_NOT_ALLOWED/],
+        [{ source: "producer_console" }, /EVIDENCE_KIND_NOT_ALLOWED/],
+        [{ evidenceKind: "toString" }, /EVIDENCE_KIND_NOT_ALLOWED/],
+        [{ digestBasis: "JCS_UTF8" }, /EVIDENCE_MISMATCH/],
+        [{ digestBasis: undefined }, /EVIDENCE_MISMATCH/],
+        [{ caseId: "case-9999" }, /EVIDENCE_MISMATCH/],
+        [{ caseType: "UNDELIVERED_REVISION" }, /EVIDENCE_MISMATCH/]
+    ];
+    for (const [request, expected] of requestRefusals) {
+        await assert.rejects(store(refunded, { claims: [a], request }), expected, JSON.stringify(request));
+    }
+    const attestationRefusals = [{ purpose: undefined }, { purpose: "CLOSE" }, { purpose: "financial_case_evidence" },
+        { evidencePolicyVersion: "UNAI-FINANCIAL-CASE-EVIDENCE-v1.0" }, { evidencePolicyVersion: undefined },
+        { digestBasis: "JCS_UTF8" }, { digestBasis: undefined }, { caseId: "case-0002" },
+        { evidenceKind: "PROVIDER_DISPUTE_OUTCOME" }, { source: "producer_console" }];
+    for (const attestation of attestationRefusals) {
+        await assert.rejects(store(refunded, { claims: [a], attestation }), /UNTRUSTED_EVIDENCE/, JSON.stringify(attestation));
+    }
+    await scCleanAfter(store, refunded, a);
+});
+
+test("PB/14 (gate): the TEST-only synthetic boundary holds for case evidence; the order of checks keeps purpose and format first", async () => {
+    const off = await scSetup({ allowSyntheticEvidence: false });
+    const a = scItem("pb14-a");
+    await assert.rejects(off.store(off.refunded, { claims: [a] }), /SYNTHETIC_VERIFIER_NOT_ALLOWED/);
+    const next = await off.store(off.refunded, { claims: [a], attestation: { verifier: { kind: "PRODUCTION",
+        id: "synthetic-evidence-service" } } });
+    assert.equal(next.version, off.refunded.version + 1);
+    // A used id with a wrong policy version or kind is judged on policy first, never on the registries.
+    const { refunded, store } = await scSetup();
+    const used = await scCleanAfter(store, refunded, scItem("pb14-used"));
+    await assert.rejects(store(used, { claims: [{ ...scItem("pb14-used"), digest: dgDigest("pb14-x") }],
+        request: { evidencePolicyVersion: "v0" } }), /CASE_EVIDENCE_POLICY_MISMATCH/);
+    await assert.rejects(store(used, { claims: [{ ...scItem("pb14-used"), digest: dgDigest("pb14-x") }],
+        request: { evidenceKind: "CUSTOMER_CLOSURE_CONFIRMATION" } }), /EVIDENCE_KIND_NOT_ALLOWED/);
+    await assert.rejects(store(used, { claims: [{ ...scItem("pb14-used"), digest: dgDigest("pb14-x") }] }),
+        /EVIDENCE_REFERENCE_USED/);
+});
+
+// ---- The case evidence contract (pure functions; no command, no verifier call) ----
+const cvCore = () => import("./core.mjs");
+function cvRecord(order, item, evidence = {}, extra = {}) {
+    const [evidenceKind, rule] = item.caseType === "ORDER_REFUND"
+        ? ["PAYMENT_PROVIDER_RECORD", { source: "payment_provider_reconciliation" }]
+        : ["REVISION_DELIVERY_RECORD", { source: "producer_console" }];
+    return {
+        kind: "CASE_EVIDENCE_SUBMISSION", orderId: order.id, caseId: item.caseId, reviewId: item.origin.reviewId,
+        caseType: item.caseType, evidencePolicyVersion: "UNAI-FINANCIAL-CASE-EVIDENCE-v1.1",
+        authorizationRef: "synthetic-case-auth-0001", source: "finance_console", actorId: "synthetic-finance-cv",
+        evidence: { evidenceId: "synthetic-cv-evidence-1", evidenceKind, source: rule.source, orderId: order.id,
+            caseId: item.caseId, reviewId: item.origin.reviewId, createdAt: item.createdAt, digest: dgDigest("cv"),
+            signature: "synthetic-service-signature", ...evidence },
+        signature: "synthetic-console-signature", ...extra
+    };
+}
+
+test("CV/1: the case evidence policy is closed, frozen and versioned; the case policy keeps v1.0 and one command", async () => {
+    const core = await cvCore();
+    assert.ok(Object.isFrozen(core.CASE_EVIDENCE_POLICY) && Object.isFrozen(core.CASE_EVIDENCE_POLICY.kinds.ORDER_REFUND));
+    assert.deepEqual(core.CASE_EVIDENCE_POLICY, {
+        reference: "UNAI-FINANCIAL-CASE-EVIDENCE-v1.1",
+        kinds: {
+            ORDER_REFUND: {
+                PAYMENT_PROVIDER_RECORD: { source: "payment_provider_reconciliation", digestBasis: "RAW_BYTES" },
+                PROVIDER_DISPUTE_OUTCOME: { source: "payment_provider_reconciliation", digestBasis: "RAW_BYTES" }
+            },
+            UNDELIVERED_REVISION: { REVISION_DELIVERY_RECORD: { source: "producer_console", digestBasis: "JCS_UTF8" } }
+        },
+        excludedKinds: { CUSTOMER_CLOSURE_CONFIRMATION: "LEGAL_REVIEW_PENDING" }
+    });
+    assert.equal(core.FINANCIAL_CASE_POLICY.reference, "UNAI-FINANCIAL-CASE-v1.0");
+    assert.deepEqual(Object.keys(core.FINANCIAL_CASE_POLICY.transitions), ["take_case"]);
+    const { refunded, core: live, actor } = await refundedCases();
+    assert.ok(refunded.financialCases.every(item => item.policyVersion === "UNAI-FINANCIAL-CASE-v1.0"));
+    await assert.rejects(live.dispatch(refunded, { kind: "add_case_evidence", requestId: "synthetic-cv1-request",
+        expectedVersion: refunded.version, data: {} }, actor("finance", refunded, SERVER, "synthetic-finance-cv1")),
+    /UNKNOWN_ACTION/);
+});
+
+test("CV/2: checkCaseEvidence returns the request to attest, with the expected digest basis per kind", async () => {
+    const { checkCaseEvidence, caseEvidenceBinding } = await cvCore();
+    const { refunded } = await refundedCases();
+    const [refund, revision] = refunded.financialCases;
+    const record = cvRecord(refunded, refund);
+    const request = checkCaseEvidence(record, refunded, refund, "finance");
+    assert.ok(Object.isFrozen(request));
+    assert.deepEqual(request, {
+        purpose: "FINANCIAL_CASE_EVIDENCE", evidencePolicyVersion: "UNAI-FINANCIAL-CASE-EVIDENCE-v1.1",
+        evidenceId: "synthetic-cv-evidence-1", evidenceKind: "PAYMENT_PROVIDER_RECORD",
+        source: "payment_provider_reconciliation", orderId: refunded.id, caseId: refund.caseId,
+        reviewId: refund.origin.reviewId, caseType: "ORDER_REFUND", createdAt: refund.createdAt, digest: dgDigest("cv"),
+        digestBasis: "RAW_BYTES", decisionBinding: caseEvidenceBinding(record)
+    });
+    assert.equal(checkCaseEvidence(cvRecord(refunded, revision), refunded, revision, "finance").digestBasis, "JCS_UTF8");
+    assert.equal(checkCaseEvidence(cvRecord(refunded, refund, {}, { source: "admin_console" }), refunded, refund, "admin")
+        .caseType, "ORDER_REFUND");
+});
+
+test("CV/3: checkCaseEvidence refuses shape, reference, policy, kind and time faults with the approved codes", async () => {
+    const { checkCaseEvidence } = await cvCore();
+    const { refunded } = await refundedCases();
+    const [refund, revision] = refunded.financialCases;
+    const check = (record, item = refund, role = "finance") => () => checkCaseEvidence(record, refunded, item, role);
+    const before = new Date(Date.parse(refund.createdAt) - 1).toISOString();
+    const cases = [
+        [cvRecord(refunded, refund, {}, { extra: 1 }), /EVIDENCE_MISMATCH/],
+        [cvRecord(refunded, refund, {}, { kind: "CLOSE_DECISION" }), /EVIDENCE_MISMATCH/],
+        [cvRecord(refunded, refund, {}, { authorizationRef: "bad ref" }), /EVIDENCE_MISMATCH/],
+        [cvRecord(refunded, refund, {}, { source: "admin_console" }), /EVIDENCE_MISMATCH/],
+        [cvRecord(refunded, refund, {}, { orderId: "another-order" }), /INVALID_CASE_REFERENCE/],
+        [cvRecord(refunded, refund, {}, { caseId: revision.caseId }), /INVALID_CASE_REFERENCE/],
+        [cvRecord(refunded, refund, {}, { reviewId: "review-9999" }), /INVALID_CASE_REFERENCE/],
+        [cvRecord(refunded, refund, {}, { caseType: "UNDELIVERED_REVISION" }), /INVALID_CASE_REFERENCE/],
+        [cvRecord(refunded, refund, {}, { evidencePolicyVersion: "UNAI-FINANCIAL-CASE-v1.0" }), /CASE_EVIDENCE_POLICY_MISMATCH/],
+        [cvRecord(refunded, refund, {}, { evidencePolicyVersion: undefined }), /CASE_EVIDENCE_POLICY_MISMATCH/],
+        [cvRecord(refunded, refund, { verified: true }), /EVIDENCE_MISMATCH/],
+        [cvRecord(refunded, refund, { evidenceId: "bad id" }), /EVIDENCE_MISMATCH/],
+        [cvRecord(refunded, refund, { orderId: "another-order" }), /EVIDENCE_MISMATCH/],
+        [cvRecord(refunded, refund, { caseId: revision.caseId }), /EVIDENCE_MISMATCH/],
+        [cvRecord(refunded, refund, { digest: dgDigest("cv").toUpperCase() }), /EVIDENCE_MISMATCH/],
+        [cvRecord(refunded, refund, { digest: "" }), /EVIDENCE_MISMATCH/],
+        [cvRecord(refunded, refund, { createdAt: "2026-10-28T09:00:00" }), /EVIDENCE_MISMATCH/],
+        [cvRecord(refunded, refund, { evidenceKind: "CUSTOMER_CLOSURE_CONFIRMATION", source: "customer_confirmation_service" }),
+            /EVIDENCE_KIND_NOT_ALLOWED/],
+        [cvRecord(refunded, refund, { evidenceKind: "REVISION_DELIVERY_RECORD", source: "producer_console" }),
+            /EVIDENCE_KIND_NOT_ALLOWED/],
+        [cvRecord(refunded, refund, { source: "producer_console" }), /EVIDENCE_KIND_NOT_ALLOWED/],
+        [cvRecord(refunded, refund, { createdAt: before }), /EVIDENCE_STALE/]
+    ];
+    for (const [record, expected] of cases) assert.throws(check(record), expected, JSON.stringify(record).slice(0, 120));
+    assert.throws(check(cvRecord(refunded, refund), refund, "customer"), /EVIDENCE_MISMATCH/);
+    // A polluted prototype opens no kind.
+    Object.prototype.SYNTHETIC_POLLUTED_KIND = { source: "payment_provider_reconciliation", digestBasis: "RAW_BYTES" };
+    try {
+        assert.throws(check(cvRecord(refunded, refund, { evidenceKind: "SYNTHETIC_POLLUTED_KIND" })), /EVIDENCE_KIND_NOT_ALLOWED/);
+    } finally {
+        delete Object.prototype.SYNTHETIC_POLLUTED_KIND;
+    }
+});
+
+test("CV/4: caseEvidenceBinding covers every listed field, differs from CLOSE and leaves both signatures out", async () => {
+    const { caseEvidenceBinding, CASE_EVIDENCE_BINDING_FIELDS, CASE_ATTESTED_FIELDS } = await cvCore();
+    const { refunded } = await refundedCases();
+    const record = cvRecord(refunded, refunded.financialCases[0]);
+    const base = caseEvidenceBinding(record);
+    // The lists themselves are pinned: a field dropped from either list is a test failure, not a shorter loop.
+    assert.deepEqual(CASE_EVIDENCE_BINDING_FIELDS, ["orderId", "caseId", "reviewId", "caseType", "evidencePolicyVersion",
+        "authorizationRef", "source", "actorId", "evidence.evidenceId", "evidence.evidenceKind", "evidence.source",
+        "evidence.orderId", "evidence.caseId", "evidence.reviewId", "evidence.createdAt", "evidence.digest"]);
+    assert.deepEqual(CASE_ATTESTED_FIELDS, ["purpose", "evidencePolicyVersion", "evidenceId", "evidenceKind", "source",
+        "orderId", "caseId", "reviewId", "caseType", "createdAt", "digest", "digestBasis", "decisionBinding"]);
+    assert.equal(JSON.parse(base).length, 1 + CASE_EVIDENCE_BINDING_FIELDS.length);
+    assert.equal(JSON.parse(base)[0], "UNAI-CASE-EVIDENCE-v1");
+    assert.notEqual(JSON.parse(base)[0], JSON.parse(closeDecisionBinding({}))[0]);
+    for (const path of CASE_EVIDENCE_BINDING_FIELDS) {
+        const changed = structuredClone(record);
+        const keys = path.split(".");
+        keys.slice(0, -1).reduce((value, key) => value[key], changed)[keys.at(-1)] = "synthetic-changed-value";
+        assert.notEqual(caseEvidenceBinding(changed), base, path);
+    }
+    assert.equal(caseEvidenceBinding({ ...record, signature: "other" }), base);
+    assert.equal(caseEvidenceBinding({ ...record, evidence: { ...record.evidence, signature: "other" } }), base);
+    for (const field of ["purpose", "evidencePolicyVersion", "caseId", "caseType", "digest", "digestBasis", "decisionBinding"]) {
+        assert.ok(CASE_ATTESTED_FIELDS.includes(field), field);
+    }
+});
+
+test("CV/5: a case attestation must state every attested field, the digest basis included; the console verdict must bind", async () => {
+    const { checkCaseEvidence, checkCaseEvidenceAttestation, checkCaseRecordVerdict, caseEvidenceBinding } = await cvCore();
+    const { refunded } = await refundedCases();
+    const record = cvRecord(refunded, refunded.financialCases[0]);
+    const request = checkCaseEvidence(record, refunded, refunded.financialCases[0], "finance");
+    const attested = { status: "VERIFIED", verifier: { kind: "SYNTHETIC", id: "synthetic-evidence-service" }, ...request };
+    checkCaseEvidenceAttestation(attested, request);
+    const refusals = [null, true, { ...attested, status: "PENDING" }, { ...attested, verifier: null },
+        { ...attested, verifier: { kind: "OTHER", id: "synthetic-evidence-service" } }];
+    for (const field of Object.keys(request)) refusals.push({ ...attested, [field]: undefined });
+    refusals.push({ ...attested, digestBasis: "JCS_UTF8" }, { ...attested, purpose: "CLOSE" });
+    for (const attestation of refusals) {
+        assert.throws(() => checkCaseEvidenceAttestation(attestation, request), /UNTRUSTED_EVIDENCE/,
+            JSON.stringify(attestation)?.slice(0, 80));
+    }
+    const binding = caseEvidenceBinding(record);
+    checkCaseRecordVerdict({ verified: true, binding }, binding);
+    for (const verdict of [true, null, { verified: true }, { verified: true, binding: `${binding}x` },
+        { verified: "true", binding }]) {
+        assert.throws(() => checkCaseRecordVerdict(verdict, binding), /UNTRUSTED_REVIEW/);
+    }
+});
+
+// ---- DQ-191-02: the CLOSE behaviour of this core is compared with the pinned 2B-2a core (61df9c2d), never checked out:
+// the pinned file is read with `git show` into a temporary copy outside the repository. Same deterministic scenarios,
+// same ids: refusal codes and full committed snapshots, hashes included, must be identical.
+const PINNED_2B2A = "61df9c2d308f57fb85047b7816daf3eca9211746";
+let pinnedLoad = null;
+function pinnedCore() {
+    pinnedLoad ??= (async () => {
+        const { execFileSync } = await import("node:child_process");
+        const { mkdtemp, writeFile, rm } = await import("node:fs/promises");
+        const { tmpdir } = await import("node:os");
+        const { join } = await import("node:path");
+        const { pathToFileURL, fileURLToPath } = await import("node:url");
+        // The repository root holds the pinned commit; a copy of this file outside it (a mutation run) names the
+        // repository in UNAI_PINNED_REPO. A missing commit or git fails the test, never skips it.
+        const repository = process.env.UNAI_PINNED_REPO ?? fileURLToPath(new URL("..", import.meta.url));
+        let source = execFileSync("git", ["show", `${PINNED_2B2A}:studio_order_core/core.mjs`],
+            { cwd: repository, encoding: "utf8", maxBuffer: 16 * 1024 * 1024 })
+            .replaceAll("\r\n", "\n");
+        const calendarImport = `from "./calendar.mjs";`;
+        source = inject(source, calendarImport, "", "after").replace(calendarImport,
+            () => `from ${JSON.stringify(new URL("./calendar.mjs", import.meta.url).href)};`);
+        const dir = await mkdtemp(join(tmpdir(), "unai-pinned-core-"));
+        try {
+            await writeFile(join(dir, "core.mjs"), source);
+            return await import(pathToFileURL(join(dir, "core.mjs")).href);
+        } finally {
+            await rm(dir, { recursive: true, force: true });
+        }
+    })();
+    return pinnedLoad;
+}
+
+async function closeScenarios(factory, synthetic) {
+    let n = 0;
+    const descriptor = Object.getOwnPropertyDescriptor(globalThis.crypto, "randomUUID");
+    Object.defineProperty(globalThis.crypto, "randomUUID", { configurable: true, writable: true, value: () => {
+        n += 1;
+        return `${String(n).padStart(8, "0")}-${String(n).padStart(4, "0")}-4000-8000-${String(n).padStart(12, "0")}`;
+    } });
+    try {
+        let tamper = attestation => attestation;
+        let failing = false;
+        const h = setup({ allowSyntheticEvidence: synthetic, verifyEvidence: async (evidence, request) => {
+            if (failing) throw new Error("synthetic-evidence-service-down");
+            return tamper(syntheticAttestation(evidence, request));
+        } }, null, factory);
+        const out = [];
+        const record = async (label, run) => {
+            try {
+                const value = await run();
+                out.push([label, "COMMITTED", JSON.parse(JSON.stringify(value))]);
+                return value;
+            } catch (error) {
+                out.push([label, error.code ?? `THROW:${error.message}`]);
+                return null;
+            }
+        };
+        const production = attestation => attestation && { ...attestation, verifier: { kind: "PRODUCTION", id: "synthetic-evidence-service" } };
+        const asIs = attestation => attestation;
+        tamper = production;
+        const first = await inReview("DISPUTE", h);
+        const firstRecord = dgRecord(h, first, { digest: dgDigest("diff-used") });
+        await record("first", () => h.resolveReview(first.reviewed, "CLOSE", firstRecord));
+        const usedId = firstRecord.evidence.evidenceId;
+        const usedDigest = dgDigest("diff-used");
+        const usedRef = firstRecord.authorizationRef;
+        const future = "2030-01-01T00:00:00.000Z";
+        const scenarios = [
+            ["fresh-P", {}, {}, production], ["fresh-S", {}, {}, asIs],
+            ["usedId", { evidenceId: usedId }, {}, production], ["usedDigest", { digest: usedDigest }, {}, production],
+            ["usedBoth", { evidenceId: usedId, digest: usedDigest }, {}, production],
+            ["usedRef", {}, { authorizationRef: usedRef }, production],
+            ["usedRef+usedDigest", { digest: usedDigest }, { authorizationRef: usedRef }, production],
+            ["usedRef+usedId-S", { evidenceId: usedId }, { authorizationRef: usedRef }, asIs],
+            ["usedDigest+future", { digest: usedDigest, createdAt: future }, {}, production],
+            ["future", { createdAt: future }, {}, production],
+            ["beforeOrder", { createdAt: "2020-01-01T00:00:00.000Z" }, {}, production],
+            ["upper", { digest: dgDigest("u").toUpperCase() }, {}, production],
+            ["short", { digest: "a".repeat(63) }, {}, production],
+            ["attNull", {}, {}, () => null], ["attTrue", {}, {}, () => true],
+            ["attPending", {}, {}, a => production(a) && { ...production(a), status: "PENDING" }],
+            ["verifierOther", {}, {}, a => a && { ...a, verifier: { kind: "OTHER", id: "synthetic-evidence-service" } }],
+            ["attDigestOther", {}, {}, a => production(a) && { ...production(a), digest: dgDigest("other") }],
+            ["verifierExtra", {}, {}, a => a && { ...a, verifier: { kind: "PRODUCTION", id: "synthetic-evidence-service", extra: "x" } }],
+            ["attPurpose", {}, {}, a => production(a) && { ...production(a), purpose: "FINANCIAL_CASE_EVIDENCE" }],
+            ["usedId-S", { evidenceId: usedId }, {}, asIs],
+            ["verifierThrows", {}, {}, production, { failing: true }],
+            ["duplicateOrder", {}, {}, production, { type: "CANCELLATION", code: "DUPLICATE_ORDER" }],
+            ["fraudPendingLegal", {}, {}, production, { type: "DISPUTE", code: "FRAUD_CONFIRMED" }],
+            ["retry", {}, {}, production, { retry: true }],
+            ["staleVersion", {}, {}, production, { stale: true }]
+        ];
+        for (const [label, evidence, extra, attest, options = {}] of scenarios) {
+            tamper = attest;
+            failing = Boolean(options.failing);
+            const p = await inReview(options.type ?? "DISPUTE", h);
+            const close = h.resolution(p.reviewed, p.id, "CLOSE",
+                { ...h.closeFields(p.reviewed, p.id, options.code ?? DG_CODE, evidence), ...extra });
+            const done = await record(label, () => h.resolveReview(p.reviewed, "CLOSE", close, "finance",
+                options.stale ? { version: p.reviewed.version - 1 } : {}));
+            failing = false;
+            if (options.retry && done) {
+                const requestId = done.events.at(-1).requestId;
+                await record(`${label}-same`, () => h.resolveReview(p.reviewed, "CLOSE", close, "finance", { requestId }));
+                const changed = h.resolution(p.reviewed, p.id, "CLOSE", h.closeFields(p.reviewed, p.id, DG_CODE));
+                await record(`${label}-changed`, () => h.resolveReview(p.reviewed, "CLOSE", changed, "finance", { requestId }));
+            }
+        }
+        return out;
+    } finally {
+        if (descriptor) Object.defineProperty(globalThis.crypto, "randomUUID", descriptor);
+        else delete globalThis.crypto.randomUUID;
+    }
+}
+
+test("DIFF/1 (DQ-191-02): CLOSE codes and committed snapshots, hashes included, equal the pinned 2B-2a core", async () => {
+    const pinned = await pinnedCore();
+    for (const synthetic of [true, false]) {
+        const before = await closeScenarios(pinned.createCore, synthetic);
+        const after = await closeScenarios(createCore, synthetic);
+        assert.equal(after.length, before.length);
+        assert.ok(before.length >= 28);
+        for (let i = 0; i < before.length; i++) assert.deepEqual(after[i], before[i], `synthetic=${synthetic} ${before[i][0]}`);
+        // The comparison is not vacuous: commits and refusals both occur.
+        assert.ok(before.some(entry => entry[1] === "COMMITTED") && before.some(entry => entry[1] !== "COMMITTED"));
+    }
+});
+
+test("T-S/6: the 2B-2b gate and storage helpers are synchronous; the purpose policy and claim carry the dispatch's command", async () => {
+    const source = await coreSource();
+    for (const start of ["function findEvidence(", "function storedEvidenceLocations(snapshot) {",
+        "function claimsMatchStoredLocations(before, after, claims) {",
+        "function evidenceOnlyInRegisteredPlaces(before, after, audit, claims) {",
+        "function evidenceHistoryKept(before, after) {", "function caseEvidenceRule(caseType, evidenceKind, source) {",
+        "export function checkCaseEvidence(record, order, item, role) {",
+        "export function checkCaseEvidenceAttestation(attestation, request) {",
+        "export function checkCaseRecordVerdict(signed, binding) {"]) {
+        assert.doesNotMatch(sourceBlock(source, start, "\n}\n"), /\bawait\b|\basync\b|\.then\(/, start);
+    }
+    const gate = sourceBlock(source, "        const claimEvidence = (purpose, request, attestation) => {", "\n        };\n");
+    assert.match(gate, /policy\.commands\.includes\(command\.kind\), "EVIDENCE_PURPOSE_MISMATCH"/);
+    assert.match(gate, /command: command\.kind, storage: policy\.storage/);
+    assert.equal(occurrences(source, "evidenceClaims.push("), 1);
+    // The 2B-2b checks run before any await of the commit block; the registry re-check and writes are unchanged.
+    const commit = sourceBlock(source, "        requireThat(evidenceHistoryKept(order, next), \"EVIDENCE_HISTORY_CHANGED\");",
+        "        recordClaims();");
+    assert.ok(commit.indexOf("EVIDENCE_STORAGE_INVALID") < commit.indexOf("await digest(event)"));
+});
+
+test("PB/18: a claim that bypasses the gate is refused at commit unless bound to this command and its purpose's place", async () => {
+    const { refunded, claim } = await ecSetup();
+    const base = { purpose: "FINANCIAL_CASE_EVIDENCE", command: "probe_claim", storage: "CASE_EVIDENCE", ...ecItem("pb18"),
+        orderId: refunded.id, caseId: "case-0001", verifier: { kind: "SYNTHETIC", id: "synthetic-evidence-service" } };
+    const refusals = [{ ...base, command: "take_case" }, { ...base, command: "resolve_review" }, { ...base, command: undefined },
+        { ...base, storage: "REVIEW_RESOLUTION" }, { ...base, storage: undefined }, { ...base, caseId: null },
+        { ...base, purpose: "CLOSE", storage: "REVIEW_RESOLUTION", caseId: null }];
+    for (const raw of refusals) {
+        await assert.rejects(claim(refunded, { raw: [raw], freezeRaw: true, storeRaw: true }), /EVIDENCE_MISMATCH/,
+            JSON.stringify(raw).slice(0, 120));
+    }
+    await ecCommitsCleanly(claim, refunded, [ecItem("pb18")]);
+});
+
+// ---- Görev 197 (Faz 2B-2b remediation; DQ-195-01…06, DQ-196-01) ----
+//   MUT/N-xx  one repository test for each mutant the Görev 194 audit found unguarded by this suite
+//   NE/*      evidence nested anywhere, cycles, the depth and size limits and non-plain data (A194-01, DQ-195-04)
+//   EL/*      the event log is append-only and scanned (A194-02, DQ-195-03)
+//   AB/*      case attestations bind all 13 fields, the canonical order and review, and only own fields (A194-03)
+//   AS/*      what changes while the commit is suspended is refused after the last await (A194-05, DQ-195-06)
+//   T-S/7     the structural lock of the post-await re-check
+// Every refusal is followed by a clean commit of the same evidence on the unchanged snapshot: nothing was consumed.
+
+/** A second refunded order of the same probe core: another order with its own case-0001. */
+async function scOtherOrder(h) {
+    return (await refundedCases(h)).refunded;
+}
+
+/** A refusal by the pre-check: the store is refused and the commit block's awaits were never reached (T-S/6 states
+ * that the 2B-2b checks run before them; this is the behavioural side of that contract). */
+async function scRefusedBeforeAwait(store, order, data, expected, label) {
+    const probe = await scProbeCore();
+    let reached = 0;
+    probe.setProbeAwaitHook(() => { reached += 1; });
+    try {
+        await assert.rejects(store(order, data), expected, label);
+    } finally {
+        probe.setProbeAwaitHook(null);
+    }
+    assert.equal(reached, 0, `${label}: refused before the commit's awaits`);
+}
+
+test("MUT/N-02: evidence stored one level below a registered case entry is EVIDENCE_STORAGE_INVALID, claimed or not", async () => {
+    const { refunded, store } = await scSetup();
+    const a = scItem("n02-a");
+    await assert.rejects(store(refunded, { claims: [a], put: [[a]] }), /EVIDENCE_STORAGE_INVALID/, "claimed");
+    await assert.rejects(store(refunded, { put: [[a]] }), /EVIDENCE_STORAGE_INVALID/, "unclaimed");
+    await scCleanAfter(store, refunded, a);
+});
+
+test("MUT/N-05: the transition's audit may mirror only at audit.evidence; evidence below it is EVIDENCE_STORAGE_INVALID", async () => {
+    const { refunded, store } = await scSetup();
+    const a = scItem("n05-a");
+    const b = scItem("n05-b");
+    // Refused by the pre-check itself: the event log scan after the await would refuse it too, later.
+    await scRefusedBeforeAwait(store, refunded, { claims: [a], mode: "audit", mirror: { ...a, evidence: b } },
+        /EVIDENCE_STORAGE_INVALID/, "audit.evidence.evidence below a known mirror");
+    await scRefusedBeforeAwait(store, refunded, { claims: [a], mode: "audit", mirror: { evidence: a } },
+        /EVIDENCE_STORAGE_INVALID/, "audit.evidence.evidence");
+    await scCleanAfter(store, refunded, a);
+});
+
+test("MUT/N-06: renaming a case that holds evidence is EVIDENCE_HISTORY_CHANGED", async () => {
+    const { refunded, store } = await scSetup();
+    const held = await store(refunded, { claims: [scItem("n06-a")] });
+    await assert.rejects(store(held, { mode: "rename" }), /EVIDENCE_HISTORY_CHANGED/);
+    await scCleanAfter(store, held, scItem("n06-b"));
+});
+
+test("MUT/N-07: turning a case's evidence list into an object is EVIDENCE_HISTORY_CHANGED", async () => {
+    const { refunded, store } = await scSetup();
+    const held = await store(refunded, { claims: [scItem("n07-a"), scItem("n07-b")] });
+    await assert.rejects(store(held, { mode: "non_array" }), /EVIDENCE_HISTORY_CHANGED/);
+    await scCleanAfter(store, held, scItem("n07-c"));
+});
+
+test("MUT/N-10: a bypassing claim of case evidence bound to the CLOSE storage is EVIDENCE_MISMATCH", async () => {
+    const { refunded, claim } = await ecSetup();
+    const raw = { purpose: "FINANCIAL_CASE_EVIDENCE", command: "probe_claim", storage: "REVIEW_RESOLUTION",
+        ...ecItem("n10"), orderId: refunded.id, caseId: null, verifier: { kind: "SYNTHETIC", id: "synthetic-evidence-service" } };
+    await assert.rejects(claim(refunded, { raw: [raw], freezeRaw: true, storeRaw: true }), /EVIDENCE_MISMATCH/);
+    await ecCommitsCleanly(claim, refunded, [ecItem("n10")]);
+});
+
+test("MUT/N-16: the gate judges the canonical case before the policy version", async () => {
+    const { refunded, store } = await scSetup();
+    const a = scItem("n16-a");
+    await assert.rejects(store(refunded, { claims: [a], request: { caseId: "case-9999", evidencePolicyVersion: "v1.0" } }),
+        /EVIDENCE_MISMATCH/);
+    await scCleanAfter(store, refunded, a);
+});
+
+test("MUT/N-17: a history change is reported before a storage fault in the same transition", async () => {
+    const { refunded, store } = await scSetup();
+    const held = await store(refunded, { claims: [scItem("n17-a"), scItem("n17-b")] });
+    await assert.rejects(store(held, { mode: "delete_and_decisions", put: [scItem("n17-c")] }), /EVIDENCE_HISTORY_CHANGED/);
+    await scCleanAfter(store, held, scItem("n17-c"));
+});
+
+test("MUT/N-30: a case audit trail mirror may not hold evidence below its own evidence field", async () => {
+    const { refunded, store } = await scSetup();
+    const a = scItem("n30-a");
+    await assert.rejects(store(refunded, { claims: [a], mode: "trail", mirror: { inner: a } }), /EVIDENCE_STORAGE_INVALID/);
+    await scCleanAfter(store, refunded, a);
+});
+
+test("NE/1: evidence nested in a registered case entry is EVIDENCE_STORAGE_INVALID, even when claimed", async () => {
+    const { refunded, store } = await scSetup();
+    const a = scItem("ne1-a");
+    const b = scItem("ne1-b");
+    const nested = [[{ ...a, extra: b }], [{ ...a, extra: { note: [b] } }], [{ ...a, extra: { evidenceId: b.evidenceId } }],
+        [{ ...a, extra: { digest: b.digest } }], [{ ...a, extra: { ...a } }]];
+    for (const put of nested) {
+        await assert.rejects(store(refunded, { claims: [a], put }), /EVIDENCE_STORAGE_INVALID/, JSON.stringify(put));
+    }
+    await assert.rejects(store(refunded, { claims: [a, b], put: [{ ...a, extra: b }] }), /EVIDENCE_STORAGE_INVALID/,
+        "both claimed, one nested");
+    await scCleanAfter(store, refunded, a);
+});
+
+test("NE/2: evidence nested in a mirror (the transition's audit, a case audit trail entry) is EVIDENCE_STORAGE_INVALID", async () => {
+    const { refunded, store } = await scSetup();
+    const a = scItem("ne2-a");
+    const b = scItem("ne2-b");
+    for (const mode of ["audit", "trail"]) {
+        for (const mirror of [{ ...a, inner: b }, { ...a, inner: { ...a } }, { ...a, list: [{ note: b }] }]) {
+            await assert.rejects(store(refunded, { claims: [a], mode, mirror }), /EVIDENCE_STORAGE_INVALID/,
+                `${mode} ${JSON.stringify(mirror)}`);
+        }
+    }
+    // A plain mirror of the claimed evidence still commits (PB/7).
+    const mirrored = await store(refunded, { claims: [a], mode: "trail", mirror: a });
+    assert.deepEqual(mirrored.financialCases[0].auditTrail.at(-1).evidence, a);
+});
+
+test("NE/3: a cycle is refused without a stack overflow; one object reached on several paths is not a cycle", async () => {
+    const { refunded, store } = await scSetup();
+    const a = scItem("ne3-a");
+    for (const shape of ["cycle", "array_cycle"]) {
+        await assert.rejects(store(refunded, { mode: "shape", shape }), /EVIDENCE_STORAGE_INVALID/, shape);
+        await assert.rejects(store(refunded, { mode: "shape", shape, put: [a] }), /EVIDENCE_STORAGE_INVALID/, `${shape} + evidence`);
+    }
+    const shared = await store(refunded, { mode: "shape", shape: "shared" });
+    assert.equal(shared.version, refunded.version + 1);
+    const note = shared.financialCases[0].note;
+    assert.equal(note.a, note.b[0]);
+    assert.equal(note.a, note.b[1].c);
+    const { probeFindEvidence } = await scProbeCore();
+    const loop = { step: "PROBE" };
+    loop.next = { back: [loop] };
+    assert.equal(probeFindEvidence({ root: loop }).found, null);
+    const once = { ...a };
+    assert.deepEqual(probeFindEvidence({ x: once, y: [once] }).found, [["x"], ["y", "0"]]);
+});
+
+test("NE/4: CLOSE keeps one evidence object in its resolution, audit and event; later transitions still commit", async () => {
+    const probe = await scProbeCore();
+    const h = setup({}, null, probe.createCore);
+    const p = await inReview("DISPUTE", h);
+    const closed = await dgClosesCleanly(h, p, dgRecord(h, p, { digest: dgDigest("ne4") }));
+    assert.equal(closed.reviews.at(-1).resolution.evidence, closed.events.at(-1).audit.evidence);
+    assert.deepEqual(probe.probeFindEvidence(closed).found.map(path => path.join(".")).sort(),
+        [`events.${closed.events.length - 1}.audit.evidence`, `reviews.${closed.reviews.length - 1}.resolution.evidence`]);
+    const later = await h.core.dispatch(closed, { kind: "probe_store", requestId: "synthetic-ne4-noop",
+        expectedVersion: closed.version, data: { mode: "noop" } }, h.actor("finance", closed, SERVER, "synthetic-finance-ne4"));
+    assert.equal(later.version, closed.version + 1);
+    assert.ok(closed.events.every((event, index) => later.events[index] === event));
+    assert.equal(later.reviews.at(-1).resolution.evidence, closed.reviews.at(-1).resolution.evidence);
+});
+
+test("NE/5 (depth): the deepest object may sit at path length 64; 65 and far deeper are refused without a stack overflow", async (t) => {
+    const { refunded, store } = await scSetup();
+    const { PROBE_SCAN_LIMITS, probeFindEvidence } = await scProbeCore();
+    assert.deepEqual({ ...PROBE_SCAN_LIMITS }, { depth: 64, nodes: 200000 });
+    // The note sits at path length 3 (financialCases, 0, note): `objects` nested objects end at length 2 + objects.
+    await assert.rejects(store(refunded, { mode: "deep", objects: 63 }), /EVIDENCE_STORAGE_INVALID/, "65");
+    const started = performance.now();
+    await assert.rejects(store(refunded, { mode: "deep", objects: 100000 }), /EVIDENCE_STORAGE_INVALID/, "100000");
+    t.diagnostic(`depth 100002 refused in ${(performance.now() - started).toFixed(1)} ms`);
+    // The refusals left the snapshot current: the deepest allowed note commits as its next version.
+    const deepest = await store(refunded, { mode: "deep", objects: 62 });
+    assert.equal(deepest.version, refunded.version + 1);
+    // The scan itself: a chain of n objects from the root ends at path length n - 1.
+    const chain = n => {
+        let value = {};
+        for (let level = 1; level < n; level += 1) value = { d: value };
+        return value;
+    };
+    assert.deepEqual(probeFindEvidence(chain(65)).found, []);
+    assert.equal(probeFindEvidence(chain(66)).found, null);
+    await scCleanAfter(store, deepest, scItem("ne5-depth"));
+});
+
+test("NE/5 (nodes): one scan visits at most 200000 objects; the order and the commit stay within it, a DAG cannot explode it", async (t) => {
+    const { refunded, store } = await scSetup();
+    const { probeFindEvidence } = await scProbeCore();
+    const flat = n => Array.from({ length: n }, () => ({}));
+    assert.equal(probeFindEvidence(flat(199999)).used, 200000);
+    assert.deepEqual(probeFindEvidence(flat(199999)).found, []);
+    assert.equal(probeFindEvidence(flat(200000)).found, null);
+    // Shared references are visited per path (no global seen-set), so a DAG with 2^40 paths hits the budget at once.
+    let dag = {};
+    for (let level = 0; level < 40; level += 1) dag = { l: dag, r: dag };
+    let started = performance.now();
+    assert.equal(probeFindEvidence(dag).found, null);
+    t.diagnostic(`DAG with 2^40 paths refused in ${(performance.now() - started).toFixed(1)} ms`);
+    // End to end: the order, the note's array, its objects and (after the await) the new event share the budget.
+    const base = probeFindEvidence(refunded).used;
+    t.diagnostic(`objects in the refunded test order: ${base}`);
+    assert.ok(base > 0 && base < 1000);
+    const largest = 200000 - base - 2;
+    // One object over passes the pre-check and is refused by the re-check after the await, which also counts the event.
+    await assert.rejects(store(refunded, { mode: "wide", count: largest + 1 }), /EVIDENCE_STORAGE_INVALID/, "one over");
+    await assert.rejects(store(refunded, { mode: "wide", count: 300000 }), /EVIDENCE_STORAGE_INVALID/, "far over");
+    started = performance.now();
+    const filled = await store(refunded, { mode: "wide", count: largest });
+    t.diagnostic(`commit with a ${largest}-object note (two full scans) in ${(performance.now() - started).toFixed(1)} ms`);
+    assert.equal(filled.version, refunded.version + 1);
+    // A typical commit stays cheap.
+    const fresh = await scSetup();
+    started = performance.now();
+    await scCleanAfter(fresh.store, fresh.refunded, scItem("ne5-nodes"));
+    t.diagnostic(`typical probe commit in ${(performance.now() - started).toFixed(1)} ms`);
+});
+
+test("NE/5 (budget): the order and the transition's audit share one scan budget; the pre-check refuses the excess", async () => {
+    const { refunded, store } = await scSetup();
+    // About 199 992 objects in the audit alone fit the limit; with the order's own objects they do not.
+    const mirror = Array.from({ length: 199990 }, () => ({}));
+    await scRefusedBeforeAwait(store, refunded, { mode: "audit", mirror }, /EVIDENCE_STORAGE_INVALID/, "audit + order");
+    await scCleanAfter(store, refunded, scItem("ne5-budget"));
+});
+
+test("NE/6: non-plain data anywhere in the order is EVIDENCE_STORAGE_INVALID (fail-closed); plain and null-prototype data commit", async () => {
+    const { refunded, store } = await scSetup();
+    const a = scItem("ne6-a");
+    const refused = ["map", "set", "date", "instance", "symbol_key", "accessor", "hidden", "array_key", "function",
+        "symbol_value", "bigint"];
+    for (const shape of refused) {
+        await assert.rejects(store(refunded, { mode: "shape", shape }), /EVIDENCE_STORAGE_INVALID/, shape);
+        await assert.rejects(store(refunded, { mode: "shape", shape, put: [a] }), /EVIDENCE_STORAGE_INVALID/, `${shape} + evidence`);
+    }
+    const held = await scCleanAfter(store, refunded, a);
+    const plain = await store(held, { mode: "shape", shape: "plain" });
+    assert.equal(plain.version, held.version + 1);
+    const nullProto = await store(plain, { mode: "shape", shape: "null_proto" });
+    assert.equal(nullProto.version, plain.version + 1);
+});
+
+test("EL/1: deleting, reordering, replacing or adding events is EVIDENCE_HISTORY_CHANGED and consumes nothing", async () => {
+    const { refunded, store } = await scSetup();
+    const a = scItem("ev1-a");
+    for (const mode of ["event_drop", "event_pop", "event_reorder", "event_replace", "event_append", "event_evidence"]) {
+        await assert.rejects(store(refunded, { mode, put: [a] }), /EVIDENCE_HISTORY_CHANGED/, mode);
+        await assert.rejects(store(refunded, { mode, claims: [a] }), /EVIDENCE_HISTORY_CHANGED/, `${mode} claimed`);
+    }
+    await scCleanAfter(store, refunded, a);
+});
+
+test("EL/2: a commit appends exactly its own event; earlier events stay the same objects and the hash chain holds", async () => {
+    const { refunded, store } = await scSetup();
+    const next = await store(refunded, { claims: [scItem("ev2-a")], mode: "audit", mirror: scItem("ev2-a") });
+    assert.equal(next.events.length, refunded.events.length + 1);
+    assert.ok(refunded.events.every((event, index) => next.events[index] === event));
+    const event = next.events.at(-1);
+    assert.equal(event.previousHash, refunded.events.at(-1).hash);
+    const { hash, ...hashed } = event;
+    assert.equal(createHash("sha256").update(JSON.stringify(hashed)).digest("hex"), hash);
+    assert.deepEqual(event.audit.evidence, scItem("ev2-a"));
+});
+
+test("EL/3: the event log is scanned: an event may mirror only known evidence, at its audit.evidence", async () => {
+    const { refunded } = await scSetup();
+    const { probeEvidenceOnly } = await scProbeCore();
+    const x = scItem("ev3-x");
+    const y = scItem("ev3-y");
+    const withEvent = event => ({ ...refunded, events: [...refunded.events, event] });
+    assert.equal(probeEvidenceOnly(refunded, withEvent({ audit: { evidence: x } }), null, [x]), true);
+    assert.equal(probeEvidenceOnly(refunded, withEvent({ audit: { evidence: x } }), null, []), false);
+    assert.equal(probeEvidenceOnly(refunded, withEvent({ note: x }), null, [x]), false);
+    assert.equal(probeEvidenceOnly(refunded, withEvent({ audit: { inner: x } }), null, [x]), false);
+    assert.equal(probeEvidenceOnly(refunded, withEvent({ audit: { evidence: { ...x, inner: y } } }), null, [x, y]), false);
+    assert.equal(probeEvidenceOnly(refunded, refunded, null, []), true);
+});
+
+test("AB/1: a case attestation must state each of the 13 attested fields as the request does; another order's is refused", async () => {
+    const { h, refunded, store } = await scSetup();
+    const { CASE_ATTESTED_FIELDS } = await import("./core.mjs");
+    const a = scItem("ab1-a");
+    for (const field of CASE_ATTESTED_FIELDS) {
+        for (const value of ["synthetic-other-value", undefined]) {
+            await assert.rejects(store(refunded, { claims: [a], attestation: { [field]: value } }), /UNTRUSTED_EVIDENCE/,
+                `${field}=${value}`);
+        }
+    }
+    // The ADV/02-loose case: every order has a case-0001; an attestation given for another order's case is refused.
+    const other = await scOtherOrder(h);
+    const foreign = other.financialCases[0];
+    assert.equal(foreign.caseId, "case-0001");
+    await assert.rejects(store(refunded, { claims: [a], attestation: { orderId: other.id } }), /UNTRUSTED_EVIDENCE/);
+    await assert.rejects(store(refunded, { claims: [a], attestation: { orderId: other.id, reviewId: foreign.origin.reviewId,
+        createdAt: foreign.createdAt } }), /UNTRUSTED_EVIDENCE/);
+    await scCleanAfter(store, refunded, a);
+});
+
+test("AB/2: the case request must name this order and the canonical case's review, state the purpose and carry every field", async () => {
+    const { h, refunded, store } = await scSetup();
+    const a = scItem("ab2-a");
+    const other = await scOtherOrder(h);
+    const both = change => ({ claims: [a], request: change, attestation: change });
+    const refusals = [{ orderId: other.id }, { reviewId: "review-9999" }, { orderId: other.id, reviewId: "review-9999" },
+        { purpose: "CLOSE" }, { purpose: undefined }, { createdAt: undefined }, { createdAt: 12345 },
+        { decisionBinding: undefined }, { decisionBinding: null }];
+    for (const change of refusals) {
+        await assert.rejects(store(refunded, both(change)), /EVIDENCE_MISMATCH/, JSON.stringify(change));
+    }
+    await scCleanAfter(store, refunded, a);
+});
+
+test("AB/3: an attested field inherited from the attestation's prototype is UNTRUSTED_EVIDENCE (gate and case contract)", async () => {
+    const { refunded, store } = await scSetup();
+    const { CASE_ATTESTED_FIELDS, checkCaseEvidence, checkCaseEvidenceAttestation } = await import("./core.mjs");
+    const a = scItem("ab3-a");
+    for (const field of CASE_ATTESTED_FIELDS) {
+        await assert.rejects(store(refunded, { claims: [a], inherit: [field] }), /UNTRUSTED_EVIDENCE/, field);
+    }
+    const next = await store(refunded, { claims: [a], inherit: [] });
+    assert.equal(next.version, refunded.version + 1);
+    // The pure case contract reads own fields only, too.
+    const item = refunded.financialCases[0];
+    const request = checkCaseEvidence(cvRecord(refunded, item), refunded, item, "finance");
+    const attested = { status: "VERIFIED", verifier: { kind: "SYNTHETIC", id: "synthetic-evidence-service" }, ...request };
+    checkCaseEvidenceAttestation(attested, request);
+    for (const field of CASE_ATTESTED_FIELDS) {
+        const { [field]: moved, ...own } = attested;
+        assert.throws(() => checkCaseEvidenceAttestation(Object.assign(Object.create({ [field]: moved }), own), request),
+            /UNTRUSTED_EVIDENCE/, field);
+    }
+});
+
+test("AS/1: claims, orders, event logs or audits changed while the commit awaits are refused after the last await", async () => {
+    const { refunded, store } = await scSetup();
+    const probe = await scProbeCore();
+    const a = scItem("as1-a");
+    const b = scItem("as1-b");
+    const pushClaim = scope => scope.evidenceClaims.push({ ...scope.evidenceClaims[0], ...b });
+    // add_case_evidence is bound to the purpose, but it is not this dispatch's command.
+    const otherCommand = scope => scope.evidenceClaims.push(Object.freeze({ ...scope.evidenceClaims[0], ...b,
+        command: "add_case_evidence" }));
+    // The transition's own event is swapped for another one as it is appended.
+    const substituted = scope => {
+        const forged = { ...scope.event, kind: "forged" };
+        Object.defineProperty(scope.next.events, "push", { value() { return Array.prototype.push.call(this, forged); } });
+    };
+    const storeUnclaimed = scope => scope.next.financialCases[0].evidenceReferences.push({ ...b });
+    const outside = scope => { scope.next.probeNote = { ...b }; };
+    const moveToOtherCase = scope => {
+        const cases = scope.next.financialCases;
+        cases[1] = { ...cases[1], evidenceReferences: [...cases[1].evidenceReferences, cases[0].evidenceReferences.pop()] };
+    };
+    const cases = [
+        // [stage, label, change, data, expected]
+        ["hash", "unfrozen claim", pushClaim, {}, /EVIDENCE_MISMATCH/],
+        ["hash", "claim of another command", otherCommand, {}, /EVIDENCE_MISMATCH/],
+        ["hash", "event dropped", scope => scope.next.events.shift(), {}, /EVIDENCE_HISTORY_CHANGED/],
+        ["hash", "own event substituted", substituted, {}, /EVIDENCE_HISTORY_CHANGED/],
+        ["hash", "case renamed", scope => { scope.next.financialCases[0].caseId = "case-0099"; }, {}, /EVIDENCE_HISTORY_CHANGED/],
+        ["hash", "evidence outside a place", outside, {}, /EVIDENCE_STORAGE_INVALID/],
+        ["hash", "evidence nested in the audit", scope => { scope.audit.extra = { ...b }; }, { mode: "audit", mirror: a },
+            /EVIDENCE_STORAGE_INVALID/],
+        ["hash", "unclaimed evidence stored", storeUnclaimed, {}, /EVIDENCE_NOT_CLAIMED/],
+        ["hash", "evidence moved to another case", moveToOtherCase, {}, /EVIDENCE_STORAGE_INVALID/],
+        ["cases", "unclaimed evidence stored", storeUnclaimed, {}, /EVIDENCE_NOT_CLAIMED/],
+        ["cases", "evidence outside a place", outside, {}, /EVIDENCE_STORAGE_INVALID/],
+        ["cases", "event appended", scope => scope.next.events.push({ sequence: 0, kind: "probe" }), {}, /EVIDENCE_HISTORY_CHANGED/]
+    ];
+    try {
+        for (const [stage, label, change, data, expected] of cases) {
+            let fired = 0;
+            probe.setProbeAwaitHook((at, scope) => {
+                if (at === stage && fired === 0) {
+                    fired += 1;
+                    change(scope);
+                }
+            });
+            await assert.rejects(store(refunded, { claims: [a], ...data }), expected, `${stage}: ${label}`);
+            assert.equal(fired, 1, `${stage}: ${label} ran`);
+        }
+        // A hook that changes nothing lets the same claim commit.
+        probe.setProbeAwaitHook(() => {});
+        const next = await scCleanAfter(store, refunded, a);
+        // Neither a nor b was consumed by the refusals: b is still free.
+        await scCleanAfter(store, next, b);
+    } finally {
+        probe.setProbeAwaitHook(null);
+    }
+});
+
+test("MUT/A198-02,03 (F198-05): a registered place is anchored at path[0]; the same tail under another root is EVIDENCE_STORAGE_INVALID", async () => {
+    const { refunded, store } = await scSetup();
+    const probe = await scProbeCore();
+    const a = scItem("p0-a");
+    const b = scItem("p0-b");
+    assert.ok(refunded.reviews.length > 0 && refunded.financialCases.length > 0);
+    // Each misplacement keeps the registered tail (resolution.evidence, evidenceReferences[i]) under the wrong root.
+    const misplaced = [
+        // A198-02: the review place's tail under financialCases.
+        ["financialCases[0].resolution.evidence", next => {
+            next.financialCases = next.financialCases.map((item, index) => (index === 0
+                ? { ...item, resolution: { evidence: { ...b } } } : item));
+        }],
+        // A198-03: the case place's tail under reviews and under another top-level array.
+        ["reviews[0].evidenceReferences[0]", next => {
+            next.reviews = next.reviews.map((review, index) => (index === 0
+                ? { ...review, evidenceReferences: [{ ...b }] } : review));
+        }],
+        ["probeList[0].evidenceReferences[0]", next => { next.probeList = [{ evidenceReferences: [{ ...b }] }]; }]
+    ];
+    // Pre-check invariant (pure): the registered places themselves are accepted, the misplaced tails are not.
+    const copy = () => ({ ...refunded, reviews: [...refunded.reviews], financialCases: [...refunded.financialCases] });
+    const inCase = copy();
+    inCase.financialCases[0] = { ...inCase.financialCases[0],
+        evidenceReferences: [...inCase.financialCases[0].evidenceReferences, { ...b }] };
+    assert.equal(probe.probeEvidenceOnly(refunded, inCase, null, []), true, "financialCases[0].evidenceReferences");
+    const inReviewPlace = copy();
+    inReviewPlace.reviews[0] = { ...inReviewPlace.reviews[0], resolution: { ...inReviewPlace.reviews[0].resolution, evidence: { ...b } } };
+    assert.equal(probe.probeEvidenceOnly(refunded, inReviewPlace, null, []), true, "reviews[0].resolution.evidence");
+    for (const [label, change] of misplaced) {
+        const next = copy();
+        change(next);
+        assert.equal(probe.probeEvidenceOnly(refunded, next, null, []), false, `pure: ${label}`);
+    }
+    // Commit-time invariant (dispatch): unclaimed evidence placed there while the commit awaits is refused.
+    try {
+        for (const [label, change] of misplaced) {
+            let fired = 0;
+            probe.setProbeAwaitHook((at, scope) => {
+                if (at === "hash" && fired === 0) {
+                    fired += 1;
+                    change(scope.next);
+                }
+            });
+            await assert.rejects(store(refunded, { claims: [a] }), /EVIDENCE_STORAGE_INVALID/, `dispatch: ${label}`);
+            assert.equal(fired, 1, `dispatch: ${label} ran`);
+        }
+        probe.setProbeAwaitHook(() => {});
+        const next = await scCleanAfter(store, refunded, a);
+        await scCleanAfter(store, next, b);
+    } finally {
+        probe.setProbeAwaitHook(null);
+    }
+});
+
+test("PB/18b: a bypassing claim naming another command bound to the same purpose is EVIDENCE_MISMATCH", async () => {
+    const { refunded, claim } = await ecSetup();
+    // add_case_evidence is bound to FINANCIAL_CASE_EVIDENCE, but the dispatch's command is probe_claim.
+    const raw = { purpose: "FINANCIAL_CASE_EVIDENCE", command: "add_case_evidence", storage: "CASE_EVIDENCE",
+        ...ecItem("pb18b"), orderId: refunded.id, caseId: "case-0001", verifier: { kind: "SYNTHETIC", id: "synthetic-evidence-service" } };
+    await assert.rejects(claim(refunded, { raw: [raw], freezeRaw: true, storeRaw: true }), /EVIDENCE_MISMATCH/);
+    await ecCommitsCleanly(claim, refunded, [ecItem("pb18b")]);
+});
+
+test("T-S/7 (A194-05): after the last await the commit re-runs the pre-check's evidence invariants, in order, before any write", async () => {
+    const source = await coreSource();
+    const checks = arg => [`claimsBoundToCommand(evidenceClaims, order.id, command.kind), "EVIDENCE_MISMATCH"`,
+        `eventHistoryKept(order, next, ${arg}), "EVIDENCE_HISTORY_CHANGED"`,
+        `evidenceHistoryKept(order, next), "EVIDENCE_HISTORY_CHANGED"`,
+        `evidenceOnlyInRegisteredPlaces(order, next, audit, evidenceClaims), "EVIDENCE_STORAGE_INVALID"`,
+        `claimsMatchStoredEvidence(order, next, evidenceClaims), "EVIDENCE_NOT_CLAIMED"`,
+        `claimsMatchStoredLocations(order, next, evidenceClaims), "EVIDENCE_STORAGE_INVALID"`].map(check => `requireThat(${check});`);
+    const pre = sourceBlock(source, "        requireThat(claimsBoundToCommand(", "        next.version += 1;");
+    const commit = sourceBlock(source, "        event.hash = await digest(event);", "        recordClaims();");
+    for (const [name, block, arg] of [["pre-check", pre, "null"], ["commit", commit, "event"]]) {
+        const at = checks(arg).map(check => block.indexOf(check));
+        assert.ok(at.every(index => index >= 0), `${name}: ${JSON.stringify(at)}`);
+        assert.deepEqual([...at].sort((x, y) => x - y), at, `${name}: order`);
+        for (const check of checks(arg)) assert.equal(occurrences(block, check), 1, `${name}: ${check}`);
+    }
+    const last = commit.indexOf(checks("event").at(-1));
+    assert.ok(last < commit.indexOf("assertClaimsFree();") && last < commit.indexOf("orders.set(order.id, committed);"));
+    assert.ok(commit.indexOf(checks("event")[0]) > commit.indexOf("next.events.push(event);"));
+    assert.equal(occurrences(commit, "await"), 1);
+    for (const start of ["function eventHistoryKept(before, after, appendedEvent) {",
+        "function claimsBoundToCommand(claims, orderId, kind) {", "function findEvidence(root, rootPath, budget) {"]) {
+        assert.doesNotMatch(sourceBlock(source, start, "\n}\n"), /\bawait\b|\basync\b|\.then\(/, start);
+    }
+    // The scan is iterative (it never calls itself) and the event log is no longer left out.
+    assert.equal(occurrences(sourceBlock(source, "function findEvidence(root, rootPath, budget) {", "\n}\n"), "findEvidence("), 1);
+    assert.doesNotMatch(source, /key !== "events"/);
+    assert.match(source, /const EVIDENCE_SCAN_MAX_DEPTH = 64;/);
+    assert.match(source, /const EVIDENCE_SCAN_MAX_NODES = 200000;/);
 });

@@ -308,13 +308,52 @@ const ATTESTED_FIELDS = Object.freeze(["evidenceId", "evidenceKind", "source", "
     "digest", "financialObligation", "linkedOrderId", "finding", "closeReasonPolicy", "reasonCode", "decision",
     "decisionBinding"]);
 const EVIDENCE_VERIFIER_KINDS = Object.freeze(["PRODUCTION", "SYNTHETIC"]);
-// Görev 185 (2B-2a): what a claim consumes evidence for. Financial case evidence joins in a later phase (2B-2b/2B-3).
-const EVIDENCE_PURPOSES = Object.freeze(["CLOSE"]);
+/** Görev 193 (Faz 2B-2b; D165-03, D165-04, DR-1/V-A, DQ-183-01): the closed, versioned financial case evidence policy.
+ * Only the listed (case type, evidence kind, source) triples are accepted; CUSTOMER_CLOSURE_CONFIRMATION waits for legal
+ * review. digestBasis names the canonical bytes of the versioned evidence-service contract (RAW_BYTES: the bytes as
+ * received; JCS_UTF8: RFC 8785 JCS output as UTF-8). The service states the basis it used in its attestation and the
+ * core compares it with this expected value; the core never sees the content and cannot verify the computation itself
+ * (A178-07). This evidence policy does not change a case's own policyVersion (UNAI-FINANCIAL-CASE-v1.0). */
+export const CASE_EVIDENCE_POLICY = freezeDeep({
+    reference: "UNAI-FINANCIAL-CASE-EVIDENCE-v1.1",
+    kinds: {
+        ORDER_REFUND: {
+            PAYMENT_PROVIDER_RECORD: { source: "payment_provider_reconciliation", digestBasis: "RAW_BYTES" },
+            PROVIDER_DISPUTE_OUTCOME: { source: "payment_provider_reconciliation", digestBasis: "RAW_BYTES" }
+        },
+        UNDELIVERED_REVISION: {
+            REVISION_DELIVERY_RECORD: { source: "producer_console", digestBasis: "JCS_UTF8" }
+        }
+    },
+    excludedKinds: { CUSTOMER_CLOSURE_CONFIRMATION: "LEGAL_REVIEW_PENDING" }
+});
+
+/** The case evidence rule for one (case type, evidence kind, source), or null. Own keys only: a polluted prototype
+ * never adds a kind. */
+function caseEvidenceRule(caseType, evidenceKind, source) {
+    const kinds = typeof caseType === "string" && Object.hasOwn(CASE_EVIDENCE_POLICY.kinds, caseType)
+        ? CASE_EVIDENCE_POLICY.kinds[caseType] : null;
+    const rule = kinds && typeof evidenceKind === "string" && Object.hasOwn(kinds, evidenceKind) ? kinds[evidenceKind] : null;
+    return rule && rule.source === source ? rule : null;
+}
+
+/** Görev 193 (Faz 2B-2b, A186-02): every evidence purpose is bound to the commands that may claim it, the one place its
+ * evidence is stored, the purpose its attestation must state and its evidence policy version. The command is taken from
+ * the dispatch's frozen snapshot, never from the caller of the claim gate. CLOSE keeps its evidence-service contract
+ * unchanged (its attestation carries no purpose). FINANCIAL_CASE_EVIDENCE is bound to add_case_evidence, which is not
+ * registered in FINANCIAL_CASE_POLICY.transitions: no command can claim case evidence yet. */
+export const EVIDENCE_PURPOSE_POLICY = freezeDeep({
+    CLOSE: { commands: ["resolve_review"], storage: "REVIEW_RESOLUTION", attestedPurpose: null,
+        evidencePolicyVersion: null },
+    FINANCIAL_CASE_EVIDENCE: { commands: ["add_case_evidence"], storage: "CASE_EVIDENCE",
+        attestedPurpose: "FINANCIAL_CASE_EVIDENCE", evidencePolicyVersion: CASE_EVIDENCE_POLICY.reference }
+});
+const EVIDENCE_PURPOSES = Object.freeze(Object.keys(EVIDENCE_PURPOSE_POLICY));
 const evidenceKey = (evidenceId, digest) => JSON.stringify([evidenceId ?? null, digest ?? null]);
 
 /** Görev 185 (2B-2a, A178-03): every evidence an order stores, as identity-and-digest keys: the close evidence of its
- * resolved reviews and the evidence entries of its financial cases. Any new place that stores evidence must be added
- * here; until it is, evidence stored there matches no claim and the transition is refused (EVIDENCE_NOT_CLAIMED). */
+ * resolved reviews and the evidence entries of its financial cases. Evidence-shaped objects in any other place are
+ * refused by evidenceOnlyInRegisteredPlaces (Görev 193, EVIDENCE_STORAGE_INVALID). */
 function storedEvidenceKeys(snapshot) {
     const keys = [];
     for (const review of snapshot.reviews) {
@@ -337,6 +376,153 @@ function claimsMatchStoredEvidence(before, after, claims) {
     const claimed = claims.map(claim => evidenceKey(claim.evidenceId, claim.digest)).sort();
     return stored.length === claimed.length && stored.every((key, index) => key === claimed[index]);
 }
+
+// Görev 193 (Faz 2B-2b, A186-01): the registered evidence places, each bound to one purpose's storage, and the mirror
+// places that may only repeat evidence already stored or claimed in the same transition.
+const locationKey = (storage, caseId, evidenceId, digest) =>
+    JSON.stringify([storage, caseId ?? null, evidenceId ?? null, digest ?? null]);
+const isEvidenceShaped = value => value !== null && typeof value === "object" && !Array.isArray(value) &&
+    (Object.hasOwn(value, "evidenceId") || Object.hasOwn(value, "digest"));
+
+/** Görev 197 (A194-01, DQ-195-04): the limits of one evidence scan of an order (every root of one check together).
+ * The deepest legitimate path is about 6 objects; an order has a few hundred objects. */
+const EVIDENCE_SCAN_MAX_DEPTH = 64;
+const EVIDENCE_SCAN_MAX_NODES = 200000;
+const ARRAY_INDEX = /^(0|[1-9][0-9]*)$/;
+
+/** Every evidence-shaped object (an own evidenceId or digest key) under `root`, with its path, or null when the
+ * structure is refused. Pure, synchronous and iterative (an explicit stack, so no depth overflows the call stack). It
+ * keeps descending below evidence-shaped objects, so evidence nested in evidence is found with its own (longer) path.
+ * Fail-closed (null): a cycle (an object that is its own ancestor on the current path; the same object reached twice
+ * on different paths, as CLOSE shares its evidence between resolution, audit and event, is not a cycle), an object
+ * deeper than EVIDENCE_SCAN_MAX_DEPTH, more than budget.nodes objects, and anything that is not plain data: a
+ * prototype other than Object.prototype, Array.prototype or null (Map, Set, Date, class instances), a symbol key, a
+ * non-enumerable or accessor property (never invoked), an array key that is not an index, a function, symbol or
+ * bigint value. Proxies are not detectable and stay out of scope. */
+function findEvidence(root, rootPath, budget) {
+    const found = [];
+    const ancestors = new Set();
+    const stack = [{ value: root, path: rootPath }];
+    while (stack.length > 0) {
+        const frame = stack.pop();
+        if (frame.leave) {
+            ancestors.delete(frame.value);
+            continue;
+        }
+        const { value, path } = frame;
+        if (typeof value === "function" || typeof value === "symbol" || typeof value === "bigint") return null;
+        if (value === null || typeof value !== "object") continue;
+        if (ancestors.has(value) || path.length > EVIDENCE_SCAN_MAX_DEPTH) return null;
+        budget.nodes -= 1;
+        if (budget.nodes < 0) return null;
+        const array = Array.isArray(value);
+        const prototype = Object.getPrototypeOf(value);
+        if (array ? prototype !== Array.prototype : prototype !== Object.prototype && prototype !== null) return null;
+        const children = [];
+        for (const key of Reflect.ownKeys(value)) {
+            if (typeof key === "symbol") return null;
+            const descriptor = Object.getOwnPropertyDescriptor(value, key);
+            if (array && key === "length") continue;
+            if (!Object.hasOwn(descriptor, "value") || !descriptor.enumerable) return null;
+            if (array && !(ARRAY_INDEX.test(key) && Number(key) < value.length)) return null;
+            children.push([key, descriptor.value]);
+        }
+        if (isEvidenceShaped(value)) found.push(path);
+        ancestors.add(value);
+        stack.push({ leave: true, value });
+        for (let index = children.length - 1; index >= 0; index -= 1) {
+            stack.push({ value: children[index][1], path: [...path, children[index][0]] });
+        }
+    }
+    return found;
+}
+
+/** The stored evidence of an order with its place: identity, digest, storage and case. */
+function storedEvidenceLocations(snapshot) {
+    const keys = [];
+    for (const review of snapshot.reviews) {
+        const evidence = review.resolution?.evidence;
+        if (evidence) keys.push(locationKey("REVIEW_RESOLUTION", null, evidence.evidenceId, evidence.digest));
+    }
+    for (const item of snapshot.financialCases) {
+        for (const evidence of item.evidenceReferences ?? []) {
+            keys.push(locationKey("CASE_EVIDENCE", item.caseId, evidence.evidenceId, evidence.digest));
+        }
+    }
+    return keys;
+}
+
+/** True exactly when the evidence a transition newly stores, place by place (storage and case), is what it claimed. */
+function claimsMatchStoredLocations(before, after, claims) {
+    const added = new Map();
+    for (const key of storedEvidenceLocations(after)) added.set(key, (added.get(key) ?? 0) + 1);
+    for (const key of storedEvidenceLocations(before)) if (added.has(key)) added.set(key, added.get(key) - 1);
+    const stored = [...added].flatMap(([key, count]) => Array(Math.max(count, 0)).fill(key)).sort();
+    const claimed = claims.map(claim => locationKey(claim.storage, claim.caseId, claim.evidenceId, claim.digest)).sort();
+    return stored.length === claimed.length && stored.every((key, index) => key === claimed[index]);
+}
+
+/** True exactly when every evidence-shaped object of the next order, its event log included (Görev 197, A194-02), sits
+ * in a registered place, and every mirror (the transition's audit, a case audit trail entry, an event's audit) repeats
+ * only evidence stored before or claimed now. Evidence anywhere else, evidence nested in evidence or in a mirror, and
+ * a structure findEvidence refuses (cycle, depth, size, non-plain data) are refused (Görev 197, A194-01). */
+function evidenceOnlyInRegisteredPlaces(before, after, audit, claims) {
+    const known = new Set([...storedEvidenceKeys(before), ...claims.map(claim => evidenceKey(claim.evidenceId, claim.digest))]);
+    const registered = path => (path.length === 4 && path[0] === "reviews" && path[2] === "resolution" &&
+        path[3] === "evidence") || (path.length === 4 && path[0] === "financialCases" && path[2] === "evidenceReferences");
+    const mirror = path => (path.length === 5 && path[0] === "financialCases" && path[2] === "auditTrail" &&
+        path[4] === "evidence") || (path.length === 4 && path[0] === "events" && path[2] === "audit" &&
+        path[3] === "evidence");
+    const at = (root, path) => path.reduce((value, key) => value[key], root);
+    const mirrorKnown = path => {
+        const evidence = at(after, path);
+        return known.has(evidenceKey(evidence.evidenceId, evidence.digest));
+    };
+    const budget = { nodes: EVIDENCE_SCAN_MAX_NODES };
+    const places = findEvidence(after, [], budget);
+    const audited = places === null ? null : findEvidence(audit ?? null, ["audit"], budget);
+    return places !== null && audited !== null && places.every(path => registered(path) || (mirror(path) && mirrorKnown(path))) &&
+        audited.every(path => path.length === 2 && path[1] === "evidence" &&
+            known.has(evidenceKey(audit.evidence.evidenceId, audit.evidence.digest)));
+}
+
+/** True exactly when the transition keeps the evidence history: a resolved review's evidence is the same object, and
+ * every case keeps its place, its id and its earlier evidence entries as the same objects, in order (append-only).
+ * Deleting, moving, reordering or changing stored evidence in place is refused. */
+function evidenceHistoryKept(before, after) {
+    return before.reviews.every((review, index) => !review.resolution?.evidence ||
+        after.reviews[index]?.resolution?.evidence === review.resolution.evidence) &&
+        before.financialCases.every((item, index) => {
+            const next = after.financialCases[index];
+            const earlier = item.evidenceReferences ?? [];
+            return next !== undefined && next.caseId === item.caseId && Array.isArray(next.evidenceReferences) &&
+                earlier.every((entry, position) => next.evidenceReferences[position] === entry);
+        });
+}
+
+/** Görev 197 (A194-02, DQ-195-03): the event log is append-only. Before the transition's own event is appended the next
+ * log holds exactly the earlier events, as the same objects and in order; afterwards it holds them followed by that one
+ * event. Deleting, moving, reordering, replacing or adding events is refused (EVIDENCE_HISTORY_CHANGED). */
+function eventHistoryKept(before, after, appendedEvent) {
+    const expected = appendedEvent === null ? before.events.length : before.events.length + 1;
+    return Array.isArray(after.events) && after.events.length === expected &&
+        before.events.every((event, index) => after.events[index] === event) &&
+        (appendedEvent === null || after.events[expected - 1] === appendedEvent);
+}
+
+/** Görev 185/193: every claim is a frozen, well-formed gate claim for this order, unique within the transition, bound
+ * to this dispatch's command and to its purpose's storage place. Görev 197: one function, checked before and again
+ * after the last await of the commit. */
+function claimsBoundToCommand(claims, orderId, kind) {
+    return claims.every((claim, index) => Object.isFrozen(claim) &&
+        EVIDENCE_PURPOSES.includes(claim.purpose) && opaque(claim.evidenceId) && typeof claim.digest === "string" &&
+        EVIDENCE_DIGEST.test(claim.digest) && claim.orderId === orderId && claims.findIndex(other =>
+            other.evidenceId === claim.evidenceId || other.digest === claim.digest) === index &&
+        // Görev 193: a claim is bound to this command and to its purpose's storage place.
+        claim.command === kind && EVIDENCE_PURPOSE_POLICY[claim.purpose].commands.includes(claim.command) &&
+        claim.storage === EVIDENCE_PURPOSE_POLICY[claim.purpose].storage &&
+        (claim.storage === "CASE_EVIDENCE" ? typeof claim.caseId === "string" : claim.caseId === null));
+}
 const DEPLOYMENT_ENVIRONMENTS = Object.freeze(["PRODUCTION", "STAGING", "TEST"]);
 
 /** Görev 159 (K-01 Faz 1): financial cases, creation only. A REFUND opens an ORDER_REFUND case; accepted, undelivered
@@ -358,6 +544,82 @@ export const FINANCIAL_CASE_POLICY = freezeDeep({
  * exactly when it is an own key of FINANCIAL_CASE_POLICY.transitions (never by name prefix or prototype). */
 function isCaseCommand(kind) {
     return typeof kind === "string" && Object.hasOwn(FINANCIAL_CASE_POLICY.transitions, kind);
+}
+
+/** Görev 193 (Faz 2B-2b, D165-01/02/03/04, DR-1/V-A): the financial case evidence contract. Constants and pure checks
+ * only: no command uses them yet (add_case_evidence comes in Faz 2B-3), and nothing here calls a verifier.
+ * A submission is { kind: "CASE_EVIDENCE_SUBMISSION", orderId, caseId, reviewId, caseType, evidencePolicyVersion,
+ * authorizationRef, source, actorId, evidence, signature } and its evidence { evidenceId, evidenceKind, source, orderId,
+ * caseId, reviewId, createdAt, digest, signature } (the evidence service's own signature, never bound here). */
+export const CASE_EVIDENCE_FIELDS = Object.freeze(["kind", "orderId", "caseId", "reviewId", "caseType",
+    "evidencePolicyVersion", "authorizationRef", "source", "actorId", "evidence", "signature"]);
+export const CASE_EVIDENCE_ITEM_FIELDS = Object.freeze(["evidenceId", "evidenceKind", "source", "orderId", "caseId",
+    "reviewId", "createdAt", "digest", "signature"]);
+/** D165-02: every field the case console signature (verifyCaseRecord) must cover, in a fixed order. */
+export const CASE_EVIDENCE_BINDING_FIELDS = Object.freeze(["orderId", "caseId", "reviewId", "caseType",
+    "evidencePolicyVersion", "authorizationRef", "source", "actorId", "evidence.evidenceId", "evidence.evidenceKind",
+    "evidence.source", "evidence.orderId", "evidence.caseId", "evidence.reviewId", "evidence.createdAt", "evidence.digest"]);
+
+export function caseEvidenceBinding(record) {
+    return JSON.stringify(["UNAI-CASE-EVIDENCE-v1", ...CASE_EVIDENCE_BINDING_FIELDS.map(path =>
+        path.split(".").reduce((value, key) => (value !== null && typeof value === "object" && Object.hasOwn(value, key)
+            ? value[key] : undefined), record) ?? null)]);
+}
+
+/** D165-01: every field the case evidence service (verifyCaseEvidence) must attest, each equal to the core's request:
+ * the purpose, the evidence policy version and the digest basis (DQ-183-01) included. */
+export const CASE_ATTESTED_FIELDS = Object.freeze(["purpose", "evidencePolicyVersion", "evidenceId", "evidenceKind",
+    "source", "orderId", "caseId", "reviewId", "caseType", "createdAt", "digest", "digestBasis", "decisionBinding"]);
+
+/** Görev 193: shape, binding to the canonical case, kind, policy version and time of a case evidence submission. Pure:
+ * no verifier and no registry. Returns the frozen request the evidence service must attest field by field. Codes:
+ * EVIDENCE_MISMATCH (shape), INVALID_CASE_REFERENCE (another order, case, review or case type),
+ * CASE_EVIDENCE_POLICY_MISMATCH, EVIDENCE_KIND_NOT_ALLOWED, EVIDENCE_STALE (created before the case, D165-04). */
+export function checkCaseEvidence(record, order, item, role) {
+    requireThat(record !== null && typeof record === "object" && !Array.isArray(record) &&
+        Object.keys(record).every(key => CASE_EVIDENCE_FIELDS.includes(key)) &&
+        record.kind === "CASE_EVIDENCE_SUBMISSION" && opaque(record.authorizationRef) &&
+        typeof role === "string" && Object.hasOwn(REVIEW_SOURCES, role) && record.source === REVIEW_SOURCES[role],
+        "EVIDENCE_MISMATCH");
+    requireThat(order !== null && typeof order === "object" && item !== null && typeof item === "object" &&
+        record.orderId === order.id && item.orderId === order.id && record.caseId === item.caseId &&
+        record.reviewId === item.origin?.reviewId && record.caseType === item.caseType, "INVALID_CASE_REFERENCE");
+    requireThat(record.evidencePolicyVersion === CASE_EVIDENCE_POLICY.reference, "CASE_EVIDENCE_POLICY_MISMATCH");
+    const evidence = record.evidence;
+    requireThat(evidence !== null && typeof evidence === "object" && !Array.isArray(evidence) &&
+        Object.keys(evidence).every(key => CASE_EVIDENCE_ITEM_FIELDS.includes(key)) && opaque(evidence.evidenceId) &&
+        evidence.orderId === record.orderId && evidence.caseId === record.caseId && evidence.reviewId === record.reviewId &&
+        typeof evidence.digest === "string" && EVIDENCE_DIGEST.test(evidence.digest) &&
+        Number.isSafeInteger(zonedInstant(evidence.createdAt)), "EVIDENCE_MISMATCH");
+    const rule = caseEvidenceRule(record.caseType, evidence.evidenceKind, evidence.source);
+    requireThat(rule !== null, "EVIDENCE_KIND_NOT_ALLOWED");
+    requireThat(zonedInstant(evidence.createdAt) >= Date.parse(item.createdAt), "EVIDENCE_STALE");
+    return freezeDeep({
+        purpose: "FINANCIAL_CASE_EVIDENCE", evidencePolicyVersion: CASE_EVIDENCE_POLICY.reference,
+        evidenceId: evidence.evidenceId, evidenceKind: evidence.evidenceKind, source: evidence.source, orderId: order.id,
+        caseId: item.caseId, reviewId: record.reviewId, caseType: item.caseType,
+        createdAt: new Date(zonedInstant(evidence.createdAt)).toISOString(), digest: evidence.digest,
+        digestBasis: rule.digestBasis, decisionBinding: caseEvidenceBinding(record)
+    });
+}
+
+/** D165-01: a case evidence attestation is VERIFIED, names a known verifier and states every CASE_ATTESTED_FIELDS value
+ * of the request, the digest basis included, as its own property (Görev 197, A194-10: an inherited value is not a
+ * statement). Anything else is UNTRUSTED_EVIDENCE. Pure. */
+export function checkCaseEvidenceAttestation(attestation, request) {
+    requireThat(attestation !== null && typeof attestation === "object" && attestation.status === "VERIFIED" &&
+        attestation.verifier !== null && typeof attestation.verifier === "object" &&
+        EVIDENCE_VERIFIER_KINDS.includes(attestation.verifier.kind) && opaque(attestation.verifier.id) &&
+        request !== null && typeof request === "object" &&
+        CASE_ATTESTED_FIELDS.every(field => Object.hasOwn(attestation, field) && attestation[field] === request[field]),
+    "UNTRUSTED_EVIDENCE");
+}
+
+/** D165-02: verifyCaseRecord(record, canonicalOrder, { binding }) must return { verified: true, binding } only after
+ * checking the case console signature over exactly caseEvidenceBinding(record); a bare `true` is refused. Pure. */
+export function checkCaseRecordVerdict(signed, binding) {
+    requireThat(signed !== null && typeof signed === "object" && signed.verified === true &&
+        typeof binding === "string" && signed.binding === binding, "UNTRUSTED_REVIEW");
 }
 
 /** Görev 169 (F168-02): a trusted server setting is read only from an own data property of the configuration object.
@@ -412,7 +674,12 @@ function revisionId(sequence) {
  * same content under another id. Every command that stores evidence consumes it through the dispatch's single claim
  * gate (Görev 185, Architecture C); evidence stored without a claim is refused (EVIDENCE_NOT_CLAIMED). Financial case
  * evidence will share these registries once add_case_evidence exists; it is not implemented. Re-verifying evidence
- * already stored (D165-09) is never a claim. A verifier of kind SYNTHETIC is refused unless the
+ * already stored (D165-09) is never a claim. Görev 193 (Faz 2B-2b): a purpose may be claimed only by the commands
+ * EVIDENCE_PURPOSE_POLICY binds to it (EVIDENCE_PURPOSE_MISMATCH), and its evidence may be stored only in that
+ * purpose's place; evidence-shaped objects anywhere else are EVIDENCE_STORAGE_INVALID, and stored evidence is
+ * append-only (EVIDENCE_HISTORY_CHANGED). verifyCaseEvidence(evidence, request, canonicalOrder) and
+ * verifyCaseRecord(record, canonicalOrder, { binding }) are the contracts of the coming case evidence command
+ * (CASE_ATTESTED_FIELDS, caseEvidenceBinding); no command calls them yet. A verifier of kind SYNTHETIC is refused unless the
  * core was created with allowSyntheticEvidence: true AND environment: "TEST" (Görev 152, F151-04). Both come from the
  * server's own configuration, never from a command or principal. A missing environment is PRODUCTION; an unknown one,
  * or the flag outside TEST, stops the core from being created. Both are read only from own data properties of the
@@ -550,22 +817,55 @@ export function createCore(config = {}) {
          * verified attestation for exactly this id and digest; the TEST-only synthetic boundary; a repeat within this
          * transition; the registries, identity before digest. The returned claim is what the command stores. */
         const claimEvidence = (purpose, request, attestation) => {
-            requireThat(EVIDENCE_PURPOSES.includes(purpose), "EVIDENCE_MISMATCH");
+            requireThat(typeof purpose === "string" && Object.hasOwn(EVIDENCE_PURPOSE_POLICY, purpose), "EVIDENCE_MISMATCH");
+            const policy = EVIDENCE_PURPOSE_POLICY[purpose];
+            // Görev 193 (A186-02): the command is this dispatch's own, from the frozen snapshot.
+            requireThat(policy.commands.includes(command.kind), "EVIDENCE_PURPOSE_MISMATCH");
             requireThat(request !== null && typeof request === "object" && opaque(request.evidenceId) &&
                 typeof request.digest === "string" && EVIDENCE_DIGEST.test(request.digest), "EVIDENCE_MISMATCH");
+            const caseEvidence = policy.storage === "CASE_EVIDENCE";
+            const rule = caseEvidence ? caseEvidenceRule(request.caseType, request.evidenceKind, request.source) : null;
+            if (caseEvidence) {
+                // A second line behind the command's own checkCaseEvidence: the canonical case, the policy version, the
+                // closed kind matrix and the expected digest basis.
+                requireThat(typeof request.caseId === "string" && order.financialCases.some(item =>
+                    item.caseId === request.caseId && item.caseType === request.caseType), "EVIDENCE_MISMATCH");
+                requireThat(request.evidencePolicyVersion === policy.evidencePolicyVersion, "CASE_EVIDENCE_POLICY_MISMATCH");
+                requireThat(rule !== null, "EVIDENCE_KIND_NOT_ALLOWED");
+                requireThat(request.digestBasis === rule.digestBasis, "EVIDENCE_MISMATCH");
+                // Görev 197 (A194-03): the request is for this order and the canonical case's review, states the case
+                // evidence purpose, and carries every attested field as its own, defined value.
+                const item = order.financialCases.find(entry =>
+                    entry.caseId === request.caseId && entry.caseType === request.caseType);
+                requireThat(request.orderId === order.id && request.reviewId === item.origin?.reviewId &&
+                    request.purpose === policy.attestedPurpose && typeof request.createdAt === "string" &&
+                    typeof request.decisionBinding === "string" &&
+                    CASE_ATTESTED_FIELDS.every(field => Object.hasOwn(request, field) && request[field] !== undefined),
+                "EVIDENCE_MISMATCH");
+            }
             requireThat(attestation !== null && typeof attestation === "object" && attestation.verifier !== null &&
                 typeof attestation.verifier === "object", "UNTRUSTED_EVIDENCE");
             const verifier = { kind: attestation.verifier.kind, id: attestation.verifier.id };
             requireThat(attestation.status === "VERIFIED" && EVIDENCE_VERIFIER_KINDS.includes(verifier.kind) &&
                 opaque(verifier.id) && attestation.evidenceId === request.evidenceId &&
                 attestation.digest === request.digest, "UNTRUSTED_EVIDENCE");
+            // D165-01, DQ-183-01: case evidence is attested for its purpose, policy version, case, kind and digest basis.
+            requireThat(!caseEvidence || (attestation.purpose === policy.attestedPurpose &&
+                attestation.evidencePolicyVersion === policy.evidencePolicyVersion &&
+                attestation.caseId === request.caseId && attestation.evidenceKind === request.evidenceKind &&
+                attestation.source === request.source && attestation.digestBasis === rule.digestBasis &&
+                // Görev 197 (A194-03, A194-10): and every attested field, stated by the attestation itself (never
+                // inherited), equal to the request: orderId, reviewId, caseType, createdAt and decisionBinding included.
+                CASE_ATTESTED_FIELDS.every(field => Object.hasOwn(attestation, field) && attestation[field] === request[field])),
+            "UNTRUSTED_EVIDENCE");
             requireThat(verifier.kind === "PRODUCTION" || syntheticEvidence, "SYNTHETIC_VERIFIER_NOT_ALLOWED");
             requireThat(evidenceClaims.every(claim => claim.evidenceId !== request.evidenceId), "EVIDENCE_REFERENCE_USED");
             requireThat(evidenceClaims.every(claim => claim.digest !== request.digest), "EVIDENCE_DIGEST_USED");
             requireThat(!evidenceReferences.has(request.evidenceId), "EVIDENCE_REFERENCE_USED");
             requireThat(!evidenceDigests.has(request.digest), "EVIDENCE_DIGEST_USED");
-            const claim = freezeDeep({ purpose, evidenceId: request.evidenceId, digest: request.digest,
-                orderId: order.id, caseId: null, verifier });
+            const claim = freezeDeep({ purpose, command: command.kind, storage: policy.storage,
+                evidenceId: request.evidenceId, digest: request.digest, orderId: order.id,
+                caseId: caseEvidence ? request.caseId : null, verifier });
             evidenceClaims.push(claim);
             return claim;
         };
@@ -1159,11 +1459,14 @@ export function createCore(config = {}) {
         // Görev 185 (2B-2a, A178-03/04): every claim is a frozen, well-formed gate claim for this order, unique within
         // the transition, and the claims are exactly the evidence this transition stores. Evidence stored without a
         // claim, or a claim for evidence that is not stored, is refused before anything is committed.
-        requireThat(evidenceClaims.every((claim, index) => Object.isFrozen(claim) &&
-            EVIDENCE_PURPOSES.includes(claim.purpose) && opaque(claim.evidenceId) && typeof claim.digest === "string" &&
-            EVIDENCE_DIGEST.test(claim.digest) && claim.orderId === order.id && evidenceClaims.findIndex(other =>
-                other.evidenceId === claim.evidenceId || other.digest === claim.digest) === index), "EVIDENCE_MISMATCH");
+        requireThat(claimsBoundToCommand(evidenceClaims, order.id, command.kind), "EVIDENCE_MISMATCH");
+        // Görev 193 (A186-01, A186-04): stored evidence is append-only, and evidence lives only in registered places.
+        // Görev 197 (A194-02): so is the event log.
+        requireThat(eventHistoryKept(order, next, null), "EVIDENCE_HISTORY_CHANGED");
+        requireThat(evidenceHistoryKept(order, next), "EVIDENCE_HISTORY_CHANGED");
+        requireThat(evidenceOnlyInRegisteredPlaces(order, next, audit, evidenceClaims), "EVIDENCE_STORAGE_INVALID");
         requireThat(claimsMatchStoredEvidence(order, next, evidenceClaims), "EVIDENCE_NOT_CLAIMED");
+        requireThat(claimsMatchStoredLocations(order, next, evidenceClaims), "EVIDENCE_STORAGE_INVALID");
         next.version += 1;
         const event = {
             sequence: next.version, requestId: command.requestId, kind: command.kind,
@@ -1188,6 +1491,15 @@ export function createCore(config = {}) {
         requireThat(!restorationRef || !restorationReferences.has(restorationRef), "RESTORATION_REFERENCE_USED");
         requireThat(!reviewRef || !reviewReferences.has(reviewRef), "REVIEW_REFERENCE_USED");
         requireThat(!replanRef || !replanReferences.has(replanRef), "REPLAN_REFERENCE_USED");
+        // Görev 197 (A194-05, DQ-195-06): the evidence invariants once more, after the last suspension point of the
+        // dispatch and in the same synchronous block as the registry re-check and every write: whatever changed the
+        // claims, the order, its event log or the audit meanwhile is refused here, in the order of the pre-check.
+        requireThat(claimsBoundToCommand(evidenceClaims, order.id, command.kind), "EVIDENCE_MISMATCH");
+        requireThat(eventHistoryKept(order, next, event), "EVIDENCE_HISTORY_CHANGED");
+        requireThat(evidenceHistoryKept(order, next), "EVIDENCE_HISTORY_CHANGED");
+        requireThat(evidenceOnlyInRegisteredPlaces(order, next, audit, evidenceClaims), "EVIDENCE_STORAGE_INVALID");
+        requireThat(claimsMatchStoredEvidence(order, next, evidenceClaims), "EVIDENCE_NOT_CLAIMED");
+        requireThat(claimsMatchStoredLocations(order, next, evidenceClaims), "EVIDENCE_STORAGE_INVALID");
         assertClaimsFree();
         // Görev 150 (F-02): the linked order must be exactly the record that was checked; any change since is a refusal.
         requireThat(!linkedOrder || orders.get(linkedOrder.id) === linkedOrder, "LINKED_ORDER_CHANGED");
