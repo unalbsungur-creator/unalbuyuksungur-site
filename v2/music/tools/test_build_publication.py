@@ -110,13 +110,13 @@ class BuildPublicationTests(unittest.TestCase):
         self.assertEqual(len(PAGES), 68)
         generated = {"_headers", "_redirects", "robots.txt"}
         self.assertEqual(set(self.tree()), published(web) | published(ALL_PAGES) | generated)
-        self.assertEqual(len(self.tree()), 604)
+        self.assertEqual(len(self.tree()), 609)
         self.assertEqual([n for n in self.tree() if n.startswith(("v2/", "legacy/"))], [])
-        self.assertEqual((manifest["webFiles"], manifest["copiedFiles"], manifest["renderedPages"]), (601, 381, 220))
-        self.assertEqual(manifest["totalOutputFiles"], 604)
+        self.assertEqual((manifest["webFiles"], manifest["copiedFiles"], manifest["renderedPages"]), (606, 381, 225))
+        self.assertEqual(manifest["totalOutputFiles"], 609)
         self.assertEqual(manifest["profile"], "preview")
         self.assertEqual(manifest["groups"], {"site": 35, "data": 2, "lyrics": 64, "stories": 64, "webp": 204,
-                                               "legacyImages": 12, "pages": 220})
+                                               "legacyImages": 12, "pages": 225})
         self.assertEqual([(a["path"], a["source"], a["sameAs"]) for a in manifest["aliases"]],
                          [("images/favicon.jpg.jpeg", "v2/legacy/v1-images/favicon.jpg.jpeg",
                            "v2/images/favicon.jpg.jpeg")])
@@ -247,7 +247,7 @@ class BuildPublicationTests(unittest.TestCase):
         """Görev 220: ana alan adında noindex yok (yalnız pages.dev), robots/sitemap üretilir, URL'ler köktedir."""
         manifest = self.build(profile="production")
         tree = self.tree()
-        self.assertEqual((manifest["profile"], manifest["totalOutputFiles"]), ("production", 605))
+        self.assertEqual((manifest["profile"], manifest["totalOutputFiles"]), ("production", 610))
         headers = tree["_headers"].decode("utf-8")
         self.assertTrue(headers.startswith(bp.MARKER + "\n"))
         self.assertIn("https://unalbuyuksungur-v2.pages.dev/*\n  X-Robots-Tag: noindex\n", headers)
@@ -261,7 +261,10 @@ class BuildPublicationTests(unittest.TestCase):
         self.assertNotIn("/blog/", sitemap)  # Görev 222: /blog/ noindex
         self.assertIn(b'<meta name="robots" content="noindex, follow">', tree["blog/index.html"])
         for slug in bp.render_site.BLOG_POSTS:
-            self.assertNotIn(f"/blog/{slug}/", sitemap)  # canonical'ı Blogspot'a veren yazılar sitemap'te yok
+            self.assertNotIn(f"/blog/{slug}/", sitemap)
+        self.assertNotIn("/yasal/", sitemap)  # Görev 226: taslak yasal metinler noindex, sitemap dışı
+        for slug in bp.render_site.LEGAL_PAGES:
+            self.assertIn(b'<meta name="robots" content="noindex, follow">', tree[f"yasal/{slug}/index.html"])  # canonical'ı Blogspot'a veren yazılar sitemap'te yok
         self.assertIn("<loc>https://unalbuyuksungur.com/en/music/work/w-0001</loc>", sitemap)
         self.assertIn('hreflang="x-default" href="https://unalbuyuksungur.com/studio/"', sitemap)
         self.assertNotIn("/v2/", sitemap)
@@ -423,12 +426,12 @@ class BuildPublicationTests(unittest.TestCase):
 
     def test_cli_exit_codes(self):
         run = [sys.executable, "-I", str(SCRIPT), "--root", str(self.root), "--out", "_site"]
-        ok = subprocess.run(run + ["--expect-count", "601"], capture_output=True, text=True, encoding="utf-8")
+        ok = subprocess.run(run + ["--expect-count", "606"], capture_output=True, text=True, encoding="utf-8")
         self.assertEqual(ok.returncode, 0, ok.stderr)
         self.assertIn("381/381", ok.stdout)
-        self.assertIn("üretilen sayfa 220 (preview)", ok.stdout)
+        self.assertIn("üretilen sayfa 225 (preview)", ok.stdout)
         manifest = json.loads((self.root / "_site-manifest.json").read_text(encoding="utf-8"))
-        self.assertEqual(manifest["totalOutputFiles"], 604)
+        self.assertEqual(manifest["totalOutputFiles"], 609)
         bad = subprocess.run(run + ["--profile", "staging"], capture_output=True, text=True, encoding="utf-8")
         self.assertEqual(bad.returncode, 2)  # argparse: geçersiz profil seçimi
         (self.root / "v2/music/catalog.css").unlink()

@@ -36,8 +36,8 @@ class MultilingualTests(unittest.TestCase):
         ids = {w["id"] for w in CATALOG["works"]}
         self.assertEqual(len(ids), 68)
         # Turkish: 68 works + 3 rendered shells (Görev 220) + 5 Turkish-only pages (Görev 221: blog, posts,
-        # privacy); EN/DE: 68 works + 4 shells each.
-        self.assertEqual(len(self.pages), 220)
+        # privacy) + 5 draft legal pages (Görev 226); EN/DE: 68 works + 4 shells each.
+        self.assertEqual(len(self.pages), 225)
         for locale in ("en", "de"):
             home = self.pages[f"v2/{locale}/index.html"].decode("utf-8")
             catalog = self.pages[f"v2/{locale}/music/index.html"].decode("utf-8")
@@ -105,6 +105,25 @@ class MultilingualTests(unittest.TestCase):
                     self.assertIn(f'<strong>{revisions}</strong> {messages[locale]["studio.revisionCount"]}', card)
                     self.assertIn(f'<strong>{alternatives}</strong> {messages[locale]["studio.alternatives"]}', card)
                     self.assertNotRegex(card, r"\bTL\b|₺|EUR|€")  # Görev 221: fiyatlar kaldırıldı
+                # Görev 226: SSS en altta, footer'dan hemen önce; Görev 221 kısıtları SSS dışındaki tanıtım içindir.
+                faq = studio.split('<section class="studio-section studio-faq"', 1)[1].split("</section>", 1)[0]
+                self.assertRegex(studio.split(faq, 1)[1], r"^</section>\s*</main>\s*<footer")
+                self.assertEqual(faq.count('<details class="faq-item">'), 17)
+                self.assertIn(f'<h2 id="studio-faq">{messages[locale]["studio.faq"]}</h2>', faq)
+                legal = "../yasal/" if locale == "tr" else "../../yasal/"
+                self.assertIn(f'href="{legal}hizmet-kosullari/">{messages[locale]["footer.legal"]}</a>', studio)
+                self.assertIn(f'href="{legal}iade/">{messages[locale]["studio.faq.a14b"]}</a>'
+                              f'{html.escape(messages[locale]["studio.faq.a14c"], quote=False)}', faq)
+                self.assertIn('href="../music/">', faq)
+                if locale != "tr":
+                    for key, value in messages["tr"].items():
+                        if key.startswith("studio.faq") and value != messages[locale][key]:
+                            self.assertNotIn(html.escape(value, quote=False), faq, key)
+                rendered = self.pages["v2/" + ("" if locale == "tr" else locale + "/") + "studio/index.html"]
+                self.assertEqual(rendered.count(b'"@type":"FAQPage"'), 1 if locale == "tr" else 0)  # yalnız TR
+                if locale == "tr":
+                    self.assertEqual(rendered.count(b'"@type":"Question"'), 17)
+                studio = studio.replace(faq, "")
                 text = " ".join(html.unescape(studio).split())
                 for key in ("studio.status", "studio.service.song", "studio.service.video", "studio.step1",
                             "studio.step6", "studio.pricesNote", "studio.inc1", "studio.inc2", "studio.exc1",

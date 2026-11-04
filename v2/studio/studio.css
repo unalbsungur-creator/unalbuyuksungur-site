@@ -147,6 +147,67 @@
     color: var(--background);
 }
 
+/* Görev 226: Sık Sorulanlar — JS gerektirmeyen açılır-kapanır liste (details/summary) */
+.faq-list {
+    max-width: 860px;
+    border-top: 1px solid var(--line);
+}
+
+.faq-item {
+    border-bottom: 1px solid var(--line);
+}
+
+.faq-item summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 20px 0;
+    cursor: pointer;
+    list-style: none;
+    font: clamp(19px, 2.2vw, 22px)/1.4 var(--font-serif);
+    color: var(--text);
+}
+
+.faq-item summary::-webkit-details-marker {
+    display: none;
+}
+
+.faq-item summary::after {
+    content: "+";
+    flex: 0 0 auto;
+    font: 26px/1 var(--font-sans);
+    color: var(--gold);
+}
+
+.faq-item[open] summary::after {
+    content: "\2212";
+}
+
+.faq-item summary:hover {
+    color: var(--gold);
+}
+
+.faq-item summary:focus-visible {
+    outline: 2px solid var(--gold);
+    outline-offset: 4px;
+}
+
+.faq-answer {
+    max-width: 780px;
+    padding: 0 0 22px;
+    color: var(--muted);
+}
+
+.faq-answer p {
+    margin: 0;
+}
+
+.faq-answer a {
+    color: var(--gold);
+    text-underline-offset: 3px;
+}
+
 @media (max-width: 900px) {
     .studio-grid,
     .studio-columns {

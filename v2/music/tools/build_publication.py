@@ -98,6 +98,12 @@ SITE_FILES = (
     "v2/blog/2026-yazinda-turkiye-turizmi/index.html",
     "v2/blog/ne-yapayim/index.html",
     "v2/privacy/index.html",
+    # Görev 226: taslak yasal metinler (yalnız TR, noindex; render_site.LEGAL_PAGES)
+    "v2/yasal/on-bilgilendirme/index.html",
+    "v2/yasal/mesafeli-satis/index.html",
+    "v2/yasal/hizmet-kosullari/index.html",
+    "v2/yasal/iade/index.html",
+    "v2/yasal/kvkk/index.html",
     "v2/images/blog/yapay-zeka-ile-uretildi-diye-degersiz-mi-800.webp",
     "v2/images/blog/yapay-zeka-ile-uretildi-diye-degersiz-mi-1200.webp",
     "v2/images/blog/2026-yazinda-turkiye-turizmi-549.webp",
@@ -194,6 +200,21 @@ def published_path(rel):
     if not rel.startswith("v2/"):
         raise BuildError(f"[OUT-PATH] v2/ dışında yayın yolu: {rel}")
     return rel[len("v2/"):]
+
+# Görev 226: doldurulmamış köşeli parantezli yer tutucular ([AÇIK ADRES], [HUKUKÇU KONTROLÜ: …] gibi).
+# Production profilinde uyarı verir (hata değil); sayfalar yine üretilir.
+PLACEHOLDER = re.compile(r"\[[A-ZÇĞİÖŞÜ][A-ZÇĞİÖŞÜ ]{2,}(?::[^\]<\n]*)?\]")
+
+
+def placeholders(pages):
+    """{paket yolu: [yer tutucular]} — yalnız yer tutucu içeren üretilmiş sayfalar."""
+    found = {}
+    for rel, data in sorted(pages.items()):
+        hits = list(dict.fromkeys(PLACEHOLDER.findall(data.decode("utf-8"))))
+        if hits:
+            found[published_path(rel)] = hits
+    return found
+
 
 # Son savunma: çıktıda bulunmaması gereken her şey (allowlist'e yanlışlıkla girse bile).
 FORBIDDEN_OUTPUT = re.compile(
@@ -406,6 +427,9 @@ def build(root, out, expect_count=None, manifest_path=None, log=print, profile="
     files = plan(root, catalog)
     pages, template_digest = render(root, catalog, files, profile)
     extra_files = generated(profile, pages)
+    if profile == "production":
+        for path, hits in placeholders(pages).items():
+            log(f"UYARI [PLACEHOLDER] {path}: {', '.join(hits)}")
 
     staging = target.with_name(f"{target.name}.staging-{os.getpid()}")
     if staging.exists():

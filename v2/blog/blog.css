@@ -101,6 +101,94 @@
     color: var(--gold);
 }
 
+/* Görev 226: taslak yasal metin sayfaları (/yasal/...) — aynı dar sütun; tablolar mobilde yatay kayar */
+.legal-draft {
+    display: inline-block;
+    margin: 0 0 8px;
+    padding: 6px 14px;
+    border: 1px solid var(--gold);
+    border-radius: 4px;
+    color: var(--gold);
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.post.legal p {
+    margin-bottom: 18px;
+}
+
+.legal a {
+    color: var(--gold);
+    text-underline-offset: 3px;
+}
+
+.post.legal ul,
+.post.legal ol {
+    margin: 0 0 18px;
+    padding-left: 24px;
+}
+
+.post.legal li+li {
+    margin-top: 6px;
+}
+
+.table-scroll {
+    margin: 0 0 24px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.table-scroll table {
+    width: 100%;
+    min-width: 560px;
+    border-collapse: collapse;
+    font-size: 15px;
+    line-height: 1.5;
+}
+
+.table-scroll th,
+.table-scroll td {
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    text-align: left;
+    vertical-align: top;
+}
+
+.table-scroll th {
+    background: var(--surface);
+    color: var(--gold);
+    font-weight: 600;
+}
+
+.legal-links {
+    margin-top: 64px;
+    padding-top: 28px;
+    border-top: 1px solid var(--line);
+}
+
+.legal-links ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 24px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.legal-links a {
+    text-decoration: none;
+}
+
+.legal-links a:hover {
+    text-decoration: underline;
+}
+
+.legal-links a[aria-current="page"] {
+    color: var(--text);
+}
+
 @media (max-width: 560px) {
     .blog-main {
         padding-top: calc(var(--header-height) + 32px);

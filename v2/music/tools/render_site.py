@@ -29,6 +29,12 @@ BLOG_POSTS = {
 FEATURED_WORKS = ("w-0023", "w-0013", "w-0014", "w-0016")  # Çat Çat Çat, Benimle Yaşlanacaktın, Biliyorum, Bir Kedim Var
 TR_PAGES = {"v2/blog/index.html": ("blog/", None), "v2/privacy/index.html": ("privacy/", None)}
 TR_PAGES.update({f"v2/blog/{slug}/index.html": (f"blog/{slug}/", url) for slug, url in BLOG_POSTS.items()})
+# Görev 226: taslak yasal metinler — yalnız TR, kaynakta noindex, sitemap'e girmez (yalnız önizleme).
+LEGAL_PAGES = ("on-bilgilendirme", "mesafeli-satis", "hizmet-kosullari", "iade", "kvkk")
+TR_PAGES.update({f"v2/yasal/{slug}/index.html": (f"yasal/{slug}/", None) for slug in LEGAL_PAGES})
+# Görev 226: stüdyo SSS'si (details/summary); TR sayfaya FAQPage JSON-LD bu öğelerden üretilir.
+FAQ_ITEM = re.compile(r'<details class="faq-item">\s*<summary>(.*?)</summary>\s*'
+                      r'<div class="faq-answer">(.*?)</div>\s*</details>', re.S)
 SRCSET_ATTRIBUTE = re.compile(r'\b(?P<name>srcset|imagesrcset)="(?P<value>[^"]*)"')
 SURFACES = {
     "home": ("v2/index.html", "index.html"),
@@ -78,7 +84,10 @@ def localize_text(text, locale, messages):
         key = source.get(normalized)
         if key is None:
             return value
-        return match.group(1) + html.escape(lookup(messages, locale, key), quote=False) + match.group(3)
+        value = lookup(messages, locale, key)
+        # Görev 226: noktalama ile başlayan çeviri (ör. bağlantıdan sonra ".") önündeki boşluğu almaz.
+        lead = "" if value[:1] in ".,;:!?" else match.group(1)
+        return lead + html.escape(value, quote=False) + match.group(3)
 
     text = TEXT_NODE.sub(lambda m: ">" + translated(m.group(1)) + "<", text)
     return ATTRIBUTE.sub(lambda m: m.group("name") + '="' +
@@ -137,6 +146,24 @@ def seo_block(text, url, profile, alternate_links, og_type="website"):
     return text[:anchor.end()] + block + text[anchor.end():]
 
 
+def faq_json_ld(text):
+    """Görev 226: TR stüdyo sayfasındaki SSS öğelerinden FAQPage JSON-LD (düz metin; sıra korunur)."""
+    def plain(fragment):
+        return " ".join(html.unescape(re.sub(r"<[^>]+>", "", fragment)).split())
+
+    items = FAQ_ITEM.findall(text)
+    if not items:
+        raise LocaleError("[STUDIO-FAQ] no FAQ items on the studio page")
+    data = {"@context": "https://schema.org", "@type": "FAQPage",
+            "mainEntity": [{"@type": "Question", "name": plain(question),
+                            "acceptedAnswer": {"@type": "Answer", "text": plain(answer)}}
+                           for question, answer in items]}
+    script = ('<script type="application/ld+json">'
+              + json.dumps(data, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/") + "</script>")
+    newline = "\r\n" if "\r\n" in text else "\n"
+    return replace_once(text, "</head>", script + newline + "</head>")
+
+
 def music_showcase(text, catalog, locale, messages):
     """Görev 224: ana sayfa Müzik vitrini — katalogdan sayılar ve öne çıkan eser kartları (statik HTML)."""
     stats = {"works": len(catalog["works"]), "recordings": len(catalog["recordings"]),
@@ -192,6 +219,8 @@ def render_page(text, locale, surface, messages, config, work=None, profile="pre
         if catalog is None:
             raise LocaleError("[HOME-FEATURED] the home page needs the catalog")
         text = music_showcase(text, catalog, locale, messages)
+    if surface == "studio" and locale == "tr":
+        text = faq_json_ld(text)
     seo_route = {"home": "", "catalog": "music/", "work": "music/work/", "studio": "studio/"}[surface]
     if work is not None:
         if not WORK_ID.fullmatch(work["id"]):
@@ -263,7 +292,7 @@ def render_page(text, locale, surface, messages, config, work=None, profile="pre
             "studio": {"../music/catalog.css": "../../music/catalog.css",
                        "studio.css": "../../studio/studio.css", "../images/": "../../images/",
                        "../i18n/": "../../i18n/", "../privacy/": "../../privacy/",
-                       "../external-links.js": "../../external-links.js"},
+                       "../external-links.js": "../../external-links.js", "../yasal/": "../../yasal/"},
         }[surface]
 
         def asset(m):
