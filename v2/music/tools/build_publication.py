@@ -91,9 +91,23 @@ SITE_FILES = (
     "v2/perspective/index.html",
     "v2/perspective/style.css",
     "v2/perspective/script.js",
+    # Görev 221: yalnız Türkçe blog ve gizlilik sayfaları (render_site.TR_PAGES) ve blog görselleri
+    "v2/blog/index.html",
+    "v2/blog/blog.css",
+    "v2/blog/yapay-zeka-ile-uretildi-diye-degersiz-mi/index.html",
+    "v2/blog/2026-yazinda-turkiye-turizmi/index.html",
+    "v2/blog/ne-yapayim/index.html",
+    "v2/privacy/index.html",
+    "v2/images/blog/yapay-zeka-ile-uretildi-diye-degersiz-mi-800.webp",
+    "v2/images/blog/yapay-zeka-ile-uretildi-diye-degersiz-mi-1200.webp",
+    "v2/images/blog/2026-yazinda-turkiye-turizmi-549.webp",
+    "v2/images/blog/ne-yapayim-800.webp",
+    "v2/images/blog/ne-yapayim-1200.webp",
 )
 # Görev 220: TR kabuk sayfaları kopyalanmaz, profile göre SEO etiketleriyle üretilir (render_site.SHELL_ROUTES).
 RENDERED_SHELLS = ("v2/index.html", "v2/music/index.html", "v2/studio/index.html")
+# Görev 221: yalnız Türkçe sayfalar da kopyalanmaz; canonical/OG etiketleriyle üretilir.
+RENDERED_PAGES = RENDERED_SHELLS + tuple(render_site.TR_PAGES)
 # 404 sayfası her adresten sunulur; kök-mutlak bağlantıya yalnız bu sayfada izin verilir.
 NOT_FOUND = "v2/404.html"
 # V1 görselleri: v2/legacy/v1-images/ altındaki kopyalar, pakette images/ altına aynı adlarla yazılır.
@@ -168,6 +182,8 @@ def sitemap(profile, pages):
             lines += [f'    <xhtml:link rel="alternate" hreflang="{code}" href="{html.escape(href, quote=True)}"/>'
                       for code, href in alternates]
             lines.append("  </url>")
+    # Görev 221: yalnız Türkçe blog sayfası; yazı sayfaları canonical'ı Blogspot'a verdiği için sitemap'e girmez.
+    lines.append(f"  <url>\n    <loc>{html.escape(render_site.locale_url('tr', 'blog/', profile))}</loc>\n  </url>")
     lines.append("</urlset>")
     return "\n".join(lines) + "\n"
 
@@ -227,7 +243,7 @@ def load_catalog(root):
 
 def plan(root, catalog):
     """Allowlist: {depo göreli yol: (beklenen SHA-256, bayt) ya da None}. Katalog yolları kalıplarla sınırlıdır."""
-    files = {rel: None for rel in SITE_FILES if rel not in RENDERED_SHELLS}
+    files = {rel: None for rel in SITE_FILES if rel not in RENDERED_PAGES}
     files[CATALOG] = None
     legacy = root / LEGACY_IMAGES
     if not legacy.is_dir():
@@ -434,7 +450,8 @@ def build(root, out, expect_count=None, manifest_path=None, log=print, profile="
             dest.write_bytes(pages[rel])
             if dest.read_bytes() != pages[rel]:
                 raise BuildError(f"[HASH-COPY] üretilen sayfa yazılamadı: {rel}")
-            source = ("v2/index.html" if re.fullmatch(r"v2/((en|de)/)?index\.html", rel)
+            source = (rel if rel in render_site.TR_PAGES
+                      else "v2/index.html" if re.fullmatch(r"v2/((en|de)/)?index\.html", rel)
                       else "v2/music/index.html" if re.fullmatch(r"v2/((en|de)/)?music/index\.html", rel)
                       else "v2/studio/index.html" if re.fullmatch(r"v2/((en|de)/)?studio/index\.html", rel)
                       else render_pages.TEMPLATE)

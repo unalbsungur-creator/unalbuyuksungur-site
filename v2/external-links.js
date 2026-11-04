@@ -13,7 +13,9 @@
         youtubeMusic: Object.freeze({ platform: "YouTube Music", display: "Ünal Büyüksungur Music", url: "https://music.youtube.com/@unalbuyuksungurmusic" }),
         appleMusic: Object.freeze({ platform: "Apple Music", display: "Ünal Büyüksungur", url: "https://music.apple.com/us/artist/%C3%BCnal-b%C3%BCy%C3%BCksungur/1868323918" }),
         blog: Object.freeze({ platform: "ÜNALBLOG", display: "ÜNALBLOG", url: "https://unalbsungur.blogspot.com/" }),
-        shopier: Object.freeze({ platform: "Shopier", display: "Shopier Mağazam", url: "https://www.shopier.com/unalbuyuksungur/" })
+        shopier: Object.freeze({ platform: "Shopier", display: "Shopier Mağazam", url: "https://www.shopier.com/unalbuyuksungur/" }),
+        etsy: Object.freeze({ platform: "Etsy", display: "Pixel & Petal Digital", url: "https://pixelandpetaldigital.etsy.com" }),
+        spotifyPlaylist: Object.freeze({ platform: "Spotify", display: "Ünal Büyüksungur", url: "https://open.spotify.com/playlist/6od7MgDo7kL9DHUgiT40rT" })
     });
 
     function applyExternalLinks(root) {

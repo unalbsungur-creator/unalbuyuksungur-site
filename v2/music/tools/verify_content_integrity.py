@@ -120,6 +120,16 @@ VIDEO_DECISIONS = {
     "r-0068": "lJTRetMuCzk",  # #38 Yoksun
 }
 VIDEO_DECISIONS_UPDATED_AT = "2026-10-21"
+# Görev 221: V1 sitesindeki single bağlantılarından, eser adı ve Spotify sayfa başlığıyla birebir doğrulanan
+# Spotify bağlantıları (sahip onaylı). Bir Kedim Var: tek şarkılık single albümü.
+SPOTIFY_DECISIONS = {
+    "r-0013": "https://open.spotify.com/track/6Zr3vhg8T0sJ35l5fGhwvI",  # Benimle Yaşlanacaktın
+    "r-0015": "https://open.spotify.com/track/2x2u6eIdxcJXjwcXdmcUAN",  # Biliyorum
+    "r-0017": "https://open.spotify.com/album/4fmPI48qPzsRXPXRdUvbNA",  # Bir Kedim Var
+    "r-0024": "https://open.spotify.com/track/7cO5d7HGc4nKxtvD1pwMwx",  # Çat Çat Çat
+    "r-0029": "https://open.spotify.com/track/0pzadgEdDUNpxLhtSTneKb",  # Elimi Sıktın
+    "r-0053": "https://open.spotify.com/track/5DcxqmKthQEozgGvcg4UCU",  # Seninle
+}
 # Görev 25 kullanıcı onaylı site hikâyesi düzeltmesi (Ağlama, w-0001; Word belgesi değişmedi).
 AGLAMA_CORRECTION = ("content/stories/w-0001.txt",
                      "1998/ Flört bitince gözler kapaklarını açtığı ve damlalar gelmeye başladı",
@@ -305,12 +315,14 @@ def expected_split_catalog(before):
 
 
 def apply_later_decisions(data):
-    """Görev 25'ten sonra onaylanan kayıt videolarını ekler (Görev 36, 40 ve 86)."""
+    """Görev 25'ten sonra onaylanan kayıt videolarını (Görev 36, 40 ve 86) ve Spotify bağlantılarını (Görev 221) ekler."""
     data = json.loads(json.dumps(data))
     for recording in data["recordings"]:
         if recording["id"] in VIDEO_DECISIONS:
             recording["videos"] = [{"provider": "youtube", "videoId": VIDEO_DECISIONS[recording["id"]],
                                     "videoType": "official-music-video"}]
+        if recording["id"] in SPOTIFY_DECISIONS:
+            recording["links"]["spotify"] = SPOTIFY_DECISIONS[recording["id"]]
     data["updatedAt"] = VIDEO_DECISIONS_UPDATED_AT
     return data
 
@@ -525,7 +537,8 @@ def archive_checks(report, catalog, archive):
         problems.append("Görev 25 yedek kataloğu beklenen sürüm değil")
     expected = apply_later_decisions(expected_split_catalog(json.loads(before_path.read_text(encoding="utf-8"))))
     problems += [key for key in sorted(set(expected) | set(catalog)) if expected.get(key) != catalog.get(key)]
-    report.check("Katalog = Görev 25 öncesi yedek + ayırma kararı + onaylı 49 eski ve 16 yeni video (başka fark yok)",
+    report.check("Katalog = Görev 25 öncesi yedek + ayırma kararı + onaylı 49 eski ve 16 yeni video "
+                 "+ 6 onaylı Spotify bağlantısı (başka fark yok)",
                  problems)
 
     backup = {}

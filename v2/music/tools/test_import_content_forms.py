@@ -23,6 +23,7 @@ from xml.sax.saxutils import escape
 sys.dont_write_bytecode = True  # v2/ altında __pycache__ oluşmasın (herkese açık klasör)
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import import_content_forms as icf  # noqa: E402
+from verify_content_integrity import SPOTIFY_DECISIONS  # noqa: E402  (Görev 221 Spotify bağlantıları)
 
 TOOL = Path(icf.__file__).resolve()
 CATALOG = icf.DATA_DIR / "catalog.json"
@@ -160,6 +161,9 @@ def write_fixture_catalog(path):
             work["story"] = {"status": "missing", "file": None}
     for recording in data["recordings"]:
         recording.pop("lyrics", None)
+        # Görev 221: sitede sonradan yayımlanan Spotify bağlantıları fikstüre girmez (testler aracın mantığını sınar).
+        if recording["id"] in SPOTIFY_DECISIONS:
+            recording["links"]["spotify"] = None
     path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
     return path
 
@@ -483,7 +487,10 @@ class ImportFormsTest(unittest.TestCase):
     def test_live_catalog_identical_published_content_is_ready(self):
         work = self.live_work("w-0014")
         read = lambda p: (MUSIC_ROOT / p).read_text(encoding="utf-8").rstrip("\n").split("\n")  # noqa: E731
-        report = self.live(complete_form(lyrics=read(work["lyrics"]["file"]), story=read(work["story"]["file"])))
+        # Canlı katalogda r-0015'in Spotify bağlantısı var (Görev 221); form aynı adresi taşır.
+        live_spotify = SPOTIFY_DECISIONS["r-0015"]
+        report = self.live(complete_form(lyrics=read(work["lyrics"]["file"]), story=read(work["story"]["file"]),
+                                         recordings=[recording(version="Orijinal", spotify=live_spotify)]))
         self.assertEqual(report["conflicts"], [])
         self.assertIn("lyrics: yayımlanmış içerikle birebir aynı", report["notes"])
         self.assertIn("story: yayımlanmış içerikle birebir aynı", report["notes"])

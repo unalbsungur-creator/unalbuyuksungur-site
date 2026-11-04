@@ -18,6 +18,15 @@ SHELL_ROUTES = {"home": "", "catalog": "music/", "studio": "studio/"}
 OG_IMAGE = {"path": "images/og/unal-digital-world-og-1200x630.jpg", "type": "image/jpeg",
             "width": "1200", "height": "630"}
 SEO_TAG = re.compile(r'<link rel="(canonical|alternate)"|<meta (property="og:(?!locale")|name="twitter:)')
+# Görev 221: yalnız Türkçe sayfalar (blog, gizlilik). EN/DE karşılıkları yoktur; hreflang üretilmez.
+# Blog yazı sayfalarının canonical'ı Blogspot'taki orijinal adrestir (sitemap'e girmez).
+BLOG_POSTS = {
+    "yapay-zeka-ile-uretildi-diye-degersiz-mi": "https://unalbsungur.blogspot.com/2026/05/yapay-zeka-ile-uretildi-diye-degersiz-mi.html",
+    "2026-yazinda-turkiye-turizmi": "https://unalbsungur.blogspot.com/2026/05/2026-yaznda-turkiye-turizmi-ezberler.html",
+    "ne-yapayim": "https://unalbsungur.blogspot.com/2026/04/ne-yapaym.html",
+}
+TR_PAGES = {"v2/blog/index.html": ("blog/", None), "v2/privacy/index.html": ("privacy/", None)}
+TR_PAGES.update({f"v2/blog/{slug}/index.html": (f"blog/{slug}/", url) for slug, url in BLOG_POSTS.items()})
 SRCSET_ATTRIBUTE = re.compile(r'\b(?P<name>srcset|imagesrcset)="(?P<value>[^"]*)"')
 SURFACES = {
     "home": ("v2/index.html", "index.html"),
@@ -86,17 +95,28 @@ def alternates(route, profile):
 
 def shell_seo(text, locale, surface, profile, config):
     """Canonical, hreflang (x-default = TR), Open Graph and Twitter tags of a TR/EN/DE shell page."""
+    url = locale_url(locale, SHELL_ROUTES[surface], profile)
+    return seo_block(text, url, profile, alternates(SHELL_ROUTES[surface], profile))
+
+
+def tr_page_seo(text, rel, profile):
+    """Görev 221: Turkish-only page; canonical is the page itself or, for blog posts, the original Blogspot URL."""
+    route, canonical = TR_PAGES[rel]
+    return seo_block(text, canonical or locale_url("tr", route, profile), profile, None)
+
+
+def seo_block(text, url, profile, alternate_links):
     if SEO_TAG.search(text):
-        raise LocaleError("[SEO-SHELL] source shell already carries canonical/alternate/og/twitter tags")
+        raise LocaleError("[SEO-SHELL] source page already carries canonical/alternate/og/twitter tags")
     title = re.findall(r"<title>([^<]*)</title>", text)
     description = re.findall(r'<meta name="description"\s+content="([^"]*)">', text)
     if len(title) != 1 or len(description) != 1:
         raise LocaleError("[SEO-SHELL] expected one <title> and one meta description")
     title, description = html.unescape(title[0]).strip(), " ".join(html.unescape(description[0]).split())
-    url = locale_url(locale, SHELL_ROUTES[surface], profile)
     image = render_pages.absolute(render_pages.profile_base(profile), OG_IMAGE["path"])
-    tags = [f'    <link rel="canonical" href="{html.escape(url, quote=True)}">',
-            alternates(SHELL_ROUTES[surface], profile)]
+    tags = [f'    <link rel="canonical" href="{html.escape(url, quote=True)}">']
+    if alternate_links:
+        tags.append(alternate_links)
     for prop, value in (("og:type", "website"), ("og:site_name", "Ünal Büyüksungur"), ("og:title", title),
                         ("og:description", description), ("og:url", url), ("og:image", image),
                         ("og:image:type", OG_IMAGE["type"]), ("og:image:width", OG_IMAGE["width"]),
@@ -144,7 +164,8 @@ def render_page(text, locale, surface, messages, config, work=None, profile="pre
         if surface in ("home", "catalog", "studio"):
             description_key = {"home": "home.meta", "catalog": "music.description",
                                "studio": "studio.meta"}[surface]
-            text = re.sub(r'(<meta name="description" content=")[^"]*(")',
+            # Görev 221: the attribute may be wrapped onto the next line (\s+), which previously left it untranslated.
+            text = re.sub(r'(<meta name="description"\s+content=")[^"]*(")',
                           lambda m: m[1] + html.escape(lookup(messages, locale, description_key), quote=True) + m[2],
                           text, count=1)
         if surface == "home":
@@ -178,18 +199,21 @@ def render_page(text, locale, surface, messages, config, work=None, profile="pre
         elif surface == "work":
             text = replace_once(text, "Eser | Müzik Dünyam | Ünal Büyüksungur",
                                 ("Work | My Music" if locale == "en" else "Werk | Meine Musik") + " | Ünal Büyüksungur")
+        # Görev 221: blog/ and privacy/ are Turkish-only pages; EN/DE pages link to the Turkish ones.
         changes = {
             "home": {"images/": "../images/", "external-links.js": "../external-links.js",
-                     "i18n/": "../i18n/"},
+                     "i18n/": "../i18n/", "blog/": "../blog/", "privacy/": "../privacy/"},
             "catalog": {"catalog.css": "../../music/catalog.css", "catalog.js": "../../music/catalog.js",
                         "../images/": "../../images/", "../external-links.js": "../../external-links.js",
-                        "../i18n/": "../../i18n/"},
+                        "../i18n/": "../../i18n/", "../privacy/": "../../privacy/"},
             "work": {"../catalog.css": "../../../music/catalog.css", "work.css": "../../../music/work/work.css",
                       "work.js": "../../../music/work/work.js", "../../external-links.js": "../../../external-links.js",
-                      "../../images/": "../../../images/", "../../i18n/": "../../../i18n/"},
+                      "../../images/": "../../../images/", "../../i18n/": "../../../i18n/",
+                      "../../privacy/": "../../../privacy/"},
             "studio": {"../music/catalog.css": "../../music/catalog.css",
                        "studio.css": "../../studio/studio.css", "../images/": "../../images/",
-                       "../i18n/": "../../i18n/"},
+                       "../i18n/": "../../i18n/", "../privacy/": "../../privacy/",
+                       "../external-links.js": "../../external-links.js"},
         }[surface]
 
         def asset(m):
@@ -268,4 +292,6 @@ def render(catalog, sources, profile="preview"):
         for surface, (source, route) in SURFACES.items():
             pages["v2/" + locale + "/" + route] = render_page(
                 sources[source].decode("utf-8"), locale, surface, messages, config, profile=profile)
+    for rel in TR_PAGES:
+        pages[rel] = tr_page_seo(sources[rel].decode("utf-8"), rel, profile).encode("utf-8")
     return pages

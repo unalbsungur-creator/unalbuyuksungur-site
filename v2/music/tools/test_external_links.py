@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-"""Görev 59: onaylı V2 dış bağlantılarının kaynak, kullanım ve güvenlik regresyonları."""
+"""Görev 59: onaylı V2 dış bağlantılarının kaynak, kullanım ve güvenlik regresyonları.
+
+Görev 221: sahip kararıyla Etsy (Pixel & Petal Digital) ve "Tüm parçaları dinle" Spotify playlist'i eklendi."""
 
 import re
 import sys
@@ -27,6 +29,8 @@ EXPECTED = {
     "appleMusic": "https://music.apple.com/us/artist/%C3%BCnal-b%C3%BCy%C3%BCksungur/1868323918",
     "blog": "https://unalbsungur.blogspot.com/",
     "shopier": "https://www.shopier.com/unalbuyuksungur/",
+    "etsy": "https://pixelandpetaldigital.etsy.com",
+    "spotifyPlaylist": "https://open.spotify.com/playlist/6od7MgDo7kL9DHUgiT40rT",
 }
 
 
@@ -37,7 +41,6 @@ def source_links():
 class ExternalLinksTests(unittest.TestCase):
     def test_canonical_source_is_exactly_the_approved_allowlist(self):
         self.assertEqual(source_links(), EXPECTED)
-        self.assertNotIn("etsy", SOURCE.lower())
         self.assertNotRegex(SOURCE.lower(), r"mailto:|tel:")
 
     def test_pages_use_the_single_canonical_source(self):
@@ -54,11 +57,11 @@ class ExternalLinksTests(unittest.TestCase):
         catalog = PAGES["catalog"]
         for key in ("linkedin", "instagram", "facebook", "tiktok"):
             self.assertRegex(home, rf'<a class="social-link" data-external-link="{key}"')
-        for key in ("spotify", "youtubeMusic", "appleMusic", "youtube"):
+        for key in ("spotify", "youtubeMusic", "appleMusic", "youtube", "spotifyPlaylist"):
             self.assertRegex(catalog, rf'<a class="platform-link" data-external-link="{key}"')
         self.assertRegex(home, r'id="yazilar"[\s\S]*?data-external-link="blog"')
-        self.assertRegex(home, r'id="magaza"[\s\S]*?data-external-link="shopier"')
-        self.assertNotRegex(home.lower(), r"etsy|mailto:|tel:|iletişim formu")
+        self.assertRegex(home, r'id="magaza"[\s\S]*?data-external-link="shopier"[\s\S]*?data-external-link="etsy"')
+        self.assertNotRegex(home.lower(), r"mailto:|tel:|iletişim formu")
 
     def test_runtime_applies_external_link_security_and_accessible_names(self):
         self.assertIn('anchor.target = "_blank"', SOURCE)

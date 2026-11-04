@@ -1154,6 +1154,16 @@ input {
     margin: 0 auto;
 }
 
+/* Görev 221: footer'daki Gizlilik bağlantısı */
+.footer-privacy {
+    color: inherit;
+    text-underline-offset: 3px;
+}
+
+.footer-privacy:hover {
+    color: var(--gold);
+}
+
 .footer-links {
     display: flex;
     flex-wrap: wrap;

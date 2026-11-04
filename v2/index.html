@@ -1229,6 +1229,121 @@
             }
         }
 
+        /* ---------- Yazılar (Görev 221) ---------- */
+
+        .writing {
+            scroll-margin-top: var(--header-height);
+            padding: clamp(64px, 7vw, 104px) var(--gutter);
+            border-top: 1px solid rgba(201, 166, 107, 0.12);
+        }
+
+        .writing-inner {
+            max-width: 1320px;
+            margin: 0 auto;
+        }
+
+        html[lang="tr"] .lang-note {
+            display: none;
+        }
+
+        .post-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 24px;
+            margin: 36px 0 24px;
+            padding: 0;
+            list-style: none;
+        }
+
+        .post-card {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            overflow: hidden;
+            border: 1px solid rgba(201, 166, 107, 0.2);
+            border-radius: 4px;
+            background: linear-gradient(150deg, #172338, #101927);
+            color: var(--text);
+            text-decoration: none;
+            transition: border-color 0.3s ease, transform 0.3s ease;
+        }
+
+        .post-card:hover,
+        .post-card:focus-visible {
+            border-color: var(--gold);
+            transform: translateY(-2px);
+        }
+
+        .post-card img {
+            display: block;
+            width: 100%;
+            height: auto;
+            aspect-ratio: 16 / 10;
+            object-fit: cover;
+        }
+
+        .post-card-body {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding: 22px 24px 26px;
+        }
+
+        .post-card-meta {
+            font-size: 12px;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            color: var(--gold);
+        }
+
+        .post-card-title {
+            font-family: var(--font-serif);
+            font-size: clamp(20px, 2vw, 24px);
+            line-height: 1.3;
+        }
+
+        .post-card-text {
+            font-size: 15px;
+            color: var(--muted);
+        }
+
+        .writing-links {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px 32px;
+        }
+
+        .shop-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 24px;
+            max-width: 1260px;
+        }
+
+        .shop-grid .shop-card {
+            max-width: none;
+        }
+
+        .about-text {
+            max-width: 860px;
+        }
+
+        .footer-privacy {
+            color: inherit;
+            text-underline-offset: 3px;
+        }
+
+        .footer-privacy:hover {
+            color: var(--gold);
+        }
+
+        @media (max-width: 900px) {
+            .post-grid,
+            .shop-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
         /* V1 adres koruması: eski #sosyal, #blog ve #satis bağlantılarının hedefleri */
         .anchor-target {
             display: block;
@@ -1258,7 +1373,8 @@
                 <li><a href="studio/">Müzik Stüdyosu</a></li>
                 <li><a href="#projeler">Dijital Projeler</a></li>
                 <li><a href="#yazilar">Yazılar</a></li>
-                <li><a href="#galeri">Galeri</a></li>
+                <!-- Galeri geçici olarak gizlendi (Görev 221): <li><a href="#galeri">Galeri</a></li> -->
+                <li><a href="#magaza">Mağaza</a></li>
                 <li><a href="#hakkimda">Hakkımda</a></li>
             </ul>
         </nav>
@@ -1387,6 +1503,7 @@
                         </div>
                     </a>
                 </li>
+                <!-- Galeri kartı geçici olarak gizlendi (Görev 221)
                 <li>
                     <a class="card" href="#galeri">
                         <div class="card-media card-media--galeri">
@@ -1414,6 +1531,7 @@
                         </div>
                     </a>
                 </li>
+                -->
             </ul>
         </section>
 
@@ -1539,22 +1657,64 @@
                 <a class="stop-link" href="music/">Kataloğu Keşfet</a>
             </section>
 
-            <section class="stop" id="yazilar" aria-labelledby="yazilar-baslik">
-                <span class="anchor-target" id="blog" aria-hidden="true"></span>
-                <span class="badge">Yakında</span>
-                <h2 id="yazilar-baslik">Yazılar</h2>
-                <p>Şiir ve deneme arşivi düzenleniyor.</p>
-                <a class="stop-link external-stop-link" data-external-link="blog" data-external-label="ÜNALBLOG'u aç">
-                    <span data-external-display>ÜNALBLOG</span>'a Git
-                </a>
-            </section>
-
+            <!-- Galeri geçici olarak gizlendi (Görev 221)
             <section class="stop" id="galeri" aria-labelledby="galeri-baslik">
                 <span class="badge">Yakında</span>
                 <h2 id="galeri-baslik">Galeri</h2>
                 <p>Fotoğraf ve video seçkisi hazırlanıyor.</p>
             </section>
+            -->
         </div>
+
+        <section class="writing" id="yazilar" aria-labelledby="yazilar-baslik">
+            <span class="anchor-target" id="blog" aria-hidden="true"></span>
+            <div class="writing-inner">
+                <p class="eyebrow">DIGITAL WORLD / YAZILAR</p>
+                <h2 class="section-title" id="yazilar-baslik">Yazılar</h2>
+                <p class="section-lead lang-note">Yazılar Türkçedir.</p>
+                <ul class="post-grid">
+                    <li>
+                        <a class="post-card" href="blog/#yapay-zeka-ile-uretildi-diye-degersiz-mi">
+                            <img src="images/blog/yapay-zeka-ile-uretildi-diye-degersiz-mi-800.webp" width="800" height="800" loading="lazy"
+                                decoding="async" alt="">
+                            <span class="post-card-body">
+                                <span class="post-card-meta">Teknoloji · 23 Mayıs 2026</span>
+                                <span class="post-card-title">Yapay Zeka ile Üretildi Diye Değersiz mi?</span>
+                                <span class="post-card-text">İnsanlar artık ortaya çıkan işe değil, o işin hangi araçla üretildiğine odaklanıyor. Oysa sanatın gerçek ölçüsü hep aynı oldu...</span>
+                            </span>
+                        </a>
+                    </li>
+                    <li>
+                        <a class="post-card" href="blog/#2026-yazinda-turkiye-turizmi">
+                            <img src="images/blog/2026-yazinda-turkiye-turizmi-549.webp" width="549" height="286" loading="lazy"
+                                decoding="async" alt="">
+                            <span class="post-card-body">
+                                <span class="post-card-meta">Turizm &amp; Strateji · 21 Mayıs 2026</span>
+                                <span class="post-card-title">2026 Yazında Türkiye Turizmi: Ezberler, Bahaneler ve Değişen Fiyat Algısı</span>
+                                <span class="post-card-text">Sektör temsilcilerinin yeniden tanıdık argümanların arkasına sığındığı bu yaz sezonunda gerçekte ne oluyor?</span>
+                            </span>
+                        </a>
+                    </li>
+                    <li>
+                        <a class="post-card" href="blog/#ne-yapayim">
+                            <img src="images/blog/ne-yapayim-800.webp" width="800" height="436" loading="lazy"
+                                decoding="async" alt="">
+                            <span class="post-card-body">
+                                <span class="post-card-meta">Müzik · 3 Nisan 2026</span>
+                                <span class="post-card-title">Ne YAPAYım?</span>
+                                <span class="post-card-text">30 yıl öncesinin sözleri bir beden ile hayat buldu. Yapay zeka ile kendi şarkılarımı nasıl ürettim ve tüm platformlara taşıdım...</span>
+                            </span>
+                        </a>
+                    </li>
+                </ul>
+                <div class="writing-links">
+                    <a class="stop-link" href="blog/">Tüm yazılar</a>
+                    <a class="stop-link external-stop-link" data-external-link="blog" data-external-label="ÜNALBLOG'u aç">
+                        <span data-external-display>ÜNALBLOG</span>'a Git
+                    </a>
+                </div>
+            </div>
+        </section>
 
         <section class="shop" id="magaza" aria-labelledby="magaza-baslik">
             <span class="anchor-target" id="satis" aria-hidden="true"></span>
@@ -1562,25 +1722,41 @@
                 <p class="eyebrow">DIGITAL WORLD / MAĞAZA</p>
                 <h2 class="section-title" id="magaza-baslik">Mağaza</h2>
                 <p class="section-lead">Dijital ürünlerime güvenli mağaza sayfam üzerinden ulaşabilirsiniz.</p>
-                <article class="shop-card">
-                    <span class="badge">Shopier</span>
-                    <h3 data-external-display>Shopier Mağazam</h3>
-                    <p>Türkiye'deki alıcılar için dijital ürünlerimi Shopier üzerinden keşfedin.</p>
-                    <a class="shop-link" data-external-link="shopier" data-external-label="Shopier Mağazamı aç">
-                        <span class="platform-icon" aria-hidden="true">S</span>
-                        <span>Mağazayı Ziyaret Et</span>
-                    </a>
-                </article>
+                <div class="shop-grid">
+                    <article class="shop-card">
+                        <span class="badge">Shopier</span>
+                        <h3>Shopier Mağazam</h3>
+                        <p>Şarkılarım ve dijital ürünlerim</p>
+                        <a class="shop-link" data-external-link="shopier" data-external-label="Shopier Mağazamı aç">
+                            <span class="platform-icon" aria-hidden="true">S</span>
+                            <span>Mağazayı Ziyaret Et</span>
+                        </a>
+                    </article>
+                    <article class="shop-card">
+                        <span class="badge">Etsy</span>
+                        <h3>Pixel &amp; Petal Digital</h3>
+                        <p>Dijital tasarım ürünleri</p>
+                        <a class="shop-link" data-external-link="etsy"
+                            data-external-label="Pixel &amp; Petal Digital Etsy mağazasını aç">
+                            <span class="platform-icon" aria-hidden="true">E</span>
+                            <span>Mağazayı Ziyaret Et</span>
+                        </a>
+                    </article>
+                </div>
             </div>
         </section>
 
         <section class="about" id="hakkimda" aria-labelledby="hakkimda-baslik">
             <span class="anchor-target" id="sosyal" aria-hidden="true"></span>
             <div class="about-inner">
-                <span class="badge">Yakında</span>
                 <h2 class="section-title" id="hakkimda-baslik">Hakkımda</h2>
-                <p class="section-lead">Burası, hikâyemi ve farklı alanlardaki çalışmalarımı paylaştığım kişisel dünyam.
-                </p>
+                <p class="section-lead about-text">Müzik, teknoloji ve yaratıcılığın buluştuğu bir dünyada kendi
+                    hikâyemi yazıyorum. Uzun yıllara dayanan profesyonel iş hayatımın ardından, müziğe olan tutkumu yapay
+                    zekânın sunduğu imkânlarla birleştirerek kendi eserlerimi üretmeye başladım. Şarkılarımda bazen aşkı,
+                    bazen özlemi, bazen de hayatın içinden gerçek hikâyeleri anlatıyorum. Bunun yanında video
+                    prodüksiyonu, dijital içerik üretimi ve yazılım projeleriyle yeni fikirleri hayata geçiriyorum.
+                    Ünal Büyüksungur Dijital Dünyası, ürettiklerimi paylaştığım, keşfetmeye ve öğrenmeye devam ettiğim
+                    kişisel yolculuğumun bir yansıması.</p>
                 <ul class="social-links" aria-label="Sosyal medya bağlantıları">
                     <li><a class="social-link" data-external-link="linkedin"
                             data-external-label="Ünal Büyüksungur LinkedIn profilini aç"><span class="platform-icon"
@@ -1609,7 +1785,7 @@
 
     <footer class="site-footer">
         <div class="footer-inner">
-            <span>© Ünal Büyüksungur · Digital World</span>
+            <span>© Ünal Büyüksungur · Digital World · <a class="footer-privacy" href="privacy/">Gizlilik</a></span>
             <ul class="footer-links" aria-label="Hızlı erişim">
                 <li><a class="footer-link" data-external-link="instagram"
                         data-external-label="Instagram profilini aç"><span aria-hidden="true">◎</span></a></li>

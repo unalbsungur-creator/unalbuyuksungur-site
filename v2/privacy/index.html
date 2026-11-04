@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gizlilik | Ünal Büyüksungur</title>
+    <meta name="description" content="Ünal Büyüksungur Digital World gizlilik bilgisi.">
+    <link rel="icon" type="image/jpeg" href="../images/favicon.jpg.jpeg">
+    <meta property="og:locale" content="tr_TR">
+    <link rel="stylesheet" href="../music/catalog.css">
+    <link rel="stylesheet" href="../blog/blog.css">
+    <script>document.documentElement.classList.add("js");</script>
+</head>
+
+<body>
+    <a class="skip-link" href="#icerik">İçeriğe geç</a>
+    <header class="site-header" id="site-header">
+        <a class="monogram" href="../" aria-label="Ünal Büyüksungur — ana sayfa">ÜB</a>
+        <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav">
+            <span class="nav-toggle-icon" aria-hidden="true"></span><span class="nav-toggle-label">Menü</span>
+        </button>
+        <nav class="site-nav" id="site-nav" aria-label="Ana menü">
+            <ul class="nav-list">
+                <li><a href="../music/">Müzik</a></li>
+                <li><a href="../studio/">Müzik Stüdyosu</a></li>
+                <li><a href="../#projeler">Dijital Projeler</a></li>
+                <li><a href="../#yazilar">Yazılar</a></li>
+                <li><a href="../#magaza">Mağaza</a></li>
+                <li><a href="../#hakkimda">Hakkımda</a></li>
+            </ul>
+        </nav>
+    </header>
+    <main id="icerik" class="blog-main">
+        <article class="post privacy">
+            <h1 class="post-title">Gizlilik</h1>
+            <p>Bu sitede kişisel veri toplayan bir form bulunmaz. Site çerez ya da analiz (analytics) aracı kullanmaz.</p>
+            <p>Dil tercihiniz yalnızca tarayıcınızda (localStorage) saklanır; sunucuya gönderilmez.</p>
+            <p>Eser sayfalarındaki videolar, oynat düğmesine bastığınızda YouTube'un çerezsiz oynatıcısıyla
+                (youtube-nocookie.com) yüklenir. Perspective sayfası yazı tiplerini Google Fonts'tan yükler. Gömülü
+                YouTube içerikleri ve dış bağlantılar (Spotify, Apple Music, Instagram, Shopier, Etsy, Blogspot vb.)
+                kendi gizlilik politikalarına tabidir.</p>
+            <p>İletişim için <a data-external-link="instagram" data-external-label="Instagram profilini aç">Instagram</a>
+                veya <a data-external-link="linkedin" data-external-label="LinkedIn profilini aç">LinkedIn</a> üzerinden
+                ulaşabilirsiniz.</p>
+
+            <h2 lang="en">Privacy</h2>
+            <p lang="en">This site has no forms that collect personal data and uses no cookies or analytics. Your
+                language preference is stored only in your browser (localStorage). Videos load from YouTube's
+                privacy-enhanced player (youtube-nocookie.com) when you press play; the Perspective page loads fonts
+                from Google Fonts. Embedded YouTube content and external links are subject to their own privacy
+                policies. You can reach me on Instagram or LinkedIn.</p>
+
+            <h2 lang="de">Datenschutz</h2>
+            <p lang="de">Diese Website enthält keine Formulare, die personenbezogene Daten erfassen, und verwendet
+                keine Cookies oder Analysedienste. Ihre Spracheinstellung wird nur in Ihrem Browser (localStorage)
+                gespeichert. Videos werden erst beim Abspielen über den datenschutzfreundlichen YouTube-Player
+                (youtube-nocookie.com) geladen; die Perspective-Seite lädt Schriften von Google Fonts. Für eingebettete
+                YouTube-Inhalte und externe Links gelten deren eigene Datenschutzrichtlinien. Kontakt über Instagram
+                oder LinkedIn.</p>
+        </article>
+    </main>
+    <footer class="site-footer">
+        <div class="footer-inner"><span>© Ünal Büyüksungur · Digital World · <a class="footer-privacy"
+                    href="../privacy/">Gizlilik</a></span></div>
+    </footer>
+    <script src="../external-links.js"></script>
+    <script>
+        (function () {
+            var header = document.getElementById("site-header");
+            var toggle = header.querySelector(".nav-toggle");
+            var nav = document.getElementById("site-nav");
+            function setOpen(open) {
+                nav.classList.toggle("is-open", open);
+                toggle.setAttribute("aria-expanded", String(open));
+            }
+            toggle.addEventListener("click", function () { setOpen(toggle.getAttribute("aria-expanded") !== "true"); });
+            nav.addEventListener("click", function (event) { if (event.target.closest("a")) setOpen(false); });
+            document.addEventListener("keydown", function (event) {
+                if (event.key === "Escape" && nav.classList.contains("is-open")) { setOpen(false); toggle.focus(); }
+            });
+            function onScroll() { header.classList.toggle("is-scrolled", window.scrollY > 24); }
+            window.addEventListener("scroll", onScroll, { passive: true });
+            onScroll();
+        })();
+    </script>
+</body>
+
+</html>

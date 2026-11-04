@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[3]
 CATALOG = json.loads((ROOT / "v2/music/data/catalog.json").read_text(encoding="utf-8"))
 SOURCES = {p: (ROOT / p).read_bytes() for p in (
     "v2/index.html", "v2/music/index.html", "v2/music/work/index.html", "v2/studio/index.html",
-    "v2/i18n/config.json", "v2/i18n/tr.json", "v2/i18n/en.json", "v2/i18n/de.json")}
+    "v2/i18n/config.json", "v2/i18n/tr.json", "v2/i18n/en.json", "v2/i18n/de.json", *render_site.TR_PAGES)}
 
 
 class MultilingualTests(unittest.TestCase):
@@ -35,8 +35,9 @@ class MultilingualTests(unittest.TestCase):
     def test_static_locales_and_metadata(self):
         ids = {w["id"] for w in CATALOG["works"]}
         self.assertEqual(len(ids), 68)
-        # Turkish: 68 works + 3 rendered shells (Görev 220); EN/DE: 68 works + 4 shells each.
-        self.assertEqual(len(self.pages), 215)
+        # Turkish: 68 works + 3 rendered shells (Görev 220) + 5 Turkish-only pages (Görev 221: blog, posts,
+        # privacy); EN/DE: 68 works + 4 shells each.
+        self.assertEqual(len(self.pages), 220)
         for locale in ("en", "de"):
             home = self.pages[f"v2/{locale}/index.html"].decode("utf-8")
             catalog = self.pages[f"v2/{locale}/music/index.html"].decode("utf-8")
@@ -99,20 +100,53 @@ class MultilingualTests(unittest.TestCase):
                 self.pages[f"v2/{locale}/studio/index.html"].decode("utf-8")
             with self.subTest(locale=locale):
                 self.assertIn(f'<html lang="{locale}">', studio)
-                for package, price, revisions, alternatives in (("START", "690 TL", 3, 8),
-                                                                 ("PLUS", "1.190 TL", 5, 12),
-                                                                 ("PREMIUM", "2.290 TL", 10, 22)):
+                for package, revisions, alternatives in (("START", 3, 8), ("PLUS", 5, 12), ("PREMIUM", 10, 22)):
                     card = studio.split(f'<h3 id="studio-{package.lower()}">{package}</h3>', 1)[1].split('</article>', 1)[0]
-                    self.assertIn(price, card)
                     self.assertIn(f'<strong>{revisions}</strong> {messages[locale]["studio.revisionCount"]}', card)
                     self.assertIn(f'<strong>{alternatives}</strong> {messages[locale]["studio.alternatives"]}', card)
-                for key in ("studio.status", "studio.clock", "studio.revisions", "studio.formats",
-                            "studio.rights", "studio.weekday", "studio.holidays"):
-                    self.assertIn(messages[locale][key], " ".join(html.unescape(studio).split()))
+                    self.assertNotRegex(card, r"\bTL\b|₺|EUR|€")  # Görev 221: fiyatlar kaldırıldı
+                text = " ".join(html.unescape(studio).split())
+                for key in ("studio.status", "studio.service.song", "studio.service.video", "studio.step1",
+                            "studio.step6", "studio.pricesNote", "studio.inc1", "studio.inc2", "studio.exc1",
+                            "studio.exc4", "studio.usageText", "studio.notifyText", "studio.notifyCta"):
+                    self.assertIn(messages[locale][key], text, key)
+                # Görev 221: fiyat, çalışma saati, acil tarife, teslim süresi ve satın alma çağrısı yok.
+                self.assertNotRegex(text, r"\d+[.,]?\d* ?TL|09:00|18:00|acil tarife|teslim süresi|satın al")
                 self.assertNotRegex(studio.lower(), r'<form\b|checkout|shopier|type="email"|<iframe\b')
                 self.assertEqual(studio.count('aria-current="page"'), 1)
                 self.assertIn('href="../music/"', studio)
                 self.assertIn('href="./" aria-current="page"', studio)
+
+    def test_turkish_only_pages_and_links(self):
+        """Görev 221: blog, yazı ve gizlilik sayfaları yalnız TR; EN/DE sayfaları TR sayfalarına bağlanır."""
+        production = render_site.render(CATALOG, SOURCES, "production")
+        blog = production["v2/blog/index.html"].decode("utf-8")
+        self.assertIn('<link rel="canonical" href="https://unalbuyuksungur.com/blog/">', blog)
+        self.assertIn('<link rel="canonical" href="https://unalbuyuksungur.com/privacy/">',
+                      production["v2/privacy/index.html"].decode("utf-8"))
+        for slug, url in render_site.BLOG_POSTS.items():
+            post = production[f"v2/blog/{slug}/index.html"].decode("utf-8")
+            self.assertIn(f'<link rel="canonical" href="{url}">', post)
+            self.assertIn(f'<meta property="og:url" content="{url}">', post)
+            self.assertIn(f'href="{url}" target="_blank" rel="noopener">Blogda oku →</a>', post)
+            self.assertIn(f'id="{slug}"', blog)
+        for rel in render_site.TR_PAGES:
+            self.assertNotIn("hreflang", production[rel].decode("utf-8"), rel)
+        for locale, note in (("en", "Articles are in Turkish."), ("de", "Die Artikel sind auf Türkisch.")):
+            home = self.pages[f"v2/{locale}/index.html"].decode("utf-8")
+            self.assertIn(note, home)
+            self.assertEqual(home.count('href="../blog/#'), 3)
+            self.assertIn('href="../privacy/"', home)
+            self.assertIn('href="../../privacy/"', self.pages[f"v2/{locale}/studio/index.html"].decode("utf-8"))
+            self.assertIn('href="../../../privacy/"',
+                          self.pages[f"v2/{locale}/music/work/w-0001.html"].decode("utf-8"))
+        # Menü: Galeri yok, Mağaza var (3 dilde aynı sıra).
+        for source in ("v2/index.html", "v2/music/index.html", "v2/music/work/index.html", "v2/studio/index.html",
+                       *render_site.TR_PAGES):
+            nav = SOURCES[source].decode("utf-8").split('<ul class="nav-list">', 1)[1].split("</ul>", 1)[0]
+            visible = re.sub(r"<!--.*?-->", "", nav, flags=re.S)
+            self.assertEqual(re.findall(r">([^<]+)</a>", visible),
+                             ["Müzik", "Müzik Stüdyosu", "Dijital Projeler", "Yazılar", "Mağaza", "Hakkımda"], source)
 
     def test_studio_navigation_and_responsive_styles(self):
         for locale in ("tr", "en", "de"):
@@ -185,7 +219,9 @@ class MultilingualTests(unittest.TestCase):
         self.assertNotIn("Dinleme bağlantıları yakında eklenecek", source + template)
         self.assertIn("@media (max-width: 560px)", style)
         self.assertIn(".listen-links .button {\n        width: 100%;", style)
-        recording = next(r for r in CATALOG["recordings"] if r["links"]["spotify"])
+        # Üç platform bağlantısı da olan kayıt (Görev 221 sonrası yalnız Spotify bağlantılı kayıtlar da var).
+        recording = next(r for r in CATALOG["recordings"]
+                         if all(r["links"][key] for key in ("spotify", "appleMusic", "youtubeMusic")))
         messages = {loc: json.loads((ROOT / f"v2/i18n/{loc}.json").read_text(encoding="utf-8"))
                     for loc in ("tr", "en", "de")}
         titles = {"tr": "Müzik Platformlarında Dinle", "en": "Listen on Music Platforms",

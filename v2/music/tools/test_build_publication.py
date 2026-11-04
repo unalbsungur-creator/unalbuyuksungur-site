@@ -36,6 +36,8 @@ LOCALE_SHELLS = {f"v2/{locale}/{route}index.html" for locale in ("en", "de")
                  for route in ("", "music/", "music/work/", "studio/")}
 # Görev 220: TR kabuk sayfaları da profile göre SEO etiketleriyle üretilir.
 ALL_PAGES = PAGES | LOCALE_PAGES | LOCALE_SHELLS | set(bp.RENDERED_SHELLS)
+# Görev 221: yalnız Türkçe blog, yazı ve gizlilik sayfaları da üretilir.
+ALL_PAGES |= set(bp.render_site.TR_PAGES)
 SHELLS = LOCALE_SHELLS | set(bp.RENDERED_SHELLS)
 # Görev 73 öncesindeki _headers baytları: preview noindex korunmalı, dosya birebir aynı kalmalı.
 HEADERS_BEFORE = ("# build_publication.py tarafından üretildi; elle düzenlemeyin.\n/*\n  X-Robots-Tag: noindex\n"
@@ -44,7 +46,7 @@ HEADERS_BEFORE = ("# build_publication.py tarafından üretildi; elle düzenleme
 
 def expected_web_files():
     """Allowlist, oluşturucudan bağımsız olarak yeniden hesaplanır."""
-    files = (set(bp.SITE_FILES) - set(bp.RENDERED_SHELLS)) | {bp.CATALOG, bp.MUSIC + "data/schema.json"}
+    files = (set(bp.SITE_FILES) - set(bp.RENDERED_PAGES)) | {bp.CATALOG, bp.MUSIC + "data/schema.json"}
     files |= {bp.LEGACY_IMAGES + name for name in bp.LEGACY_V1_IMAGES}
     for work in CATALOG["works"]:
         files |= {bp.MUSIC + work[k]["file"] for k in ("lyrics", "story") if work[k]["status"] == "published"}
@@ -104,17 +106,17 @@ class BuildPublicationTests(unittest.TestCase):
     def test_output_is_exactly_the_allowlist(self):
         manifest = self.build()
         web = expected_web_files()
-        self.assertEqual(len(web), 376)  # V1 favicon, V2 favicon ile aynı paket yoluna düşer (alias)
+        self.assertEqual(len(web), 382)  # V1 favicon, V2 favicon ile aynı paket yoluna düşer (alias)
         self.assertEqual(len(PAGES), 68)
         generated = {"_headers", "_redirects", "robots.txt"}
         self.assertEqual(set(self.tree()), published(web) | published(ALL_PAGES) | generated)
-        self.assertEqual(len(self.tree()), 593)
+        self.assertEqual(len(self.tree()), 604)
         self.assertEqual([n for n in self.tree() if n.startswith(("v2/", "legacy/"))], [])
-        self.assertEqual((manifest["webFiles"], manifest["copiedFiles"], manifest["renderedPages"]), (590, 375, 215))
-        self.assertEqual(manifest["totalOutputFiles"], 593)
+        self.assertEqual((manifest["webFiles"], manifest["copiedFiles"], manifest["renderedPages"]), (601, 381, 220))
+        self.assertEqual(manifest["totalOutputFiles"], 604)
         self.assertEqual(manifest["profile"], "preview")
-        self.assertEqual(manifest["groups"], {"site": 29, "data": 2, "lyrics": 64, "stories": 64, "webp": 204,
-                                               "legacyImages": 12, "pages": 215})
+        self.assertEqual(manifest["groups"], {"site": 35, "data": 2, "lyrics": 64, "stories": 64, "webp": 204,
+                                               "legacyImages": 12, "pages": 220})
         self.assertEqual([(a["path"], a["source"], a["sameAs"]) for a in manifest["aliases"]],
                          [("images/favicon.jpg.jpeg", "v2/legacy/v1-images/favicon.jpg.jpeg",
                            "v2/images/favicon.jpg.jpeg")])
@@ -160,7 +162,7 @@ class BuildPublicationTests(unittest.TestCase):
     def test_output_bytes_identical_to_source(self):
         manifest = self.build()
         tree = self.tree()
-        self.assertEqual(len(manifest["files"]), 375)
+        self.assertEqual(len(manifest["files"]), 381)
         self.assertEqual(tree["images/favicon.jpg.jpeg"], (REPO / "images/favicon.jpg.jpeg").read_bytes())
         for entry in manifest["files"]:
             source = (REPO / entry["source"]).read_bytes()
@@ -182,7 +184,8 @@ class BuildPublicationTests(unittest.TestCase):
             rel = entry["source"]
             self.assertEqual(entry["path"], bp.published_path(rel))
             self.assertEqual(bp.sha256(tree[entry["path"]]), entry["sha256"])
-            source = ("v2/index.html" if rel in {"v2/index.html", "v2/en/index.html", "v2/de/index.html"}
+            source = (rel if rel in bp.render_site.TR_PAGES
+                      else "v2/index.html" if rel in {"v2/index.html", "v2/en/index.html", "v2/de/index.html"}
                       else "v2/music/index.html" if rel in {"v2/music/index.html", "v2/en/music/index.html",
                                                             "v2/de/music/index.html"}
                       else "v2/studio/index.html" if rel in {"v2/studio/index.html", "v2/en/studio/index.html",
@@ -190,9 +193,9 @@ class BuildPublicationTests(unittest.TestCase):
                       else "v2/music/work/index.html")
             self.assertEqual((entry["template"], entry["templateSha256"]),
                              (source, bp.sha256((REPO / source).read_bytes())))
-            if rel not in bp.RENDERED_SHELLS:
+            if rel not in bp.RENDERED_PAGES:
                 self.assertFalse((REPO / rel).exists(), "statik sayfa kaynakta olmamalı")
-            if rel not in SHELLS:
+            if rel not in SHELLS and rel not in bp.render_site.TR_PAGES:
                 work_id = rel[-11:-5]
                 locale = rel.split("/")[1]
                 locale_prefix = locale + "/" if locale in ("en", "de") else ""
@@ -244,7 +247,7 @@ class BuildPublicationTests(unittest.TestCase):
         """Görev 220: ana alan adında noindex yok (yalnız pages.dev), robots/sitemap üretilir, URL'ler köktedir."""
         manifest = self.build(profile="production")
         tree = self.tree()
-        self.assertEqual((manifest["profile"], manifest["totalOutputFiles"]), ("production", 594))
+        self.assertEqual((manifest["profile"], manifest["totalOutputFiles"]), ("production", 605))
         headers = tree["_headers"].decode("utf-8")
         self.assertTrue(headers.startswith(bp.MARKER + "\n"))
         self.assertIn("https://unalbuyuksungur-v2.pages.dev/*\n  X-Robots-Tag: noindex\n", headers)
@@ -254,7 +257,10 @@ class BuildPublicationTests(unittest.TestCase):
         self.assertEqual(tree["robots.txt"],
                          b"User-agent: *\nAllow: /\nSitemap: https://unalbuyuksungur.com/sitemap.xml\n")
         sitemap = tree["sitemap.xml"].decode("utf-8")
-        self.assertEqual(sitemap.count("<url>"), 3 * (3 + len(CATALOG["works"])))
+        self.assertEqual(sitemap.count("<url>"), 3 * (3 + len(CATALOG["works"])) + 1)  # + /blog/ (Görev 221)
+        self.assertIn("<loc>https://unalbuyuksungur.com/blog/</loc>", sitemap)
+        for slug in bp.render_site.BLOG_POSTS:
+            self.assertNotIn(f"/blog/{slug}/", sitemap)  # canonical'ı Blogspot'a veren yazılar sitemap'te yok
         self.assertIn("<loc>https://unalbuyuksungur.com/en/music/work/w-0001</loc>", sitemap)
         self.assertIn('hreflang="x-default" href="https://unalbuyuksungur.com/studio/"', sitemap)
         self.assertNotIn("/v2/", sitemap)
@@ -416,12 +422,12 @@ class BuildPublicationTests(unittest.TestCase):
 
     def test_cli_exit_codes(self):
         run = [sys.executable, "-I", str(SCRIPT), "--root", str(self.root), "--out", "_site"]
-        ok = subprocess.run(run + ["--expect-count", "590"], capture_output=True, text=True, encoding="utf-8")
+        ok = subprocess.run(run + ["--expect-count", "601"], capture_output=True, text=True, encoding="utf-8")
         self.assertEqual(ok.returncode, 0, ok.stderr)
-        self.assertIn("375/375", ok.stdout)
-        self.assertIn("üretilen sayfa 215 (preview)", ok.stdout)
+        self.assertIn("381/381", ok.stdout)
+        self.assertIn("üretilen sayfa 220 (preview)", ok.stdout)
         manifest = json.loads((self.root / "_site-manifest.json").read_text(encoding="utf-8"))
-        self.assertEqual(manifest["totalOutputFiles"], 593)
+        self.assertEqual(manifest["totalOutputFiles"], 604)
         bad = subprocess.run(run + ["--profile", "staging"], capture_output=True, text=True, encoding="utf-8")
         self.assertEqual(bad.returncode, 2)  # argparse: geçersiz profil seçimi
         (self.root / "v2/music/catalog.css").unlink()
