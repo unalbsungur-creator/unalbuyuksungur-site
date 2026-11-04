@@ -171,6 +171,13 @@ def render_page(text, locale, surface, messages, config, work=None, profile="pre
                           lambda m: m[1] + html.escape(lookup(messages, locale, description_key), quote=True) + m[2],
                           text, count=1)
         if surface == "home":
+            # Görev 223: "Yazılar Türkçedir." notu yalnız EN/DE ana sayfada; TR kaynakta yoktur.
+            text, notes = re.subn(r'(<h2 class="section-title" id="yazilar-baslik">[^<]*</h2>\n)',
+                                  lambda m: m[1] + '                <p class="section-lead lang-note">'
+                                  + html.escape(lookup(messages, locale, "home.writing.note"), quote=False) + "</p>\n",
+                                  text, count=1)
+            if notes != 1:
+                raise LocaleError("[I18N-TEMPLATE] writing heading not found")
             text = replace_once(text, "<span data-external-display>ÜNALBLOG</span>'a Git",
                                 (("Visit " if locale == "en" else "Zum ") +
                                  "<span data-external-display>ÜNALBLOG</span>"))

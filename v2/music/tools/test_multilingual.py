@@ -136,6 +136,12 @@ class MultilingualTests(unittest.TestCase):
             self.assertIn(f'id="{slug}"', blog)
         for rel in render_site.TR_PAGES:
             self.assertNotIn("hreflang", production[rel].decode("utf-8"), rel)
+        # Görev 223: not yalnız EN/DE ana sayfada; TR ana sayfada ve başlıkta "V2" yok.
+        tr_home = self.pages["v2/index.html"].decode("utf-8")
+        self.assertNotIn("lang-note", tr_home)
+        self.assertNotIn("Yazılar Türkçedir.", tr_home)
+        self.assertIn("<title>Ünal Büyüksungur | Digital World</title>", tr_home)
+        self.assertNotIn("Digital World V2", "".join(p.decode("utf-8") for p in self.pages.values()))
         for locale, note in (("en", "Articles are in Turkish."), ("de", "Die Artikel sind auf Türkisch.")):
             home = self.pages[f"v2/{locale}/index.html"].decode("utf-8")
             self.assertIn(note, home)
