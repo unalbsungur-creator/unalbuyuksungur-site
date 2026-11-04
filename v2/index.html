@@ -416,6 +416,12 @@
                 radial-gradient(circle at 50% 50%, rgba(201, 166, 107, 0.14), transparent 65%);
         }
 
+        .card-media--magaza {
+            background-image:
+                linear-gradient(135deg, rgba(201, 166, 107, 0.12), transparent 55%),
+                radial-gradient(circle at 30% 70%, rgba(201, 166, 107, 0.18), transparent 50%);
+        }
+
         .card-media--galeri {
             background-image:
                 linear-gradient(135deg, rgba(201, 166, 107, 0.12), transparent 55%),
@@ -1344,6 +1350,47 @@
             }
         }
 
+        /* Görev 222: Galeri gizliyken Müzik bölümü tam genişlikte tek satır (iki sınıf: medya sorgularını geçer) */
+        .stops.stops--single {
+            grid-template-columns: 1fr;
+        }
+
+        .stops--single .stop {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px 28px;
+            padding: 28px 0 20px;
+            border-left: 0;
+        }
+
+        .stops--single .stop .badge,
+        .stops--single .stop h2 {
+            margin: 0;
+        }
+
+        .stops--single .stop-link {
+            margin: 0 0 0 auto;
+        }
+
+        @media (max-width: 680px) {
+            .stops--single .stop {
+                display: block;
+            }
+
+            .stops--single .stop .badge {
+                margin-bottom: 14px;
+            }
+
+            .stops--single .stop h2 {
+                margin-bottom: 8px;
+            }
+
+            .stops--single .stop-link {
+                margin: 6px 0 0;
+            }
+        }
+
         /* V1 adres koruması: eski #sosyal, #blog ve #satis bağlantılarının hedefleri */
         .anchor-target {
             display: block;
@@ -1532,6 +1579,33 @@
                     </a>
                 </li>
                 -->
+                <li>
+                    <a class="card" href="#magaza">
+                        <div class="card-media card-media--magaza">
+                            <span class="card-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"
+                                    stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                                    <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
+                                    <path d="M3 6h18" />
+                                    <path d="M16 10a4 4 0 0 1-8 0" />
+                                </svg>
+                            </span>
+                        </div>
+                        <div class="card-body">
+                            <span class="card-index" aria-hidden="true">04</span>
+                            <h3>Mağazam</h3>
+                            <p class="card-text">Şarkılarım ve dijital tasarım ürünlerim</p>
+                            <div class="card-foot">
+                                <span class="card-tags">Shopier · Etsy</span>
+                                <svg class="card-arrow" width="22" height="22" viewBox="0 0 24 24" fill="none"
+                                    stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
+                                    stroke-linejoin="round" aria-hidden="true" focusable="false">
+                                    <path d="M5 12h14M13 6l6 6-6 6" />
+                                </svg>
+                            </div>
+                        </div>
+                    </a>
+                </li>
             </ul>
         </section>
 
@@ -1649,7 +1723,7 @@
             </div>
         </section>
 
-        <div class="stops">
+        <div class="stops stops--single">
             <section class="stop" id="muzik" aria-labelledby="muzik-baslik">
                 <span class="badge">Yayında</span>
                 <h2 id="muzik-baslik">Müzik</h2>
@@ -1721,7 +1795,7 @@
             <div class="shop-inner">
                 <p class="eyebrow">DIGITAL WORLD / MAĞAZA</p>
                 <h2 class="section-title" id="magaza-baslik">Mağaza</h2>
-                <p class="section-lead">Dijital ürünlerime güvenli mağaza sayfam üzerinden ulaşabilirsiniz.</p>
+                <p class="section-lead">Şarkılarıma ve dijital tasarım ürünlerime iki mağazamdan ulaşabilirsiniz.</p>
                 <div class="shop-grid">
                     <article class="shop-card">
                         <span class="badge">Shopier</span>

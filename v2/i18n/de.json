@@ -72,7 +72,7 @@
     "home.gallery.description": "Eine Auswahl an Fotos und Videos entsteht gerade.",
     "home.shop.eyebrow": "DIGITAL WORLD / SHOP",
     "home.shop.title": "Shop",
-    "home.shop.lead": "Meine digitalen Produkte finden Sie auf meiner sicheren Shop-Seite.",
+    "home.shop.lead": "Meine Songs und digitalen Designprodukte finden Sie in meinen beiden Shops.",
     "home.shop.description": "Meine Songs und digitalen Produkte",
     "home.shop.cta": "Zum Shop",
     "home.about.lead": "In einer Welt, in der Musik, Technologie und Kreativität aufeinandertreffen, schreibe ich meine eigene Geschichte. Nach vielen Jahren im Berufsleben habe ich begonnen, meine Leidenschaft für Musik mit den Möglichkeiten der künstlichen Intelligenz zu verbinden und eigene Werke zu schaffen. In meinen Liedern erzähle ich mal von Liebe, mal von Sehnsucht und mal von wahren Geschichten aus dem Leben. Daneben setze ich mit Videoproduktion, digitaler Content-Erstellung und Softwareprojekten neue Ideen um. Ünal Büyüksungur Digital World ist ein Spiegel meiner persönlichen Reise: ein Ort, an dem ich teile, was ich erschaffe, und an dem ich weiter entdecke und lerne.",
@@ -209,5 +209,7 @@
     "label.spotify": "Spotify-Künstlerprofil von Ünal Büyüksungur öffnen",
     "label.appleMusic": "Apple-Music-Künstlerprofil von Ünal Büyüksungur öffnen",
     "label.youtubeMusic": "YouTube-Music-Profil von Ünal Büyüksungur Music öffnen",
-    "label.youtube": "YouTube-Kanal von Ünal Büyüksungur Music öffnen"
+    "label.youtube": "YouTube-Kanal von Ünal Büyüksungur Music öffnen",
+    "home.card.shop": "Mein Shop",
+    "home.card.shopDesc": "Meine Songs und digitalen Designprodukte"
 }

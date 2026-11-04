@@ -72,7 +72,7 @@
     "home.gallery.description": "Fotoğraf ve video seçkisi hazırlanıyor.",
     "home.shop.eyebrow": "DIGITAL WORLD / MAĞAZA",
     "home.shop.title": "Mağaza",
-    "home.shop.lead": "Dijital ürünlerime güvenli mağaza sayfam üzerinden ulaşabilirsiniz.",
+    "home.shop.lead": "Şarkılarıma ve dijital tasarım ürünlerime iki mağazamdan ulaşabilirsiniz.",
     "home.shop.description": "Şarkılarım ve dijital ürünlerim",
     "home.shop.cta": "Mağazayı Ziyaret Et",
     "home.about.lead": "Müzik, teknoloji ve yaratıcılığın buluştuğu bir dünyada kendi hikâyemi yazıyorum. Uzun yıllara dayanan profesyonel iş hayatımın ardından, müziğe olan tutkumu yapay zekânın sunduğu imkânlarla birleştirerek kendi eserlerimi üretmeye başladım. Şarkılarımda bazen aşkı, bazen özlemi, bazen de hayatın içinden gerçek hikâyeleri anlatıyorum. Bunun yanında video prodüksiyonu, dijital içerik üretimi ve yazılım projeleriyle yeni fikirleri hayata geçiriyorum. Ünal Büyüksungur Dijital Dünyası, ürettiklerimi paylaştığım, keşfetmeye ve öğrenmeye devam ettiğim kişisel yolculuğumun bir yansıması.",
@@ -209,5 +209,7 @@
     "label.spotify": "Ünal Büyüksungur Spotify sanatçı profilini aç",
     "label.appleMusic": "Ünal Büyüksungur Apple Music sanatçı profilini aç",
     "label.youtubeMusic": "Ünal Büyüksungur Music YouTube Music profilini aç",
-    "label.youtube": "Ünal Büyüksungur Music YouTube kanalını aç"
+    "label.youtube": "Ünal Büyüksungur Music YouTube kanalını aç",
+    "home.card.shop": "Mağazam",
+    "home.card.shopDesc": "Şarkılarım ve dijital tasarım ürünlerim"
 }

@@ -122,12 +122,16 @@ class MultilingualTests(unittest.TestCase):
         production = render_site.render(CATALOG, SOURCES, "production")
         blog = production["v2/blog/index.html"].decode("utf-8")
         self.assertIn('<link rel="canonical" href="https://unalbuyuksungur.com/blog/">', blog)
+        self.assertIn('<meta name="robots" content="noindex, follow">', blog)  # Görev 222
+        self.assertIn('<meta property="og:type" content="website">', blog)
         self.assertIn('<link rel="canonical" href="https://unalbuyuksungur.com/privacy/">',
                       production["v2/privacy/index.html"].decode("utf-8"))
         for slug, url in render_site.BLOG_POSTS.items():
             post = production[f"v2/blog/{slug}/index.html"].decode("utf-8")
             self.assertIn(f'<link rel="canonical" href="{url}">', post)
             self.assertIn(f'<meta property="og:url" content="{url}">', post)
+            self.assertIn('<meta property="og:type" content="article">', post)  # Görev 222
+            self.assertNotIn('name="robots"', post)
             self.assertIn(f'href="{url}" target="_blank" rel="noopener">Blogda oku →</a>', post)
             self.assertIn(f'id="{slug}"', blog)
         for rel in render_site.TR_PAGES:

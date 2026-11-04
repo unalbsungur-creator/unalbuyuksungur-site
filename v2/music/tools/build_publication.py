@@ -182,8 +182,7 @@ def sitemap(profile, pages):
             lines += [f'    <xhtml:link rel="alternate" hreflang="{code}" href="{html.escape(href, quote=True)}"/>'
                       for code, href in alternates]
             lines.append("  </url>")
-    # Görev 221: yalnız Türkçe blog sayfası; yazı sayfaları canonical'ı Blogspot'a verdiği için sitemap'e girmez.
-    lines.append(f"  <url>\n    <loc>{html.escape(render_site.locale_url('tr', 'blog/', profile))}</loc>\n  </url>")
+    # Görev 222: /blog/ noindex olduğu, yazı sayfaları canonical'ı Blogspot'a verdiği için sitemap'e girmez.
     lines.append("</urlset>")
     return "\n".join(lines) + "\n"
 

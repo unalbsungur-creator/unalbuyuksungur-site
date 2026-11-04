@@ -72,7 +72,7 @@
     "home.gallery.description": "A selection of photos and videos is in the works.",
     "home.shop.eyebrow": "DIGITAL WORLD / SHOP",
     "home.shop.title": "Shop",
-    "home.shop.lead": "Explore my digital products through my secure shop page.",
+    "home.shop.lead": "You can find my songs and digital design products in my two shops.",
     "home.shop.description": "My songs and digital products",
     "home.shop.cta": "Visit the Shop",
     "home.about.lead": "In a world where music, technology and creativity meet, I am writing my own story. After many years of professional working life, I began creating my own works by combining my passion for music with the possibilities of artificial intelligence. In my songs I sometimes tell of love, sometimes of longing, and sometimes of real stories taken from life. Alongside this, I bring new ideas to life through video production, digital content creation and software projects. Ünal Büyüksungur Digital World is a reflection of my personal journey: a place where I share what I create and keep exploring and learning.",
@@ -209,5 +209,7 @@
     "label.spotify": "Open Ünal Büyüksungur's Spotify artist profile",
     "label.appleMusic": "Open Ünal Büyüksungur's Apple Music artist profile",
     "label.youtubeMusic": "Open the Ünal Büyüksungur Music profile on YouTube Music",
-    "label.youtube": "Open the Ünal Büyüksungur Music YouTube channel"
+    "label.youtube": "Open the Ünal Büyüksungur Music YouTube channel",
+    "home.card.shop": "My Shop",
+    "home.card.shopDesc": "My songs and digital design products"
 }

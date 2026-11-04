@@ -257,8 +257,9 @@ class BuildPublicationTests(unittest.TestCase):
         self.assertEqual(tree["robots.txt"],
                          b"User-agent: *\nAllow: /\nSitemap: https://unalbuyuksungur.com/sitemap.xml\n")
         sitemap = tree["sitemap.xml"].decode("utf-8")
-        self.assertEqual(sitemap.count("<url>"), 3 * (3 + len(CATALOG["works"])) + 1)  # + /blog/ (Görev 221)
-        self.assertIn("<loc>https://unalbuyuksungur.com/blog/</loc>", sitemap)
+        self.assertEqual(sitemap.count("<url>"), 3 * (3 + len(CATALOG["works"])))
+        self.assertNotIn("/blog/", sitemap)  # Görev 222: /blog/ noindex
+        self.assertIn(b'<meta name="robots" content="noindex, follow">', tree["blog/index.html"])
         for slug in bp.render_site.BLOG_POSTS:
             self.assertNotIn(f"/blog/{slug}/", sitemap)  # canonical'ı Blogspot'a veren yazılar sitemap'te yok
         self.assertIn("<loc>https://unalbuyuksungur.com/en/music/work/w-0001</loc>", sitemap)

@@ -102,10 +102,12 @@ def shell_seo(text, locale, surface, profile, config):
 def tr_page_seo(text, rel, profile):
     """Görev 221: Turkish-only page; canonical is the page itself or, for blog posts, the original Blogspot URL."""
     route, canonical = TR_PAGES[rel]
-    return seo_block(text, canonical or locale_url("tr", route, profile), profile, None)
+    # Görev 222: blog yazıları og:type=article.
+    return seo_block(text, canonical or locale_url("tr", route, profile), profile, None,
+                     "article" if canonical else "website")
 
 
-def seo_block(text, url, profile, alternate_links):
+def seo_block(text, url, profile, alternate_links, og_type="website"):
     if SEO_TAG.search(text):
         raise LocaleError("[SEO-SHELL] source page already carries canonical/alternate/og/twitter tags")
     title = re.findall(r"<title>([^<]*)</title>", text)
@@ -117,7 +119,7 @@ def seo_block(text, url, profile, alternate_links):
     tags = [f'    <link rel="canonical" href="{html.escape(url, quote=True)}">']
     if alternate_links:
         tags.append(alternate_links)
-    for prop, value in (("og:type", "website"), ("og:site_name", "Ünal Büyüksungur"), ("og:title", title),
+    for prop, value in (("og:type", og_type), ("og:site_name", "Ünal Büyüksungur"), ("og:title", title),
                         ("og:description", description), ("og:url", url), ("og:image", image),
                         ("og:image:type", OG_IMAGE["type"]), ("og:image:width", OG_IMAGE["width"]),
                         ("og:image:height", OG_IMAGE["height"]), ("og:image:alt", title)):
