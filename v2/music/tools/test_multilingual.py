@@ -35,7 +35,8 @@ class MultilingualTests(unittest.TestCase):
     def test_static_locales_and_metadata(self):
         ids = {w["id"] for w in CATALOG["works"]}
         self.assertEqual(len(ids), 68)
-        self.assertEqual(len(self.pages), 212)  # Turkish: 68; EN/DE: 68 works + 4 shells each.
+        # Turkish: 68 works + 3 rendered shells (Görev 220); EN/DE: 68 works + 4 shells each.
+        self.assertEqual(len(self.pages), 215)
         for locale in ("en", "de"):
             home = self.pages[f"v2/{locale}/index.html"].decode("utf-8")
             catalog = self.pages[f"v2/{locale}/music/index.html"].decode("utf-8")
@@ -43,11 +44,11 @@ class MultilingualTests(unittest.TestCase):
             for page, route in ((home, ""), (catalog, "music/"), (studio, "studio/")):
                 with self.subTest(locale=locale, route=route):
                     self.assertIn(f'<html lang="{locale}">', page)
-                    self.assertIn(f'<link rel="canonical" href="{render_site.locale_url(locale, route)}">', page)
+                    self.assertIn(f'<link rel="canonical" href="{render_site.locale_url(locale, route, "preview")}">', page)
                     self.assertIn(f'content="{ "en_US" if locale == "en" else "de_DE" }"', page)
-                    self.assertEqual(page.count('rel="alternate" hreflang='), 3)
+                    self.assertEqual(page.count('rel="alternate" hreflang='), 4)  # tr, en, de, x-default
                     self.assertIn('X-Robots-Tag: noindex',
-                                  __import__('build_publication').GENERATED['_headers'])
+                                  __import__('build_publication').generated("preview", {})['_headers'])
                     self.assertEqual(page.count('class="language-switcher"'), 1)
                     self.assertEqual(page.count('aria-current="true"'), 1)
             self.assertIn("Digital Projects" if locale == "en" else "Digitale Projekte", home)
@@ -61,10 +62,33 @@ class MultilingualTests(unittest.TestCase):
             for work_id in ids:
                 page = self.pages[f"v2/{locale}/music/work/{work_id}.html"].decode("utf-8")
                 self.assertIn(f'<html lang="{locale}" data-work-id="{work_id}">', page)
-                self.assertIn(f'<link rel="canonical" href="{render_site.locale_url(locale, "music/work/" + work_id)}">', page)
-                self.assertEqual(page.count('rel="alternate" hreflang='), 3)
+                self.assertIn(f'<link rel="canonical" href="{render_site.locale_url(locale, "music/work/" + work_id, "preview")}">', page)
+                self.assertEqual(page.count('rel="alternate" hreflang='), 4)
                 self.assertIn('src="../../../music/work/work.js"', page)
                 self.assertIn('src="../../../i18n/runtime.js"', page)
+
+    def test_shell_seo_per_profile(self):
+        """Görev 220: every TR/EN/DE shell gets canonical, hreflang (x-default = TR), OG and Twitter tags."""
+        production = render_site.render(CATALOG, SOURCES, "production")
+        for pages, origin in ((self.pages, "https://unalbuyuksungur-v2.pages.dev/"),
+                              (production, "https://unalbuyuksungur.com/")):
+            for locale in ("tr", "en", "de"):
+                prefix = "" if locale == "tr" else locale + "/"
+                for route in ("", "music/", "studio/"):
+                    page = pages["v2/" + prefix + route + "index.html"].decode("utf-8")
+                    with self.subTest(origin=origin, locale=locale, route=route):
+                        self.assertIn(f'<link rel="canonical" href="{origin}{prefix}{route}">', page)
+                        self.assertIn(f'<link rel="alternate" hreflang="x-default" href="{origin}{route}">', page)
+                        self.assertIn(f'<meta property="og:url" content="{origin}{prefix}{route}">', page)
+                        self.assertIn(f'<meta property="og:image" content="{origin}images/og/'
+                                      'unal-digital-world-og-1200x630.jpg">', page)
+                        for tag in ('property="og:title"', 'property="og:description"', 'name="twitter:card"',
+                                    'name="twitter:title"', 'name="twitter:description"', 'name="twitter:image"'):
+                            self.assertEqual(page.count(tag), 1, tag)
+                        self.assertNotIn("/v2/", page)
+        self.assertNotIn("pages.dev", "".join(p.decode("utf-8") for p in production.values()))
+        with self.assertRaisesRegex(render_site.LocaleError, "I18N-PROFILE"):
+            render_site.render(CATALOG, SOURCES, "staging")
 
     def test_studio_packages_and_inactive_ordering(self):
         messages = {locale: json.loads((ROOT / f"v2/i18n/{locale}.json").read_text(encoding="utf-8"))

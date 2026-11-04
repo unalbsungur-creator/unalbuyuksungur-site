@@ -4,14 +4,14 @@
 Her eser için v2/music/work/w-0001.html … üretilir. Sayfa, eser şablonunun (v2/music/work/index.html)
 kendisidir; yalnızca head içindeki varsayılan metadata bölgesi eserin statik metadata'sıyla değiştirilir ve
 <html> etiketine data-work-id eklenir. Gövde, stil ve betik yolları şablonla bayt bayt aynı kalır; dosya aynı
-klasörde olduğu için göreli yollar değişmez. Cloudflare Pages w-0001.html dosyasını /v2/music/work/w-0001
-adresinde sunar.
+klasörde olduğu için göreli yollar değişmez. Cloudflare Pages w-0001.html dosyasını /music/work/w-0001
+adresinde sunar (Görev 220: paket köke yazılır).
 
 Metadata yalnızca katalogdaki bilgilerden üretilir (başlık, dil, koleksiyon, yayımlanmış söz/hikâye, video,
 kapak). Tarih, tür ve orijinallik yazılmaz. Bütün değerler escape edilir; eksik ya da şüpheli veride
 RenderError ile durulur (kısmi çıktı yok). Çıktı belirlenimcidir: zaman damgası, ortam değişkeni yoktur.
 
-Yalnızca preview profili tanımlıdır; production (ana alan adı) bu görevde bilerek yoktur.
+İki profil vardır: preview (unalbuyuksungur-v2.pages.dev) ve production (unalbuyuksungur.com).
 """
 
 import html
@@ -22,9 +22,11 @@ TEMPLATE = "v2/music/work/index.html"
 OUTPUT_DIR = "v2/music/work/"
 SITE_NAME = "Ünal Büyüksungur"
 
-# Ortam profili: mutlak metadata URL'lerinin kökü. Yeni profil bilinçli olarak eklenmeli (ör. production).
+# Ortam profili: mutlak metadata URL'lerinin kökü. Görev 220: paket /v2/ öneki olmadan köke yazılır;
+# preview pages.dev önizlemesidir (noindex), production ana alan adıdır.
 PROFILES = {
-    "preview": {"origin": "https://unalbuyuksungur-v2.pages.dev", "prefix": "/v2/"},
+    "preview": {"origin": "https://unalbuyuksungur-v2.pages.dev", "prefix": "/"},
+    "production": {"origin": "https://unalbuyuksungur.com", "prefix": "/"},
 }
 
 LANGUAGE_NAMES = {"tr": "Türkçe", "de": "Almanca"}  # work.js ile aynı

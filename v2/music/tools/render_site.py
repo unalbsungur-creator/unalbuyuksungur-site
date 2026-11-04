@@ -11,8 +11,14 @@ import re
 
 import render_pages
 
-ORIGIN = "https://unalbuyuksungur-v2.pages.dev"
 ROOT = "v2/"
+# Görev 220: TR/EN/DE kabuk sayfalarının canonical, hreflang, Open Graph ve Twitter etiketleri build sırasında
+# profile göre üretilir; kaynak sayfalar bu etiketleri taşımaz. og:image, hero görselinin 1200×630 türevidir.
+SHELL_ROUTES = {"home": "", "catalog": "music/", "studio": "studio/"}
+OG_IMAGE = {"path": "images/og/unal-digital-world-og-1200x630.jpg", "type": "image/jpeg",
+            "width": "1200", "height": "630"}
+SEO_TAG = re.compile(r'<link rel="(canonical|alternate)"|<meta (property="og:(?!locale")|name="twitter:)')
+SRCSET_ATTRIBUTE = re.compile(r'\b(?P<name>srcset|imagesrcset)="(?P<value>[^"]*)"')
 SURFACES = {
     "home": ("v2/index.html", "index.html"),
     "catalog": ("v2/music/index.html", "music/index.html"),
@@ -68,13 +74,43 @@ def localize_text(text, locale, messages):
                          html.escape(html.unescape(translated(m.group("value"))), quote=True) + '"', text)
 
 
-def locale_url(locale, route):
-    return ORIGIN + "/v2/" + (locale + "/" if locale != "tr" else "") + route
+def locale_url(locale, route, profile):
+    return render_pages.profile_base(profile) + (locale + "/" if locale != "tr" else "") + route
 
 
-def alternates(route):
-    return "\n".join('    <link rel="alternate" hreflang="' + locale + '" href="' + locale_url(locale, route) + '">'
-                     for locale in ("tr", "en", "de"))
+def alternates(route, profile):
+    links = [(locale, locale_url(locale, route, profile)) for locale in ("tr", "en", "de")]
+    links.append(("x-default", locale_url("tr", route, profile)))
+    return "\n".join('    <link rel="alternate" hreflang="' + locale + '" href="' + url + '">' for locale, url in links)
+
+
+def shell_seo(text, locale, surface, profile, config):
+    """Canonical, hreflang (x-default = TR), Open Graph and Twitter tags of a TR/EN/DE shell page."""
+    if SEO_TAG.search(text):
+        raise LocaleError("[SEO-SHELL] source shell already carries canonical/alternate/og/twitter tags")
+    title = re.findall(r"<title>([^<]*)</title>", text)
+    description = re.findall(r'<meta name="description"\s+content="([^"]*)">', text)
+    if len(title) != 1 or len(description) != 1:
+        raise LocaleError("[SEO-SHELL] expected one <title> and one meta description")
+    title, description = html.unescape(title[0]).strip(), " ".join(html.unescape(description[0]).split())
+    url = locale_url(locale, SHELL_ROUTES[surface], profile)
+    image = render_pages.absolute(render_pages.profile_base(profile), OG_IMAGE["path"])
+    tags = [f'    <link rel="canonical" href="{html.escape(url, quote=True)}">',
+            alternates(SHELL_ROUTES[surface], profile)]
+    for prop, value in (("og:type", "website"), ("og:site_name", "Ünal Büyüksungur"), ("og:title", title),
+                        ("og:description", description), ("og:url", url), ("og:image", image),
+                        ("og:image:type", OG_IMAGE["type"]), ("og:image:width", OG_IMAGE["width"]),
+                        ("og:image:height", OG_IMAGE["height"]), ("og:image:alt", title)):
+        tags.append(f'    <meta property="{prop}" content="{html.escape(value, quote=True)}">')
+    for name, value in (("twitter:card", "summary_large_image"), ("twitter:title", title),
+                        ("twitter:description", description), ("twitter:image", image)):
+        tags.append(f'    <meta name="{name}" content="{html.escape(value, quote=True)}">')
+    anchor = re.search(r'    <meta property="og:locale" content="[a-z]{2}_[A-Z]{2}">\r?\n', text)
+    if anchor is None:
+        raise LocaleError("[SEO-SHELL] og:locale line not found")
+    newline = "\r\n" if anchor.group(0).endswith("\r\n") else "\n"
+    block = newline.join("\n".join(tags).split("\n")) + newline
+    return text[:anchor.end()] + block + text[anchor.end():]
 
 
 def replace_once(text, old, new):
@@ -91,7 +127,7 @@ def relative_route(source, locale, route):
     return rel
 
 
-def render_page(text, locale, surface, messages, config, work=None, catalog=None):
+def render_page(text, locale, surface, messages, config, work=None, profile="preview"):
     """Localize a source HTML document while keeping stable catalog facts and shared assets."""
     original, route = SURFACES[surface]
     seo_route = {"home": "", "catalog": "music/", "work": "music/work/", "studio": "studio/"}[surface]
@@ -132,12 +168,11 @@ def render_page(text, locale, surface, messages, config, work=None, catalog=None
                     raise LocaleError("[I18N-META] missing " + attr)
         text = replace_once(text, 'property="og:locale" content="tr_TR"',
                             'property="og:locale" content="' + config["ogLocales"][locale] + '"')
-        old_canonical = locale_url("tr", seo_route)
-        new_canonical = locale_url(locale, seo_route)
-        if surface != "work" or work is not None:
+        old_canonical = locale_url("tr", seo_route, profile)
+        new_canonical = locale_url(locale, seo_route, profile)
+        if work is not None:
             text = replace_once(text, 'rel="canonical" href="' + old_canonical + '"',
                                 'rel="canonical" href="' + new_canonical + '"')
-        if work is not None:
             text = replace_once(text, 'property="og:url" content="' + old_canonical + '"',
                                 'property="og:url" content="' + new_canonical + '"')
         elif surface == "work":
@@ -167,7 +202,21 @@ def render_page(text, locale, surface, messages, config, work=None, catalog=None
             return m.group(0)
 
         text = ASSET_ATTRIBUTE.sub(asset, text)
-        # The shared music assets are loaded from /v2/music/; navigation stays within the locale.
+
+        # Görev 220: responsive image candidates (srcset/imagesrcset) follow the same shared-asset rewrite.
+        def candidates(m):
+            rewritten = []
+            for candidate in m.group("value").split(","):
+                parts = candidate.strip().split()
+                if not parts:
+                    raise LocaleError("[I18N-SRCSET] empty image candidate")
+                inner = ASSET_ATTRIBUTE.match('src="' + parts[0] + '"')
+                parts[0] = asset(inner)[len('src="'):-1]
+                rewritten.append(" ".join(parts))
+            return m.group("name") + '="' + ", ".join(rewritten) + '"'
+
+        text = SRCSET_ATTRIBUTE.sub(candidates, text)
+        # The shared music assets are loaded from the root music/ folder; navigation stays within the locale.
         if surface == "work":
             script = '<script>window.UNAL_MESSAGES=' + json.dumps(messages[locale], ensure_ascii=True,
                                                                   separators=(",", ":")) + ';</script>'
@@ -189,27 +238,34 @@ def render_page(text, locale, surface, messages, config, work=None, catalog=None
     text = re.sub(r'(<a data-locale="(tr|en|de)"[^>]*?) aria-current="true"', r'\1', text)
     text = re.sub(r'(<a data-locale="' + locale + r'"[^>]*)(>)', r'\1 aria-current="true"\2', text, count=1)
     if work is not None:
-        canonical = locale_url(locale, seo_route)
+        canonical = locale_url(locale, seo_route, profile)
         text = replace_once(text, f'<link rel="canonical" href="{canonical}">',
-                            f'<link rel="canonical" href="{canonical}">\n' + alternates(seo_route))
+                            f'<link rel="canonical" href="{canonical}">\n' + alternates(seo_route, profile))
+    if surface in SHELL_ROUTES:
+        text = shell_seo(text, locale, surface, profile, config)
     return text.encode("utf-8")
 
 
 def render(catalog, sources, profile="preview"):
-    if profile != "preview":
-        raise LocaleError("[I18N-PROFILE] only noindexed preview is supported")
+    if profile not in render_pages.PROFILES:
+        raise LocaleError(f"[I18N-PROFILE] unknown profile: {profile!r}")
     config, messages = load_messages(lambda rel: sources[rel])
     tr_pages = render_pages.render_work_pages(catalog, sources[SURFACES["work"][0]], profile)
     works = {w["id"]: w for w in catalog["works"]}
     pages = {}
     for path, data in tr_pages.items():
         work = works[path.rsplit("/", 1)[-1][:-5]]
-        pages[path] = render_page(data.decode("utf-8"), "tr", "work", messages, config, work)
+        pages[path] = render_page(data.decode("utf-8"), "tr", "work", messages, config, work, profile)
         for locale in ("en", "de"):
             pages[path.replace("v2/music/", "v2/" + locale + "/music/", 1)] = render_page(
-                data.decode("utf-8"), locale, "work", messages, config, work)
+                data.decode("utf-8"), locale, "work", messages, config, work, profile)
+    # Görev 220: Turkish shells are rendered too, so every shell carries profile-specific SEO tags.
+    for surface in SHELL_ROUTES:
+        source = SURFACES[surface][0]
+        pages[source] = render_page(sources[source].decode("utf-8"), "tr", surface, messages, config,
+                                    profile=profile)
     for locale in ("en", "de"):
         for surface, (source, route) in SURFACES.items():
             pages["v2/" + locale + "/" + route] = render_page(
-                sources[source].decode("utf-8"), locale, surface, messages, config)
+                sources[source].decode("utf-8"), locale, surface, messages, config, profile=profile)
     return pages

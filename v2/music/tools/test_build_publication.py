@@ -34,7 +34,9 @@ LOCALE_PAGES = {f"v2/{locale}/music/work/{w['id']}.html" for locale in ("en", "d
                 for w in CATALOG["works"]}
 LOCALE_SHELLS = {f"v2/{locale}/{route}index.html" for locale in ("en", "de")
                  for route in ("", "music/", "music/work/", "studio/")}
-ALL_PAGES = PAGES | LOCALE_PAGES | LOCALE_SHELLS
+# Görev 220: TR kabuk sayfaları da profile göre SEO etiketleriyle üretilir.
+ALL_PAGES = PAGES | LOCALE_PAGES | LOCALE_SHELLS | set(bp.RENDERED_SHELLS)
+SHELLS = LOCALE_SHELLS | set(bp.RENDERED_SHELLS)
 # Görev 73 öncesindeki _headers baytları: preview noindex korunmalı, dosya birebir aynı kalmalı.
 HEADERS_BEFORE = ("# build_publication.py tarafından üretildi; elle düzenlemeyin.\n/*\n  X-Robots-Tag: noindex\n"
                   "  X-Content-Type-Options: nosniff\n  Referrer-Policy: strict-origin-when-cross-origin\n").encode("utf-8")
@@ -42,11 +44,17 @@ HEADERS_BEFORE = ("# build_publication.py tarafından üretildi; elle düzenleme
 
 def expected_web_files():
     """Allowlist, oluşturucudan bağımsız olarak yeniden hesaplanır."""
-    files = set(bp.SITE_FILES) | {bp.CATALOG, bp.MUSIC + "data/schema.json"}
+    files = (set(bp.SITE_FILES) - set(bp.RENDERED_SHELLS)) | {bp.CATALOG, bp.MUSIC + "data/schema.json"}
+    files |= {bp.LEGACY_IMAGES + name for name in bp.LEGACY_V1_IMAGES}
     for work in CATALOG["works"]:
         files |= {bp.MUSIC + work[k]["file"] for k in ("lyrics", "story") if work[k]["status"] == "published"}
     files |= {bp.MUSIC + i["path"] for c in CATALOG["covers"] for i in c["webImages"]}
     return files
+
+
+def published(paths):
+    """Görev 220: paket yolları (v2/ öneki düşer, V1 görselleri images/ altında)."""
+    return {bp.published_path(rel) for rel in paths}
 
 
 def quiet(*_args):
@@ -96,15 +104,20 @@ class BuildPublicationTests(unittest.TestCase):
     def test_output_is_exactly_the_allowlist(self):
         manifest = self.build()
         web = expected_web_files()
-        self.assertEqual(len(web), 358)
+        self.assertEqual(len(web), 376)  # V1 favicon, V2 favicon ile aynı paket yoluna düşer (alias)
         self.assertEqual(len(PAGES), 68)
-        self.assertEqual(set(self.tree()), web | ALL_PAGES | set(bp.GENERATED))
-        self.assertEqual(len(self.tree()), 572)
-        self.assertEqual((manifest["webFiles"], manifest["copiedFiles"], manifest["renderedPages"]), (570, 358, 212))
-        self.assertEqual(manifest["totalOutputFiles"], 572)
+        generated = {"_headers", "_redirects", "robots.txt"}
+        self.assertEqual(set(self.tree()), published(web) | published(ALL_PAGES) | generated)
+        self.assertEqual(len(self.tree()), 593)
+        self.assertEqual([n for n in self.tree() if n.startswith(("v2/", "legacy/"))], [])
+        self.assertEqual((manifest["webFiles"], manifest["copiedFiles"], manifest["renderedPages"]), (590, 375, 215))
+        self.assertEqual(manifest["totalOutputFiles"], 593)
         self.assertEqual(manifest["profile"], "preview")
-        self.assertEqual(manifest["groups"], {"site": 24, "data": 2, "lyrics": 64, "stories": 64, "webp": 204,
-                                               "pages": 212})
+        self.assertEqual(manifest["groups"], {"site": 29, "data": 2, "lyrics": 64, "stories": 64, "webp": 204,
+                                               "legacyImages": 12, "pages": 215})
+        self.assertEqual([(a["path"], a["source"], a["sameAs"]) for a in manifest["aliases"]],
+                         [("images/favicon.jpg.jpeg", "v2/legacy/v1-images/favicon.jpg.jpeg",
+                           "v2/images/favicon.jpg.jpeg")])
 
     def test_project_portfolio_policy(self):
         source = (REPO / "v2/index.html").read_text(encoding="utf-8")
@@ -141,39 +154,50 @@ class BuildPublicationTests(unittest.TestCase):
             self.assertNotIn(rel, names)
         self.assertEqual([n for n in names if "/tools/" in n or n.startswith("tools/")], [])
         self.assertEqual([n for n in names if re.search(r"\.(py|md)$|(^|/)\.", n)], [])
-        for v1 in ("index.html", "README.md", "perspective/index.html", "images/favicon.jpg.jpeg"):
-            self.assertNotIn(v1, names)
+        self.assertNotIn("README.md", names)
+        self.assertEqual([n for n in names if "studio_order_core" in n or n.endswith(".mjs")], [])
 
     def test_output_bytes_identical_to_source(self):
         manifest = self.build()
         tree = self.tree()
-        self.assertEqual(len(manifest["files"]), 358)
-        self.assertEqual(tree["v2/images/favicon.jpg.jpeg"], (REPO / "images/favicon.jpg.jpeg").read_bytes())
+        self.assertEqual(len(manifest["files"]), 375)
+        self.assertEqual(tree["images/favicon.jpg.jpeg"], (REPO / "images/favicon.jpg.jpeg").read_bytes())
         for entry in manifest["files"]:
-            source = (REPO / entry["path"]).read_bytes()
+            source = (REPO / entry["source"]).read_bytes()
+            self.assertEqual(entry["path"], bp.published_path(entry["source"]))
             self.assertEqual(tree[entry["path"]], source, entry["path"])
             self.assertEqual(bp.sha256(source), entry["sha256"])
-        self.assertEqual(tree["v2/music/work/index.html"], (REPO / "v2/music/work/index.html").read_bytes())
+        self.assertEqual(tree["music/work/index.html"], (REPO / "v2/music/work/index.html").read_bytes())
+        # V1 görselleri ve Perspective aynı adlarla, bayt bayt (kök images/ ile aynı).
+        for name in bp.LEGACY_V1_IMAGES:
+            self.assertEqual(tree["images/" + name], (REPO / "images" / name).read_bytes(), name)
+        for name in ("index.html", "style.css", "script.js"):
+            self.assertEqual(tree["perspective/" + name], (REPO / "v2/perspective" / name).read_bytes())
 
     def test_rendered_pages_in_manifest(self):
         manifest = self.build()
         tree = self.tree()
-        self.assertEqual({e["path"] for e in manifest["pages"]}, ALL_PAGES)
+        self.assertEqual({e["source"] for e in manifest["pages"]}, ALL_PAGES)
         for entry in manifest["pages"]:
+            rel = entry["source"]
+            self.assertEqual(entry["path"], bp.published_path(rel))
             self.assertEqual(bp.sha256(tree[entry["path"]]), entry["sha256"])
-            source = ("v2/index.html" if entry["path"] in {"v2/en/index.html", "v2/de/index.html"}
-                      else "v2/music/index.html" if entry["path"] in {"v2/en/music/index.html", "v2/de/music/index.html"}
-                      else "v2/studio/index.html" if entry["path"] in {"v2/en/studio/index.html", "v2/de/studio/index.html"}
+            source = ("v2/index.html" if rel in {"v2/index.html", "v2/en/index.html", "v2/de/index.html"}
+                      else "v2/music/index.html" if rel in {"v2/music/index.html", "v2/en/music/index.html",
+                                                            "v2/de/music/index.html"}
+                      else "v2/studio/index.html" if rel in {"v2/studio/index.html", "v2/en/studio/index.html",
+                                                             "v2/de/studio/index.html"}
                       else "v2/music/work/index.html")
             self.assertEqual((entry["template"], entry["templateSha256"]),
                              (source, bp.sha256((REPO / source).read_bytes())))
-            self.assertFalse((REPO / entry["path"]).exists(), "statik sayfa kaynakta olmamalı")
-            if entry["path"] not in LOCALE_SHELLS:
-                work_id = entry["path"][-11:-5]
-                locale = entry["path"].split("/")[1]
+            if rel not in bp.RENDERED_SHELLS:
+                self.assertFalse((REPO / rel).exists(), "statik sayfa kaynakta olmamalı")
+            if rel not in SHELLS:
+                work_id = rel[-11:-5]
+                locale = rel.split("/")[1]
                 locale_prefix = locale + "/" if locale in ("en", "de") else ""
                 self.assertIn(f'data-work-id="{work_id}"'.encode(), tree[entry["path"]])
-                self.assertIn(f'href="https://unalbuyuksungur-v2.pages.dev/v2/{locale_prefix}music/work/{work_id}"'.encode(),
+                self.assertIn(f'href="https://unalbuyuksungur-v2.pages.dev/{locale_prefix}music/work/{work_id}"'.encode(),
                               tree[entry["path"]])
 
     def test_catalog_and_page_references_resolve(self):
@@ -184,33 +208,87 @@ class BuildPublicationTests(unittest.TestCase):
         self.assertEqual(len(CATALOG["covers"]), 68)
         for work in CATALOG["works"]:
             for key in ("lyrics", "story"):
-                self.assertIn(bp.MUSIC + work[key]["file"], names)
+                self.assertIn(bp.published_path(bp.MUSIC + work[key]["file"]), names)
         for cover in CATALOG["covers"]:
             for image in cover["webImages"]:
-                self.assertIn(bp.MUSIC + image["path"], names)
-        for page in ("v2/index.html", "v2/music/index.html", "v2/music/work/index.html",
-                     "v2/studio/index.html", *sorted(ALL_PAGES)):
+                self.assertIn(bp.published_path(bp.MUSIC + image["path"]), names)
+        tree = self.tree()
+        for page in ("v2/music/work/index.html", "v2/perspective/index.html", bp.NOT_FOUND, *sorted(ALL_PAGES)):
             parser = bp.Links()
-            parser.feed(self.tree()[page].decode("utf-8"))
+            parser.feed(tree[bp.published_path(page)].decode("utf-8"))
             for ref in parser.refs:
                 target = bp.resolve_ref(page, ref)
                 if target is not None:
-                    self.assertIn(target, names, f"{page}: {ref}")
+                    self.assertIn(bp.published_path(target), names, f"{page}: {ref}")
+        # Ana sayfadaki duyarlı hero adayları (srcset) ve V1 anchor hedefleri.
+        home = tree["index.html"].decode("utf-8")
+        for width in (800, 1280, 1672):
+            self.assertIn(f"images/unal-digital-world-hero-{width}.webp {width}w", home)
+        for anchor in ("sosyal", "blog", "satis", "muzik"):
+            self.assertEqual(home.count(f'id="{anchor}"'), 1, anchor)
 
     def test_generated_pages_config(self):
         self.build()
         tree = self.tree()
         self.assertIn(b"X-Robots-Tag: noindex", tree["_headers"])
         self.assertEqual(tree["_headers"], HEADERS_BEFORE)
-        self.assertIn(b"/  /v2/  302", tree["_redirects"])
-        self.assertEqual([n for n in tree if n.endswith(("robots.txt", "sitemap.xml"))], [])
+        redirects = tree["_redirects"].decode("utf-8")
+        self.assertNotIn("/v2/  302", redirects)
+        for rule in ("/v2    /        301", "/v2/   /        301", "/v2/*  /:splat  301",
+                     "/images/og-image.jpg.jpg  /images/og-image.jpg.jpg.jpg  301"):
+            self.assertIn(rule, redirects)
+        self.assertEqual(tree["robots.txt"], b"User-agent: *\nDisallow: /\n")
+        self.assertNotIn("sitemap.xml", tree)
+
+    def test_production_profile(self):
+        """Görev 220: ana alan adında noindex yok (yalnız pages.dev), robots/sitemap üretilir, URL'ler köktedir."""
+        manifest = self.build(profile="production")
+        tree = self.tree()
+        self.assertEqual((manifest["profile"], manifest["totalOutputFiles"]), ("production", 594))
+        headers = tree["_headers"].decode("utf-8")
+        self.assertTrue(headers.startswith(bp.MARKER + "\n"))
+        self.assertIn("https://unalbuyuksungur-v2.pages.dev/*\n  X-Robots-Tag: noindex\n", headers)
+        self.assertIn("https://:version.unalbuyuksungur-v2.pages.dev/*\n  X-Robots-Tag: noindex\n", headers)
+        self.assertEqual(headers.count("X-Robots-Tag"), 2)
+        self.assertIn("/*\n  X-Content-Type-Options: nosniff\n", headers)
+        self.assertEqual(tree["robots.txt"],
+                         b"User-agent: *\nAllow: /\nSitemap: https://unalbuyuksungur.com/sitemap.xml\n")
+        sitemap = tree["sitemap.xml"].decode("utf-8")
+        self.assertEqual(sitemap.count("<url>"), 3 * (3 + len(CATALOG["works"])))
+        self.assertIn("<loc>https://unalbuyuksungur.com/en/music/work/w-0001</loc>", sitemap)
+        self.assertIn('hreflang="x-default" href="https://unalbuyuksungur.com/studio/"', sitemap)
+        self.assertNotIn("/v2/", sitemap)
+        for name, data in tree.items():
+            if name.endswith((".html", ".xml", ".txt")):
+                self.assertNotIn(b"pages.dev", data if name != "_headers" else b"", name)
+        self.assertIn(b'<link rel="canonical" href="https://unalbuyuksungur.com/">', tree["index.html"])
+
+    def test_root_publication_guards(self):
+        """Görev 220: kök-mutlak bağlantı yalnız 404.html'de; V1 görselleri onaylı ve değişmemiş olmalı."""
+        page = self.root / "v2/music/index.html"
+        original = page.read_bytes()
+        page.write_bytes(original.replace(b"</body>", b'<a href="/studio/">x</a></body>', 1))
+        self.assert_fails("[REF-ABSOLUTE]")
+        page.write_bytes(original)
+        legacy = self.root / bp.LEGACY_IMAGES
+        (legacy / "yeni.jpg").write_bytes(b"x")
+        self.assert_fails("[SRC-UNEXPECTED]")
+        (legacy / "yeni.jpg").unlink()
+        image = legacy / "biliyorum.jpg"
+        data = image.read_bytes()
+        image.write_bytes(data + b"x")
+        self.assert_fails("[HASH-EXPECTED]")
+        image.write_bytes(data)
+        favicon = self.root / "v2/images/favicon.jpg.jpeg"
+        favicon.write_bytes(favicon.read_bytes() + b"x")
+        self.assert_fails("[OUT-COLLISION]")
 
     def test_deterministic_and_replaces_previous_output(self):
         first = self.build()
-        (self.root / "_site" / "v2" / "stale.txt").write_text("eski", encoding="utf-8")
+        (self.root / "_site" / "stale.txt").write_text("eski", encoding="utf-8")
         second = self.build()
         self.assertEqual(first["packageDigest"], second["packageDigest"])
-        self.assertNotIn("v2/stale.txt", self.tree())
+        self.assertNotIn("stale.txt", self.tree())
 
     # --- Başarısızlık durumları ---
 
@@ -314,7 +392,8 @@ class BuildPublicationTests(unittest.TestCase):
         self.assert_fails("[SRC-MISSING]")
         self.assertEqual(self.tree(), before)
         self.assertEqual(bp.sha256("".join(f"{p}  {bp.sha256(before[p])}\n" for p in sorted(before)
-                                           if p not in bp.GENERATED).encode("utf-8")), good["packageDigest"])
+                                           if p not in bp.generated("preview", {})).encode("utf-8")),
+                         good["packageDigest"])
 
     def test_expect_count_mismatch_stops_build(self):
         self.assert_fails("[OUT-COUNT]", expect_count=343)
@@ -337,17 +416,19 @@ class BuildPublicationTests(unittest.TestCase):
 
     def test_cli_exit_codes(self):
         run = [sys.executable, "-I", str(SCRIPT), "--root", str(self.root), "--out", "_site"]
-        ok = subprocess.run(run + ["--expect-count", "570"], capture_output=True, text=True, encoding="utf-8")
+        ok = subprocess.run(run + ["--expect-count", "590"], capture_output=True, text=True, encoding="utf-8")
         self.assertEqual(ok.returncode, 0, ok.stderr)
-        self.assertIn("358/358", ok.stdout)
-        self.assertIn("üretilen eser sayfası 212", ok.stdout)
+        self.assertIn("375/375", ok.stdout)
+        self.assertIn("üretilen sayfa 215 (preview)", ok.stdout)
         manifest = json.loads((self.root / "_site-manifest.json").read_text(encoding="utf-8"))
-        self.assertEqual(manifest["totalOutputFiles"], 572)
+        self.assertEqual(manifest["totalOutputFiles"], 593)
+        bad = subprocess.run(run + ["--profile", "staging"], capture_output=True, text=True, encoding="utf-8")
+        self.assertEqual(bad.returncode, 2)  # argparse: geçersiz profil seçimi
         (self.root / "v2/music/catalog.css").unlink()
         failed = subprocess.run(run, capture_output=True, text=True, encoding="utf-8")
         self.assertEqual(failed.returncode, 1)
         self.assertIn("BUILD FAILED", failed.stderr)
-        self.assertTrue((self.root / "_site/v2/music/catalog.css").is_file(), "önceki çıktı korunmalı")
+        self.assertTrue((self.root / "_site/music/catalog.css").is_file(), "önceki çıktı korunmalı")
 
 
 if __name__ == "__main__":

@@ -9,12 +9,9 @@
     <meta name="description" content="Ünal Büyüksungur'un müzik, yazı ve dijital projeler dünyası.">
     <link rel="icon" type="image/jpeg" href="images/favicon.jpg.jpeg">
     <meta property="og:locale" content="tr_TR">
-    <link rel="canonical" href="https://unalbuyuksungur-v2.pages.dev/v2/">
-    <link rel="alternate" hreflang="tr" href="https://unalbuyuksungur-v2.pages.dev/v2/">
-    <link rel="alternate" hreflang="en" href="https://unalbuyuksungur-v2.pages.dev/v2/en/">
-    <link rel="alternate" hreflang="de" href="https://unalbuyuksungur-v2.pages.dev/v2/de/">
 
-    <link rel="preload" as="image" href="images/unal-digital-world-hero.png" fetchpriority="high">
+    <link rel="preload" as="image" type="image/webp" href="images/unal-digital-world-hero-1280.webp"
+        imagesrcset="images/unal-digital-world-hero-800.webp 800w, images/unal-digital-world-hero-1280.webp 1280w, images/unal-digital-world-hero-1672.webp 1672w" imagesizes="100vw" fetchpriority="high">
     <link rel="stylesheet" href="i18n/selector.css">
     <script src="i18n/runtime.js" defer></script>
 
@@ -1231,6 +1228,12 @@
                 transition-duration: 0.01ms !important;
             }
         }
+
+        /* V1 adres koruması: eski #sosyal, #blog ve #satis bağlantılarının hedefleri */
+        .anchor-target {
+            display: block;
+            scroll-margin-top: var(--header-height);
+        }
     </style>
 
     <script>
@@ -1268,8 +1271,11 @@
 
     <main id="icerik">
         <section class="hero" id="ust" aria-labelledby="hero-baslik">
-            <img class="hero-media" src="images/unal-digital-world-hero.png" width="1672" height="941"
-                fetchpriority="high" alt="">
+            <picture>
+                <source type="image/webp" srcset="images/unal-digital-world-hero-800.webp 800w, images/unal-digital-world-hero-1280.webp 1280w, images/unal-digital-world-hero-1672.webp 1672w" sizes="100vw">
+                <img class="hero-media" src="images/unal-digital-world-hero.png" width="1672" height="941"
+                    fetchpriority="high" alt="">
+            </picture>
 
             <div class="hero-content">
                 <p class="brand reveal">
@@ -1534,6 +1540,7 @@
             </section>
 
             <section class="stop" id="yazilar" aria-labelledby="yazilar-baslik">
+                <span class="anchor-target" id="blog" aria-hidden="true"></span>
                 <span class="badge">Yakında</span>
                 <h2 id="yazilar-baslik">Yazılar</h2>
                 <p>Şiir ve deneme arşivi düzenleniyor.</p>
@@ -1550,6 +1557,7 @@
         </div>
 
         <section class="shop" id="magaza" aria-labelledby="magaza-baslik">
+            <span class="anchor-target" id="satis" aria-hidden="true"></span>
             <div class="shop-inner">
                 <p class="eyebrow">DIGITAL WORLD / MAĞAZA</p>
                 <h2 class="section-title" id="magaza-baslik">Mağaza</h2>
@@ -1567,6 +1575,7 @@
         </section>
 
         <section class="about" id="hakkimda" aria-labelledby="hakkimda-baslik">
+            <span class="anchor-target" id="sosyal" aria-hidden="true"></span>
             <div class="about-inner">
                 <span class="badge">Yakında</span>
                 <h2 class="section-title" id="hakkimda-baslik">Hakkımda</h2>

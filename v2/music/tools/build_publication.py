@@ -16,12 +16,20 @@ Sıra: kaynak ve katalog denetimi -> geçici staging klasöründe kopyalama ve s
 bir denetim başarısız olursa staging silinir, mevcut çıktı klasörüne dokunulmaz ve çıkış kodu 1 olur.
 Kaynak dosyalar yalnızca okunur.
 
+Görev 220: paket /v2/ öneki olmadan köke yazılır (v2/index.html -> index.html, v2/music/... -> music/...).
+Kaynak v2/ altında kalır; bütün denetimler depo yollarıyla yapılır, yalnız yazma adımında önek düşer.
+V1 görselleri (v2/legacy/v1-images/) aynı adlarla images/ altına, Perspective perspective/ altına yazılır.
+İki profil vardır: preview (pages.dev, her yerde noindex) ve production (unalbuyuksungur.com; noindex yalnız
+pages.dev adreslerinde). Profil; canonical/hreflang/OG kökünü, _headers, robots.txt ve sitemap.xml'i belirler.
+
 Kullanım:
-    python v2/music/tools/build_publication.py --out _site
+    python v2/music/tools/build_publication.py --out _site                       (varsayılan: preview)
+    python v2/music/tools/build_publication.py --profile production --out _site
     python v2/music/tools/build_publication.py --out _site --expect-count 417
 
 Cloudflare Pages (ayrı V2 projesi): build command
     python3 v2/music/tools/build_publication.py --out _site
+    (canlı alan adı için: --profile production)
 build output directory: _site
 
 Çıkış kodu: paket üretildiyse 0, aksi hâlde 1.
@@ -29,6 +37,7 @@ build output directory: _site
 
 import argparse
 import hashlib
+import html
 import json
 import os
 import re
@@ -58,8 +67,13 @@ SITE_FILES = (
     "v2/i18n/de.json",
     "v2/i18n/runtime.js",
     "v2/i18n/selector.css",
+    "v2/404.html",
     "v2/images/favicon.jpg.jpeg",
     "v2/images/unal-digital-world-hero.png",
+    "v2/images/unal-digital-world-hero-800.webp",
+    "v2/images/unal-digital-world-hero-1280.webp",
+    "v2/images/unal-digital-world-hero-1672.webp",
+    "v2/images/og/unal-digital-world-og-1200x630.jpg",
     "v2/images/projects/dilek-kutum-placeholder-1200.webp",
     "v2/images/projects/istec-placeholder-1200.webp",
     "v2/images/projects/mindot-homepage-1200.webp",
@@ -74,7 +88,32 @@ SITE_FILES = (
     "v2/music/work/work.js",
     "v2/studio/index.html",
     "v2/studio/studio.css",
+    "v2/perspective/index.html",
+    "v2/perspective/style.css",
+    "v2/perspective/script.js",
 )
+# Görev 220: TR kabuk sayfaları kopyalanmaz, profile göre SEO etiketleriyle üretilir (render_site.SHELL_ROUTES).
+RENDERED_SHELLS = ("v2/index.html", "v2/music/index.html", "v2/studio/index.html")
+# 404 sayfası her adresten sunulur; kök-mutlak bağlantıya yalnız bu sayfada izin verilir.
+NOT_FOUND = "v2/404.html"
+# V1 görselleri: v2/legacy/v1-images/ altındaki kopyalar, pakette images/ altına aynı adlarla yazılır.
+# Kök images/ klasörü ve main dalındaki V1 aynen kalır. SHA-256 değerleri sabittir.
+LEGACY_IMAGES = "v2/legacy/v1-images/"
+LEGACY_V1_IMAGES = {
+    "benimle-yaslanacaktin.jpg": "0d3a934809db0f4d9f47ba593ac8617ec58a57e284ea3eaf57ca33b138a92162",
+    "biliyorum.jpg": "f8347ecab951d613bfa068935344cfde0edab1e0eb905875e3d5777a650e2da4",
+    "bir-kedim-var.jpg.jpg": "63fee54c7f324801b21688d8b86f11d9609ac8c3880825bb44df08188ef66097",
+    "cat-cat-cat.jpg.jpg": "31a1e4cd58cb065307ddf631986869f8f240d7bb0735dc18eb1d034877ba4ece",
+    "elimi-siktin.jpg": "a5831f18c552d9fe05fa94b72049f4f53435776abd5f87a664d2cf354ede78c6",
+    "favicon.jpg.jpeg": "e4c5d514b1b6f40a3cc941f8da1a758269b5f3d0741d43846e93d3b8a0009f35",
+    "haydi-dene.jpg.jpg": "03a1c28f888195a98f917327fde2560794b306238fccc27c19593fbf75b89f2e",
+    "ne-yapayim.jpg": "11097f605e93ac09bf14f64489cee07e5fe01f8f3d578657fd2e62867e905a0c",
+    "og-image.jpg.jpg.jpg": "e62aeadca54b1616713042d508ef18754fffba1daff3e810f15d6934ac44bf5b",
+    "sebebi-sensin.jpg": "5305bf2be5b5006fb65c6332b9b313e1a5958a37fe5a2563e394021c7fa789a0",
+    "seninle.jpg.jpg": "2a0abfa8ddcfcd627a1eed077d44787bf73fc8bfc8bf34613b11839cfc6f0ef7",
+    "turkiye-turizmi.jpg": "c195a80e558ee84e888bcd4b01b89ee3b10c1e4952898a63dfd5fcf454de90d2",
+    "yapay-zeka.jpg": "9c78a03fc2f005b020203834a91cb3250ec09fe724bddb997d0740102e1b0ff9",
+}
 MUSIC = "v2/music/"
 CATALOG = MUSIC + "data/catalog.json"
 CONTENT_PATH = re.compile(r"^content/(lyrics|stories)/[wr]-\d{4}\.txt$")  # work.js ile aynı kalıp
@@ -91,12 +130,55 @@ JS_CONSTANTS = {
 # Pages yapılandırma dosyaları: statik dosya olarak sunulmaz. İlk satır, bu aracın ürettiği bir çıktı
 # klasörünü tanımak için işarettir (başka bir klasör asla silinmez).
 MARKER = "# build_publication.py tarafından üretildi; elle düzenlemeyin."
-PROFILE = "preview"  # yalnızca preview; production profili bu sürümde yok (render_pages.PROFILES)
-GENERATED = {
-    "_headers": MARKER + "\n/*\n  X-Robots-Tag: noindex\n  X-Content-Type-Options: nosniff\n"
-                "  Referrer-Policy: strict-origin-when-cross-origin\n",
-    "_redirects": MARKER + "\n/  /v2/  302\n",
-}
+PROFILES = tuple(render_pages.PROFILES)  # preview (varsayılan) | production
+PREVIEW_HOST = "unalbuyuksungur-v2.pages.dev"
+SECURITY_HEADERS = "  X-Content-Type-Options: nosniff\n  Referrer-Policy: strict-origin-when-cross-origin\n"
+# Her iki profilde: eski /v2/ adresleri köke, V1'de og:image olarak paylaşılmış bozuk ad gerçek dosyaya.
+REDIRECTS = (MARKER + "\n/v2    /        301\n/v2/   /        301\n/v2/*  /:splat  301\n"
+             "/images/og-image.jpg.jpg  /images/og-image.jpg.jpg.jpg  301\n")
+
+
+def generated(profile, pages):
+    """Pages yapılandırması ve SEO dosyaları: {çıktı yolu: metin}. _headers'ın ilk satırı her zaman MARKER'dır."""
+    if profile == "production":
+        headers = (MARKER + f"\nhttps://{PREVIEW_HOST}/*\n  X-Robots-Tag: noindex\n"
+                   f"https://:version.{PREVIEW_HOST}/*\n  X-Robots-Tag: noindex\n/*\n" + SECURITY_HEADERS)
+        base = render_pages.profile_base(profile)
+        files = {"_headers": headers, "_redirects": REDIRECTS,
+                 "robots.txt": f"User-agent: *\nAllow: /\nSitemap: {base}sitemap.xml\n",
+                 "sitemap.xml": sitemap(profile, pages)}
+    else:
+        files = {"_headers": MARKER + "\n/*\n  X-Robots-Tag: noindex\n" + SECURITY_HEADERS,
+                 "_redirects": REDIRECTS, "robots.txt": "User-agent: *\nDisallow: /\n"}
+    return files
+
+
+def sitemap(profile, pages):
+    """TR/EN/DE kabuk ve eser sayfaları; her biri hreflang alternatifleriyle (x-default = TR)."""
+    routes = list(render_site.SHELL_ROUTES.values())
+    routes += sorted("music/work/" + rel.rsplit("/", 1)[-1][:-5] for rel in pages
+                     if re.fullmatch(r"v2/music/work/w-\d{4}\.html", rel))
+    lines = ['<?xml version="1.0" encoding="UTF-8"?>',
+             '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">']
+    for route in routes:
+        alternates = [(locale, render_site.locale_url(locale, route, profile)) for locale in ("tr", "en", "de")]
+        alternates.append(("x-default", render_site.locale_url("tr", route, profile)))
+        for _locale, url in alternates[:3]:
+            lines.append(f"  <url>\n    <loc>{html.escape(url)}</loc>")
+            lines += [f'    <xhtml:link rel="alternate" hreflang="{code}" href="{html.escape(href, quote=True)}"/>'
+                      for code, href in alternates]
+            lines.append("  </url>")
+    lines.append("</urlset>")
+    return "\n".join(lines) + "\n"
+
+
+def published_path(rel):
+    """Depo yolunu paket yoluna çevirir: v2/ öneki düşer, V1 görselleri images/ altına yazılır."""
+    if rel.startswith(LEGACY_IMAGES):
+        return "images/" + rel[len(LEGACY_IMAGES):]
+    if not rel.startswith("v2/"):
+        raise BuildError(f"[OUT-PATH] v2/ dışında yayın yolu: {rel}")
+    return rel[len("v2/"):]
 
 # Son savunma: çıktıda bulunmaması gereken her şey (allowlist'e yanlışlıkla girse bile).
 FORBIDDEN_OUTPUT = re.compile(
@@ -145,8 +227,16 @@ def load_catalog(root):
 
 def plan(root, catalog):
     """Allowlist: {depo göreli yol: (beklenen SHA-256, bayt) ya da None}. Katalog yolları kalıplarla sınırlıdır."""
-    files = {rel: None for rel in SITE_FILES}
+    files = {rel: None for rel in SITE_FILES if rel not in RENDERED_SHELLS}
     files[CATALOG] = None
+    legacy = root / LEGACY_IMAGES
+    if not legacy.is_dir():
+        raise BuildError(f"[SRC-MISSING] klasör yok: {LEGACY_IMAGES}")
+    for entry in sorted(legacy.iterdir()):
+        if entry.name not in LEGACY_V1_IMAGES:
+            raise BuildError(f"[SRC-UNEXPECTED] onaylı V1 görsel listesinde olmayan dosya: {LEGACY_IMAGES}{entry.name}")
+    for name, digest in LEGACY_V1_IMAGES.items():
+        files[LEGACY_IMAGES + name] = (digest, None)
     schema = catalog.get("$schema")
     if not isinstance(schema, str) or not SCHEMA_PATH.match(schema):
         raise BuildError(f"[CAT-SCHEMA] beklenmeyen $schema: {schema!r}")
@@ -185,20 +275,20 @@ def plan(root, catalog):
     return files
 
 
-def render(root, catalog, files):
+def render(root, catalog, files, profile):
     """Statik TR/EN/DE arayüz ve eser sayfaları; iki kez üretilip karşılaştırılır."""
     template = checked_source(root, render_pages.TEMPLATE)
     sources = {rel: checked_source(root, rel) for rel in SITE_FILES
                if rel.endswith((".html", ".json"))}
     try:
-        pages = render_site.render(catalog, sources, PROFILE)
-        again = render_site.render(catalog, sources, PROFILE)
+        pages = render_site.render(catalog, sources, profile)
+        again = render_site.render(catalog, sources, profile)
     except (render_pages.RenderError, render_site.LocaleError, ValueError) as exc:
         raise BuildError(str(exc)) from None
     if pages != again:
         raise BuildError("[SEO-DETERMINISM] aynı girdiyle iki üretim farklı")
     for rel in pages:
-        if rel in files or rel in GENERATED or FORBIDDEN_OUTPUT.search(rel):
+        if rel in files or FORBIDDEN_OUTPUT.search(rel):
             raise BuildError(f"[SEO-PATH] üretilen sayfa mevcut ya da yasak bir yolla çakışıyor: {rel}")
     return pages, sha256(template)
 
@@ -212,6 +302,9 @@ class Links(HTMLParser):
         for name, value in attrs:
             if name in ("href", "src") and value is not None:
                 self.refs.append(value)
+            elif name in ("srcset", "imagesrcset") and value is not None:
+                # Görev 220: duyarlı görsel adayları ("yol 800w, yol 1280w") da denetlenir.
+                self.refs += [c.strip().split()[0] for c in value.split(",") if c.strip()]
 
 
 def resolve_ref(base, ref):
@@ -220,7 +313,11 @@ def resolve_ref(base, ref):
     if parts.scheme or parts.netloc or not parts.path:
         return None
     if parts.path.startswith("/"):
-        raise BuildError(f"[REF-ABSOLUTE] kök göreli bağlantı desteklenmiyor: {ref}")
+        if base != NOT_FOUND:
+            raise BuildError(f"[REF-ABSOLUTE] kök göreli bağlantı desteklenmiyor: {ref}")
+        # 404.html her adresten sunulur: kök-mutlak yol paket kökünden, yani depoda v2/ altından çözülür.
+        target = os.path.normpath("v2" + parts.path).replace("\\", "/")
+        return target.rstrip("/") + "/index.html" if parts.path.endswith("/") else target
     target = os.path.normpath(os.path.join(os.path.dirname(base), parts.path)).replace("\\", "/")
     if parts.path.endswith("/") or parts.path in (".", ".."):
         target = target.rstrip("/") + "/index.html"
@@ -285,18 +382,24 @@ def git_commit(root):
         return None
 
 
-def build(root, out, expect_count=None, manifest_path=None, log=print):
+def build(root, out, expect_count=None, manifest_path=None, log=print, profile="preview"):
+    if profile not in PROFILES:
+        raise BuildError(f"[PROFILE] tanımsız profil: {profile!r}; geçerli: {', '.join(PROFILES)}")
     root = root.resolve()
     target = safe_out(root, out)
     catalog = load_catalog(root)
     files = plan(root, catalog)
-    pages, template_digest = render(root, catalog, files)
+    pages, template_digest = render(root, catalog, files, profile)
+    extra_files = generated(profile, pages)
 
     staging = target.with_name(f"{target.name}.staging-{os.getpid()}")
     if staging.exists():
         shutil.rmtree(staging)
     staging.mkdir(parents=True)
     try:
+        # Görev 220: denetimler depo yollarıyla yapılır; yalnız yazarken v2/ öneki düşer (published_path).
+        written = {}  # paket yolu -> (depo yolu, SHA-256)
+        aliases = []
         entries = []
         for rel in sorted(files):
             data = checked_source(root, rel)
@@ -306,39 +409,54 @@ def build(root, out, expect_count=None, manifest_path=None, log=print):
                 raise BuildError(f"[HASH-EXPECTED] {rel}: onaylı SHA-256/bayt değeriyle uyuşmuyor")
             if FORBIDDEN_OUTPUT.search(rel):
                 raise BuildError(f"[OUT-FORBIDDEN] yasak dosya allowlist'te: {rel}")
-            dest = staging / rel
+            path = published_path(rel)
+            if path in written:
+                # Aynı paket yoluna iki kaynak: yalnız baytları birebir aynıysa kabul edilir (ör. favicon).
+                if written[path][1] != digest:
+                    raise BuildError(f"[OUT-COLLISION] {path}: {written[path][0]} ve {rel} farklı içerikte")
+                aliases.append({"path": path, "source": rel, "sameAs": written[path][0], "sha256": digest})
+                continue
+            written[path] = (rel, digest)
+            dest = staging / path
             dest.parent.mkdir(parents=True, exist_ok=True)
             dest.write_bytes(data)
             if sha256(dest.read_bytes()) != digest:
                 raise BuildError(f"[HASH-COPY] kopya kaynakla aynı değil: {rel}")
-            entries.append({"path": rel, "bytes": len(data), "sha256": digest})
+            entries.append({"path": path, "source": rel, "bytes": len(data), "sha256": digest})
         page_entries = []
         for rel in sorted(pages):
-            dest = staging / rel
+            path = published_path(rel)
+            if path in written or path in extra_files:
+                raise BuildError(f"[OUT-COLLISION] üretilen sayfa başka bir dosyayla çakışıyor: {path}")
+            written[path] = (rel, sha256(pages[rel]))
+            dest = staging / path
             dest.parent.mkdir(parents=True, exist_ok=True)
             dest.write_bytes(pages[rel])
             if dest.read_bytes() != pages[rel]:
                 raise BuildError(f"[HASH-COPY] üretilen sayfa yazılamadı: {rel}")
-            source = ("v2/index.html" if re.fullmatch(r"v2/(en|de)/index\.html", rel)
-                      else "v2/music/index.html" if re.fullmatch(r"v2/(en|de)/music/index\.html", rel)
-                      else "v2/studio/index.html" if re.fullmatch(r"v2/(en|de)/studio/index\.html", rel)
+            source = ("v2/index.html" if re.fullmatch(r"v2/((en|de)/)?index\.html", rel)
+                      else "v2/music/index.html" if re.fullmatch(r"v2/((en|de)/)?music/index\.html", rel)
+                      else "v2/studio/index.html" if re.fullmatch(r"v2/((en|de)/)?studio/index\.html", rel)
                       else render_pages.TEMPLATE)
-            page_entries.append({"path": rel, "bytes": len(pages[rel]), "sha256": sha256(pages[rel]),
-                                 "template": source, "templateSha256": sha256(checked_source(root, source))})
-        for name, text in GENERATED.items():
+            page_entries.append({"path": path, "source": rel, "bytes": len(pages[rel]),
+                                 "sha256": sha256(pages[rel]), "template": source,
+                                 "templateSha256": sha256(checked_source(root, source))})
+        for name, text in extra_files.items():
+            if name in written:
+                raise BuildError(f"[OUT-COLLISION] üretilen yapılandırma bir site dosyasıyla çakışıyor: {name}")
             (staging / name).write_bytes(text.encode("utf-8"))
 
         def read_staged(rel):
-            return (staging / rel).read_bytes()
+            return (staging / published_path(rel)).read_bytes()
         references = check_references(set(files) | set(pages), read_staged)
 
         produced = sorted(p.relative_to(staging).as_posix() for p in staging.rglob("*") if not p.is_dir())
-        expected_set = sorted([*files, *pages, *GENERATED])
+        expected_set = sorted({*written, *extra_files})
         if produced != expected_set:
             extra = sorted(set(produced) - set(expected_set))
             missing = sorted(set(expected_set) - set(produced))
             raise BuildError(f"[OUT-SET] çıktı allowlist'e eşit değil; fazla {extra[:5]}, eksik {missing[:5]}")
-        bad = [p for p in produced if p not in GENERATED and FORBIDDEN_OUTPUT.search(p)]
+        bad = [p for p in produced if p not in extra_files and FORBIDDEN_OUTPUT.search(p)]
         if bad or any(p.is_symlink() for p in staging.rglob("*")):
             raise BuildError(f"[OUT-FORBIDDEN] çıktıda yasak dosya ya da bağ: {bad[:5]}")
         web = sorted(entries + page_entries, key=lambda e: e["path"])
@@ -346,29 +464,32 @@ def build(root, out, expect_count=None, manifest_path=None, log=print):
             raise BuildError(f"[OUT-COUNT] {len(web)} web dosyası; beklenen {expect_count}")
 
         digest = sha256("".join(f"{e['path']}  {e['sha256']}\n" for e in web).encode("utf-8"))
+        copied = {e["source"] for e in entries}
         groups = {
-            "site": sum(rel in SITE_FILES for rel in files),
-            "data": sum(rel.startswith(MUSIC + "data/") for rel in files),
-            "lyrics": sum(rel.startswith(MUSIC + "content/lyrics/") for rel in files),
-            "stories": sum(rel.startswith(MUSIC + "content/stories/") for rel in files),
-            "webp": sum(rel.startswith(MUSIC + "images/") for rel in files),
+            "site": sum(rel in SITE_FILES for rel in copied),
+            "data": sum(rel.startswith(MUSIC + "data/") for rel in copied),
+            "lyrics": sum(rel.startswith(MUSIC + "content/lyrics/") for rel in copied),
+            "stories": sum(rel.startswith(MUSIC + "content/stories/") for rel in copied),
+            "webp": sum(rel.startswith(MUSIC + "images/") for rel in copied),
+            "legacyImages": sum(rel.startswith(LEGACY_IMAGES) for rel in copied),
             "pages": len(pages),
         }
         manifest = {
             "tool": "v2/music/tools/build_publication.py",
             "commit": git_commit(root),
             "output": out.as_posix(),
-            "profile": PROFILE,
+            "profile": profile,
             "webFiles": len(web),
             "copiedFiles": len(entries),
             "renderedPages": len(page_entries),
-            "generatedFiles": sorted(GENERATED),
+            "generatedFiles": sorted(extra_files),
             "totalOutputFiles": len(produced),
             "webBytes": sum(e["bytes"] for e in web),
             "groups": groups,
             "checkedReferences": references,
             "packageDigest": digest,
             "files": entries,
+            "aliases": aliases,
             "pages": page_entries,
         }
 
@@ -390,10 +511,11 @@ def build(root, out, expect_count=None, manifest_path=None, log=print):
 
     if manifest_path is not None:
         manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    log(f"V2 yayın paketi: {out.as_posix()}/")
+    log(f"V2 yayın paketi: {out.as_posix()}/ (profil: {profile})")
     log(f"  web dosyası {len(web)}: kopyalanan {len(entries)} (site {groups['site']}, veri {groups['data']}, "
-        f"söz {groups['lyrics']}, hikâye {groups['stories']}, WebP {groups['webp']}) + üretilen eser sayfası "
-        f"{len(page_entries)} ({PROFILE}) + Pages yapılandırması {len(GENERATED)} = {len(produced)} dosya, "
+        f"söz {groups['lyrics']}, hikâye {groups['stories']}, WebP {groups['webp']}, V1 görsel "
+        f"{groups['legacyImages']}) + üretilen sayfa "
+        f"{len(page_entries)} ({profile}) + yapılandırma/SEO {len(extra_files)} = {len(produced)} dosya, "
         f"{manifest['webBytes']} bayt")
     log(f"  denetlenen bağlantı {references}; kaynak-çıktı SHA-256 eşleşmesi {len(entries)}/{len(entries)}")
     log(f"  commit {manifest['commit']}")
@@ -404,6 +526,8 @@ def build(root, out, expect_count=None, manifest_path=None, log=print):
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("--out", type=Path, required=True, help="depo köküne göre çıktı klasörü (ör. _site)")
+    parser.add_argument("--profile", choices=PROFILES, default="preview",
+                        help="preview (pages.dev, noindex; varsayılan) ya da production (unalbuyuksungur.com)")
     parser.add_argument("--expect-count", type=int, help="beklenen web dosyası sayısı (farklıysa build durur)")
     parser.add_argument("--manifest", type=Path, help="manifest JSON yolu (varsayılan: depo kökünde <out>-manifest.json)")
     parser.add_argument("--root", type=Path, default=DEFAULT_ROOT, help=argparse.SUPPRESS)  # testler için
@@ -413,7 +537,7 @@ def main():
     root = args.root.resolve()
     manifest = args.manifest or root / f"{args.out.name}-manifest.json"
     try:
-        build(root, args.out, args.expect_count, manifest)
+        build(root, args.out, args.expect_count, manifest, profile=args.profile)
     except (BuildError, OSError) as exc:
         print(f"BUILD FAILED: {exc}", file=sys.stderr)
         print("Yayın paketi üretilmedi; mevcut çıktı klasörü değiştirilmedi.", file=sys.stderr)

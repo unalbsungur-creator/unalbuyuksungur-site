@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex">
+    <title>Sayfa bulunamadı | Ünal Büyüksungur</title>
+    <!-- Her adresten sunulur: bağlantılar kök-mutlaktır (build_publication.py yalnız bu sayfaya izin verir). -->
+    <link rel="icon" type="image/jpeg" href="/images/favicon.jpg.jpeg">
+    <style>
+        :root {
+            --background: #0B101B;
+            --surface: #172338;
+            --gold: #C9A66B;
+            --text: #F5F0E8;
+            --muted: #B8C2D1;
+            --line: rgba(201, 166, 107, 0.35);
+            --font-serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, "Times New Roman", serif;
+            --font-sans: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            margin: 0;
+            min-height: 100%;
+        }
+
+        body {
+            display: grid;
+            min-height: 100vh;
+            place-items: center;
+            padding: 32px 20px;
+            background: radial-gradient(circle at 50% 0%, var(--surface), var(--background) 70%);
+            color: var(--text);
+            font-family: var(--font-sans);
+            line-height: 1.6;
+            text-align: center;
+        }
+
+        main {
+            max-width: 560px;
+        }
+
+        .code {
+            margin: 0;
+            color: var(--gold);
+            font-family: var(--font-serif);
+            font-size: clamp(4rem, 18vw, 7rem);
+            line-height: 1;
+            letter-spacing: 0.04em;
+        }
+
+        h1 {
+            margin: 16px 0 8px;
+            font-family: var(--font-serif);
+            font-size: clamp(1.5rem, 5vw, 2rem);
+            font-weight: 500;
+        }
+
+        p {
+            margin: 0 0 8px;
+            color: var(--muted);
+        }
+
+        .other {
+            margin-top: 20px;
+            padding-top: 16px;
+            border-top: 1px solid var(--line);
+            font-size: 0.95rem;
+        }
+
+        nav {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 12px;
+            margin-top: 28px;
+        }
+
+        nav a {
+            padding: 10px 22px;
+            border: 1px solid var(--gold);
+            border-radius: 999px;
+            color: var(--text);
+            text-decoration: none;
+            transition: background 0.2s, color 0.2s;
+        }
+
+        nav a:hover,
+        nav a:focus-visible {
+            background: var(--gold);
+            color: var(--background);
+            outline: none;
+        }
+    </style>
+</head>
+
+<body>
+    <main>
+        <p class="code" aria-hidden="true">404</p>
+        <h1>Aradığınız sayfa bulunamadı</h1>
+        <p>Adres değişmiş ya da sayfa kaldırılmış olabilir.</p>
+        <div class="other">
+            <p lang="en">Page not found. The address may have changed.</p>
+            <p lang="de">Seite nicht gefunden. Die Adresse hat sich möglicherweise geändert.</p>
+        </div>
+        <nav aria-label="Sayfa bağlantıları">
+            <a href="/">Ana sayfa</a>
+            <a href="/music/">Müzik</a>
+        </nav>
+    </main>
+</body>
+
+</html>

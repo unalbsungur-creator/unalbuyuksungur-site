@@ -20,3 +20,7 @@ Thumbs.db
 /_site-manifest.json
 /_site.staging-*/
 /_site.previous-*/
+/_site_preview/
+/_site_preview-manifest.json
+/_site_preview.staging-*/
+/_site_preview.previous-*/

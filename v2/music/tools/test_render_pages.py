@@ -24,7 +24,7 @@ import render_pages as rp  # noqa: E402
 REPO = Path(__file__).resolve().parents[3]
 CATALOG = json.loads((REPO / "v2/music/data/catalog.json").read_text(encoding="utf-8"))
 TEMPLATE = (REPO / rp.TEMPLATE).read_bytes()
-BASE = "https://unalbuyuksungur-v2.pages.dev/v2/"
+BASE = "https://unalbuyuksungur-v2.pages.dev/"  # Görev 220: paket köke yazılır
 LANG = {"tr": "Türkçe", "de": "Almanca"}
 
 
@@ -228,10 +228,15 @@ class RenderPagesTests(unittest.TestCase):
                 with self.subTest(code=code, case=index):
                     self.assert_error(code, mutate(fn))
 
-    def test_unknown_profile_and_no_production(self):
-        self.assertEqual(set(rp.PROFILES), {"preview"})
-        self.assert_error("[SEO-PROFILE]", profile="production")
+    def test_profiles_and_unknown_profile(self):
+        # Görev 220: preview (pages.dev) ve production (ana alan adı); ikisi de kök önekli, başka profil yok.
+        self.assertEqual(set(rp.PROFILES), {"preview", "production"})
         self.assertEqual(rp.profile_base("preview"), BASE)
+        self.assertEqual(rp.profile_base("production"), "https://unalbuyuksungur.com/")
+        self.assert_error("[SEO-PROFILE]", profile="staging")
+        page = rp.render_work_pages(CATALOG, TEMPLATE, "production")["v2/music/work/w-0001.html"].decode("utf-8")
+        self.assertIn('<link rel="canonical" href="https://unalbuyuksungur.com/music/work/w-0001">', page)
+        self.assertNotIn("pages.dev", page)
 
     def test_url_guard(self):
         for bad in ("music/work/../../x", "music/work/./x", "music/work/x#frag"):
