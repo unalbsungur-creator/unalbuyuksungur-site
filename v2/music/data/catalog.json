@@ -3317,24 +3317,24 @@
           "format": "webp",
           "width": 400,
           "height": 400,
-          "bytes": 18918,
-          "sha256": "7516b7744d0853391bd5025f68f285a1c70e5c463c5f50d9a233be55821fdadc"
+          "bytes": 30730,
+          "sha256": "203eb2520a9fde4776d17d03a8636507db87e28efebe2e8a5a236574336f5782"
         },
         {
           "path": "images/c-0015-800.webp",
           "format": "webp",
           "width": 800,
           "height": 800,
-          "bytes": 61538,
-          "sha256": "552ee3015cf2c42fc5ff87f6047cef9340907d3988cf32c7d2e1a909266fef9c"
+          "bytes": 98490,
+          "sha256": "674af8098e00d042b719d5059dec48c4c702e9da4198d6d37cfafc8b2e6e00c5"
         },
         {
           "path": "images/c-0015-1200.webp",
           "format": "webp",
           "width": 1200,
           "height": 1200,
-          "bytes": 113412,
-          "sha256": "6874b097a1dbcb9d320f053119424ec3ecdafcd13740a3ea72b37a9fc7e75b50"
+          "bytes": 176938,
+          "sha256": "5dbac967756792065b01874305d4a7bcc353f24b663c709007492d206c3c2c31"
         }
       ]
     },

@@ -130,6 +130,16 @@ SPOTIFY_DECISIONS = {
     "r-0029": "https://open.spotify.com/track/0pzadgEdDUNpxLhtSTneKb",  # Elimi Sıktın
     "r-0053": "https://open.spotify.com/track/5DcxqmKthQEozgGvcg4UCU",  # Seninle
 }
+# Görev 225: sahibin verdiği yeni Biliyorum kapağı (kare, siyah bantsız). Yalnızca web görselleri yenilendi
+# (aynı ayar: Pillow, RGB, Lanczos, WebP quality=80, method=6); kaynak alanları arşivdeki Biliyorum.jpg'yi
+# tanımlamaya devam eder. Yol -> (bayt, SHA-256).
+COVER_DECISIONS = {
+    "c-0015": {
+        "images/c-0015-400.webp": (30730, "203eb2520a9fde4776d17d03a8636507db87e28efebe2e8a5a236574336f5782"),
+        "images/c-0015-800.webp": (98490, "674af8098e00d042b719d5059dec48c4c702e9da4198d6d37cfafc8b2e6e00c5"),
+        "images/c-0015-1200.webp": (176938, "5dbac967756792065b01874305d4a7bcc353f24b663c709007492d206c3c2c31"),
+    },
+}
 # Görev 25 kullanıcı onaylı site hikâyesi düzeltmesi (Ağlama, w-0001; Word belgesi değişmedi).
 AGLAMA_CORRECTION = ("content/stories/w-0001.txt",
                      "1998/ Flört bitince gözler kapaklarını açtığı ve damlalar gelmeye başladı",
@@ -315,7 +325,8 @@ def expected_split_catalog(before):
 
 
 def apply_later_decisions(data):
-    """Görev 25'ten sonra onaylanan kayıt videolarını (Görev 36, 40 ve 86) ve Spotify bağlantılarını (Görev 221) ekler."""
+    """Görev 25'ten sonra onaylanan kayıt videolarını (Görev 36, 40 ve 86), Spotify bağlantılarını (Görev 221)
+    ve yenilenen kapak web görsellerini (Görev 225) ekler."""
     data = json.loads(json.dumps(data))
     for recording in data["recordings"]:
         if recording["id"] in VIDEO_DECISIONS:
@@ -323,6 +334,10 @@ def apply_later_decisions(data):
                                     "videoType": "official-music-video"}]
         if recording["id"] in SPOTIFY_DECISIONS:
             recording["links"]["spotify"] = SPOTIFY_DECISIONS[recording["id"]]
+    for cover in data["covers"]:
+        for item in cover["webImages"]:
+            if item["path"] in COVER_DECISIONS.get(cover["id"], {}):
+                item["bytes"], item["sha256"] = COVER_DECISIONS[cover["id"]][item["path"]]
     data["updatedAt"] = VIDEO_DECISIONS_UPDATED_AT
     return data
 
@@ -538,7 +553,7 @@ def archive_checks(report, catalog, archive):
     expected = apply_later_decisions(expected_split_catalog(json.loads(before_path.read_text(encoding="utf-8"))))
     problems += [key for key in sorted(set(expected) | set(catalog)) if expected.get(key) != catalog.get(key)]
     report.check("Katalog = Görev 25 öncesi yedek + ayırma kararı + onaylı 49 eski ve 16 yeni video "
-                 "+ 6 onaylı Spotify bağlantısı (başka fark yok)",
+                 "+ 6 onaylı Spotify bağlantısı + yenilenen Biliyorum kapağı (başka fark yok)",
                  problems)
 
     backup = {}
@@ -546,10 +561,13 @@ def archive_checks(report, catalog, archive):
         digest, path = line.split(" *", 1)
         backup[path.strip()] = digest.strip()
     webp = {p: h for p, h in backup.items() if p.startswith("v2/music/images/") and p.endswith(".webp")}
-    problems = [p for p, h in webp.items() if sha256(REPO_ROOT / p) != h]
+    replaced = {"v2/music/" + p: h for items in COVER_DECISIONS.values() for p, (_b, h) in items.items()}
+    problems = [p for p, h in webp.items() if sha256(REPO_ROOT / p) != replaced.get(p, h)]
+    problems += [f"{p}: yedekte yok" for p in replaced if p not in webp]
     if len(webp) != 204:
         problems.append(f"yedekte {len(webp)} WebP")
-    report.check("204 WebP Görev 21 yedek manifestiyle bayt bayt aynı", problems)
+    report.check(f"204 WebP Görev 21 yedek manifestiyle bayt bayt aynı ({len(replaced)} yenilenen kapak "
+                 "görseli Görev 225 kararıyla)", problems)
 
 
 def main():
