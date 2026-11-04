@@ -1346,44 +1346,199 @@
             }
         }
 
-        /* Görev 222: Galeri gizliyken Müzik bölümü tam genişlikte tek satır (iki sınıf: medya sorgularını geçer) */
-        .stops.stops--single {
-            grid-template-columns: 1fr;
+        /* ---------- Müzik vitrini (Görev 224) — /music/ giriş bölümüyle aynı tipografi, renk ve sayı stili ---------- */
+
+        .music-showcase {
+            scroll-margin-top: var(--header-height);
+            padding: clamp(64px, 7vw, 104px) var(--gutter);
+            border-top: 1px solid rgba(201, 166, 107, 0.12);
+            background:
+                radial-gradient(ellipse 55% 70% at 88% 18%, rgba(201, 166, 107, 0.09), transparent 70%),
+                linear-gradient(180deg, #0D1422 0%, var(--background) 100%);
         }
 
-        .stops--single .stop {
+        .music-showcase-inner {
+            max-width: 1320px;
+            margin: 0 auto;
+        }
+
+        .music-showcase h2 {
+            margin: 0;
+            font-family: var(--font-serif);
+            font-size: clamp(40px, 5vw, 72px);
+            font-weight: 400;
+            line-height: 1.04;
+            letter-spacing: -0.01em;
+        }
+
+        .music-showcase h2 .accent {
+            display: block;
+            margin-top: 14px;
+            font-size: clamp(20px, 2.1vw, 30px);
+            letter-spacing: 0.02em;
+            color: var(--gold);
+        }
+
+        .music-showcase-lead {
+            max-width: 44ch;
+            margin: clamp(22px, 3vh, 32px) 0 0;
+            font-size: clamp(17px, 1.35vw, 20px);
+            line-height: 1.65;
+            color: var(--muted);
+        }
+
+        .music-stats {
             display: flex;
             flex-wrap: wrap;
-            align-items: center;
-            gap: 8px 28px;
-            padding: 28px 0 20px;
+            margin: clamp(28px, 4vw, 44px) 0 0;
+        }
+
+        .music-stats div {
+            padding: 4px 28px;
+            border-left: 1px solid rgba(201, 166, 107, 0.16);
+        }
+
+        .music-stats div:first-child {
+            padding-left: 0;
             border-left: 0;
         }
 
-        .stops--single .stop .badge,
-        .stops--single .stop h2 {
-            margin: 0;
+        .music-stats dt {
+            font-size: 11px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: var(--muted);
         }
 
-        .stops--single .stop-link {
-            margin: 0 0 0 auto;
+        .music-stats dd {
+            margin: 0;
+            font-family: var(--font-serif);
+            font-size: clamp(28px, 2.6vw, 38px);
+            line-height: 1.2;
+            color: var(--text);
+        }
+
+        .featured-works {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: clamp(16px, 2vw, 28px);
+            margin: clamp(36px, 4.5vw, 56px) 0 0;
+            padding: 0;
+            list-style: none;
+        }
+
+        .featured-work {
+            display: block;
+            color: var(--text);
+            text-decoration: none;
+            transition: transform 0.35s ease;
+        }
+
+        .featured-work img {
+            display: block;
+            width: 100%;
+            height: auto;
+            aspect-ratio: 1;
+            object-fit: cover;
+            border: 1px solid rgba(201, 166, 107, 0.16);
+            border-radius: 4px;
+            background: #0D1523;
+            transition: border-color 0.35s ease;
+        }
+
+        .featured-work span {
+            display: block;
+            padding: 14px 2px 0;
+            font-family: var(--font-serif);
+            font-size: clamp(18px, 1.5vw, 22px);
+            line-height: 1.25;
+            overflow-wrap: anywhere;
+        }
+
+        .featured-work:hover,
+        .featured-work:focus-visible {
+            transform: translateY(-4px);
+        }
+
+        .featured-work:hover img,
+        .featured-work:focus-visible img {
+            border-color: rgba(201, 166, 107, 0.6);
+        }
+
+        .music-showcase-foot {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 20px 32px;
+            margin-top: clamp(32px, 4vw, 48px);
+            padding-top: 28px;
+            border-top: 1px solid rgba(201, 166, 107, 0.16);
+        }
+
+        .music-platforms {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin: 0;
+            padding: 0;
+            list-style: none;
+        }
+
+        .music-showcase .platform-link {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-height: 46px;
+            padding: 6px 16px 6px 8px;
+            border: 1px solid rgba(201, 166, 107, 0.2);
+            border-radius: 4px;
+            background: rgba(23, 35, 56, 0.7);
+            color: var(--text);
+            text-decoration: none;
+            transition: border-color 0.3s ease, color 0.3s ease, transform 0.3s ease;
+        }
+
+        .music-showcase .platform-link:hover {
+            border-color: var(--gold);
+            color: var(--gold);
+            transform: translateY(-2px);
+        }
+
+        .music-cta {
+            gap: 8px;
+        }
+
+        .music-showcase .platform-icon {
+            flex: 0 0 30px;
+            width: 30px;
+            height: 30px;
+        }
+
+        .music-showcase .link-copy {
+            font-size: 12px;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        @media (max-width: 1100px) {
+            .featured-works {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
         }
 
         @media (max-width: 680px) {
-            .stops--single .stop {
-                display: block;
+            .music-showcase-foot {
+                display: grid;
             }
 
-            .stops--single .stop .badge {
-                margin-bottom: 14px;
+            .music-platforms {
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
             }
 
-            .stops--single .stop h2 {
-                margin-bottom: 8px;
-            }
-
-            .stops--single .stop-link {
-                margin: 6px 0 0;
+            .music-cta {
+                justify-content: center;
             }
         }
 
@@ -1719,22 +1874,68 @@
             </div>
         </section>
 
-        <div class="stops stops--single">
-            <section class="stop" id="muzik" aria-labelledby="muzik-baslik">
-                <span class="badge">Yayında</span>
-                <h2 id="muzik-baslik">Müzik</h2>
-                <p>Eser kataloğu ve koleksiyonlar yayında.</p>
-                <a class="stop-link" href="music/">Kataloğu Keşfet</a>
-            </section>
+        <!-- Görev 224: Müzik vitrini. Öne çıkan eser kartları (FEATURED_WORKS) ve sayılar build sırasında
+             catalog.json'dan üretilir (render_site.py); kaynakta yer tutucular vardır. -->
+        <section class="music-showcase" id="muzik" aria-labelledby="muzik-baslik">
+            <div class="music-showcase-inner">
+                <div class="music-showcase-head">
+                    <h2 id="muzik-baslik">Müzik Dünyam
+                        <span class="accent">Bir Ömür. Birçok Hikâye.</span>
+                    </h2>
+                    <p class="music-showcase-lead">Her şarkı bir duygu, her melodi başka bir hikâye. Sözcüklerle başlayan
+                        yolculuk, notalarla devam ediyor.</p>
+                    <dl class="music-stats">
+                        <div>
+                            <dt>Eser</dt>
+                            <dd data-home-stat="works">–</dd>
+                        </div>
+                        <div>
+                            <dt>Kayıt</dt>
+                            <dd data-home-stat="recordings">–</dd>
+                        </div>
+                        <div>
+                            <dt>Koleksiyon</dt>
+                            <dd data-home-stat="collections">–</dd>
+                        </div>
+                    </dl>
+                </div>
+                <ul class="featured-works">
+                    <!-- FEATURED_WORKS -->
+                </ul>
+                <div class="music-showcase-foot">
+                    <ul class="music-platforms">
+                        <li><a class="platform-link" data-external-link="spotify"
+                                data-external-label="Ünal Büyüksungur Spotify sanatçı profilini aç"><span
+                                    class="platform-icon" aria-hidden="true">♪</span><span class="link-copy"
+                                    data-external-platform>Spotify</span></a></li>
+                        <li><a class="platform-link" data-external-link="youtubeMusic"
+                                data-external-label="Ünal Büyüksungur Music YouTube Music profilini aç"><span
+                                    class="platform-icon" aria-hidden="true">▶</span><span class="link-copy"
+                                    data-external-platform>YouTube Music</span></a></li>
+                        <li><a class="platform-link" data-external-link="appleMusic"
+                                data-external-label="Ünal Büyüksungur Apple Music sanatçı profilini aç"><span
+                                    class="platform-icon" aria-hidden="true">♫</span><span class="link-copy"
+                                    data-external-platform>Apple Music</span></a></li>
+                        <li><a class="platform-link" data-external-link="youtube"
+                                data-external-label="Ünal Büyüksungur Music YouTube kanalını aç"><span
+                                    class="platform-icon" aria-hidden="true">▶</span><span class="link-copy"
+                                    data-external-platform>YouTube</span></a></li>
+                    </ul>
+                    <a class="button button-primary music-cta" href="music/">Kataloğu Keşfet<span
+                            aria-hidden="true">→</span></a>
+                </div>
+            </div>
+        </section>
 
-            <!-- Galeri geçici olarak gizlendi (Görev 221)
+        <!-- Galeri geçici olarak gizlendi (Görev 221); geri getirmek için bir .stops kapsayıcısı içine alın:
+        <div class="stops">
             <section class="stop" id="galeri" aria-labelledby="galeri-baslik">
                 <span class="badge">Yakında</span>
                 <h2 id="galeri-baslik">Galeri</h2>
                 <p>Fotoğraf ve video seçkisi hazırlanıyor.</p>
             </section>
-            -->
         </div>
+        -->
 
         <section class="writing" id="yazilar" aria-labelledby="yazilar-baslik">
             <span class="anchor-target" id="blog" aria-hidden="true"></span>

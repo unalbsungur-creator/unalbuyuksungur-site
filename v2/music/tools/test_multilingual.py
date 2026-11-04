@@ -117,6 +117,39 @@ class MultilingualTests(unittest.TestCase):
                 self.assertIn('href="../music/"', studio)
                 self.assertIn('href="./" aria-current="page"', studio)
 
+    def test_home_music_showcase(self):
+        """Görev 224: Müzik vitrini statik HTML; sayılar katalogdan, kartlar FEATURED_WORKS listesinden (eser kimliği)."""
+        self.assertEqual(render_site.FEATURED_WORKS, ("w-0023", "w-0013", "w-0014", "w-0016"))
+        titles = {w["id"]: w["title"] for w in CATALOG["works"]}
+        expected = {"works": len(CATALOG["works"]), "recordings": len(CATALOG["recordings"]),
+                    "collections": len(CATALOG["collections"])}
+        for locale, prefix in (("tr", ""), ("en", "../"), ("de", "../")):
+            page = self.pages["v2/" + ("" if locale == "tr" else locale + "/") + "index.html"].decode("utf-8")
+            section = page.split('<section class="music-showcase" id="muzik"', 1)[1].split("</section>", 1)[0]
+            with self.subTest(locale=locale):
+                for key, value in expected.items():
+                    self.assertIn(f'<dd data-home-stat="{key}">{value}</dd>', section)
+                cards = re.findall(r'<a class="featured-work" href="music/work/(w-\d{4})\.html"><img src="([^"]+)"'
+                                   r' srcset="([^"]+)"[^>]* loading="lazy"[^>]*><span>([^<]+)</span>', section)
+                self.assertEqual([c[0] for c in cards], list(render_site.FEATURED_WORKS))
+                for work_id, src, srcset, title in cards:
+                    self.assertEqual(html.unescape(title), titles[work_id])
+                    self.assertTrue(src.startswith(prefix + "music/images/c-") and src.endswith("-400.webp"), src)
+                    self.assertIn("-800.webp 800w", srcset)
+                self.assertEqual(len(re.findall(r'class="platform-link" data-external-link="(spotify|youtubeMusic|'
+                                                r'appleMusic|youtube)"', section)), 4)
+                self.assertIn('class="button button-primary music-cta" href="music/">', section)
+                self.assertNotIn("Yayında", section)
+                self.assertNotIn("FEATURED_WORKS", section)
+        broken = dict(SOURCES)
+        with self.assertRaisesRegex(render_site.LocaleError, "HOME-FEATURED"):
+            original = render_site.FEATURED_WORKS
+            try:
+                render_site.FEATURED_WORKS = ("w-9999",)
+                render_site.render(CATALOG, broken)
+            finally:
+                render_site.FEATURED_WORKS = original
+
     def test_turkish_only_pages_and_links(self):
         """Görev 221: blog, yazı ve gizlilik sayfaları yalnız TR; EN/DE sayfaları TR sayfalarına bağlanır."""
         production = render_site.render(CATALOG, SOURCES, "production")

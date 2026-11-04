@@ -25,6 +25,8 @@ BLOG_POSTS = {
     "2026-yazinda-turkiye-turizmi": "https://unalbsungur.blogspot.com/2026/05/2026-yaznda-turkiye-turizmi-ezberler.html",
     "ne-yapayim": "https://unalbsungur.blogspot.com/2026/04/ne-yapaym.html",
 }
+# Görev 224: ana sayfa Müzik vitrininde öne çıkan eserler (eser kimliğiyle; sıra korunur).
+FEATURED_WORKS = ("w-0023", "w-0013", "w-0014", "w-0016")  # Çat Çat Çat, Benimle Yaşlanacaktın, Biliyorum, Bir Kedim Var
 TR_PAGES = {"v2/blog/index.html": ("blog/", None), "v2/privacy/index.html": ("privacy/", None)}
 TR_PAGES.update({f"v2/blog/{slug}/index.html": (f"blog/{slug}/", url) for slug, url in BLOG_POSTS.items()})
 SRCSET_ATTRIBUTE = re.compile(r'\b(?P<name>srcset|imagesrcset)="(?P<value>[^"]*)"')
@@ -135,6 +137,40 @@ def seo_block(text, url, profile, alternate_links, og_type="website"):
     return text[:anchor.end()] + block + text[anchor.end():]
 
 
+def music_showcase(text, catalog, locale, messages):
+    """Görev 224: ana sayfa Müzik vitrini — katalogdan sayılar ve öne çıkan eser kartları (statik HTML)."""
+    stats = {"works": len(catalog["works"]), "recordings": len(catalog["recordings"]),
+             "collections": len(catalog["collections"])}
+    for key, value in stats.items():
+        text, count = re.subn(r'(<dd data-home-stat="' + key + r'">)[^<]*(</dd>)',
+                              lambda m: m[1] + str(value) + m[2], text)
+        if count != 1:
+            raise LocaleError(f"[HOME-STATS] {key}: expected one placeholder")
+    works = {w["id"]: w for w in catalog["works"]}
+    covers = {c["id"]: c for c in catalog["covers"]}
+    cards = []
+    for work_id in FEATURED_WORKS:
+        work = works.get(work_id)
+        recordings = [r for r in catalog["recordings"] if r["workId"] == work_id]
+        if work is None or not recordings or not WORK_ID.fullmatch(work_id):
+            raise LocaleError(f"[HOME-FEATURED] unknown work or no recording: {work_id}")
+        cover = covers.get(render_pages.primary_recording(recordings).get("coverId"))
+        images = {i["width"]: i["path"] for i in (cover or {}).get("webImages", [])}
+        if 400 not in images or 800 not in images:
+            raise LocaleError(f"[HOME-FEATURED] {work_id}: 400/800 cover images missing")
+        title = html.escape(work["title"], quote=False)
+        alt = html.escape(work["title"] + " " + lookup(messages, locale, "music.cover"), quote=True)
+        cards.append(
+            f'                    <li><a class="featured-work" href="music/work/{work_id}.html">'
+            f'<img src="music/{images[400]}" srcset="music/{images[400]} 400w, music/{images[800]} 800w" '
+            f'sizes="(max-width: 1100px) 45vw, 22vw" width="400" height="400" loading="lazy" decoding="async" '
+            f'alt="{alt}"><span>{title}</span></a></li>')
+    marker = "                    <!-- FEATURED_WORKS -->"
+    if text.count(marker) != 1:
+        raise LocaleError("[HOME-FEATURED] expected one FEATURED_WORKS marker")
+    return text.replace(marker, "\n".join(cards))
+
+
 def replace_once(text, old, new):
     if text.count(old) != 1:
         raise LocaleError(f"[I18N-TEMPLATE] expected one {old[:75]!r}, found {text.count(old)}")
@@ -149,9 +185,13 @@ def relative_route(source, locale, route):
     return rel
 
 
-def render_page(text, locale, surface, messages, config, work=None, profile="preview"):
+def render_page(text, locale, surface, messages, config, work=None, profile="preview", catalog=None):
     """Localize a source HTML document while keeping stable catalog facts and shared assets."""
     original, route = SURFACES[surface]
+    if surface == "home":
+        if catalog is None:
+            raise LocaleError("[HOME-FEATURED] the home page needs the catalog")
+        text = music_showcase(text, catalog, locale, messages)
     seo_route = {"home": "", "catalog": "music/", "work": "music/work/", "studio": "studio/"}[surface]
     if work is not None:
         if not WORK_ID.fullmatch(work["id"]):
@@ -211,7 +251,8 @@ def render_page(text, locale, surface, messages, config, work=None, profile="pre
         # Görev 221: blog/ and privacy/ are Turkish-only pages; EN/DE pages link to the Turkish ones.
         changes = {
             "home": {"images/": "../images/", "external-links.js": "../external-links.js",
-                     "i18n/": "../i18n/", "blog/": "../blog/", "privacy/": "../privacy/"},
+                     "i18n/": "../i18n/", "blog/": "../blog/", "privacy/": "../privacy/",
+                     "music/images/": "../music/images/"},
             "catalog": {"catalog.css": "../../music/catalog.css", "catalog.js": "../../music/catalog.js",
                         "../images/": "../../images/", "../external-links.js": "../../external-links.js",
                         "../i18n/": "../../i18n/", "../privacy/": "../../privacy/"},
@@ -296,11 +337,12 @@ def render(catalog, sources, profile="preview"):
     for surface in SHELL_ROUTES:
         source = SURFACES[surface][0]
         pages[source] = render_page(sources[source].decode("utf-8"), "tr", surface, messages, config,
-                                    profile=profile)
+                                    profile=profile, catalog=catalog)
     for locale in ("en", "de"):
         for surface, (source, route) in SURFACES.items():
             pages["v2/" + locale + "/" + route] = render_page(
-                sources[source].decode("utf-8"), locale, surface, messages, config, profile=profile)
+                sources[source].decode("utf-8"), locale, surface, messages, config, profile=profile,
+                catalog=catalog)
     for rel in TR_PAGES:
         pages[rel] = tr_page_seo(sources[rel].decode("utf-8"), rel, profile).encode("utf-8")
     return pages
