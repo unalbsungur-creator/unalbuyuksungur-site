@@ -3784,8 +3784,10 @@ test("K2/2: admin may take a case (D158-1); other roles, missing, forged and SYS
 });
 
 test("K2/3: proposing, approving, rejecting and closing are not active; the approval rules stay a design contract", async () => {
+    // Görev 206 (DQ-203-01): add_case_evidence is registered (TEST only); it decides nothing.
     assert.deepEqual(FINANCIAL_CASE_POLICY.transitions, {
-        take_case: { from: "OPEN", to: "UNDER_REVIEW", roles: ["finance", "admin"] }
+        take_case: { from: "OPEN", to: "UNDER_REVIEW", roles: ["finance", "admin"] },
+        add_case_evidence: { from: "UNDER_REVIEW", to: "UNDER_REVIEW", roles: ["finance", "admin"] }
     });
     assert.deepEqual(FINANCIAL_CASE_POLICY.approval, {
         status: "NOT_ACTIVE", roles: ["finance"], excludedActors: ["REVIEW_OPENER", "REVIEW_RESOLVER", "PROPOSER"]
@@ -3794,7 +3796,7 @@ test("K2/3: proposing, approving, rejecting and closing are not active; the appr
     const h = await refundedCases();
     const taken = await takeCase(h, h.refunded);
     for (const kind of ["propose_case_decision", "decide_case", "approve_case", "reject_case", "rework_case",
-        "close_case", "supersede_case", "add_case_evidence"]) {
+        "close_case", "supersede_case"]) {
         for (const role of ["finance", "admin"]) {
             await assert.rejects(h.send(taken, kind, role, { caseRef: caseRef(taken) },
                 { actorId: "synthetic-finance-approver" }), /UNKNOWN_ACTION/);
@@ -4072,7 +4074,7 @@ async function assertNoCommit(h, snapshot, gated = true) {
 }
 
 test("CG/1: the gate is driven by the registry: every registered case command, for every role, is refused outside TEST", async () => {
-    assert.deepEqual(CASE_COMMANDS, ["take_case"]);
+    assert.deepEqual(CASE_COMMANDS, ["take_case", "add_case_evidence"]);
     for (const environment of ["PRODUCTION", "STAGING", undefined]) {
         const h = await refundedCases(liveSetup(environment));
         for (const kind of CASE_COMMANDS) {
@@ -4087,6 +4089,12 @@ test("CG/1: the gate is driven by the registry: every registered case command, f
     for (const kind of CASE_COMMANDS) {
         const t = await refundedCases(liveSetup("TEST"));
         const role = FINANCIAL_CASE_POLICY.transitions[kind].roles[0];
+        // Görev 206 (DQ-203-01): add_case_evidence reaches its own code as well; a caseRef alone is not a submission, so
+        // its own first check refuses it, never the gate.
+        if (kind === "add_case_evidence") {
+            await assert.rejects(sendCase(t, t.refunded, kind, role, `synthetic-cg1-test-${kind}`), /INVALID_CASE_REFERENCE/);
+            continue;
+        }
         const done = await sendCase(t, t.refunded, kind, role, `synthetic-cg1-test-${kind}`);
         assert.equal(done.events.at(-1).kind, kind);
     }
@@ -5299,10 +5307,10 @@ test("T-S/3: the gate and commit helpers are synchronous, and nothing is awaited
     assert.ok(commit.indexOf("assertClaimsFree();") < commit.indexOf("orders.set(order.id, committed);"));
 });
 
-test("T-S/4 (A178-09): the contract says case evidence is not implemented and names the unclaimed refusal", async () => {
+test("T-S/4 (A178-09): the contract names add_case_evidence as the TEST-only case evidence path and names the unclaimed refusal", async () => {
     const source = await coreSource();
     assert.doesNotMatch(source, /across CLOSE and\s+\*?\s*financial cases/);
-    assert.match(source, /add_case_evidence exists; it is not implemented/);
+    assert.match(source, /evidence shares these registries through add_case_evidence \(Görev 206, TEST only\)/);
     assert.match(source, /evidence stored without a claim is refused \(EVIDENCE_NOT_CLAIMED\)/);
     assert.match(source, /Re-verifying evidence\s*\n?\s*\*?\s*already stored \(D165-09\) is never a claim/);
 });
@@ -5388,8 +5396,8 @@ test("EC/14 (A12a, DQ-191-02): the production purpose policy is exactly the appr
         FINANCIAL_CASE_EVIDENCE: { commands: ["add_case_evidence"], storage: "CASE_EVIDENCE",
             attestedPurpose: "FINANCIAL_CASE_EVIDENCE", evidencePolicyVersion: "UNAI-FINANCIAL-CASE-EVIDENCE-v1.1" }
     });
-    // add_case_evidence is bound but not registered: no command can claim case evidence in this phase.
-    assert.equal(Object.hasOwn(casePolicy.transitions, "add_case_evidence"), false);
+    // Görev 206 (owner-approved minimal update): add_case_evidence is bound and registered (TEST only).
+    assert.equal(Object.hasOwn(casePolicy.transitions, "add_case_evidence"), true);
     const probe = await purposeProbeCore();
     const h = setup({}, null, probe.createCore);
     const { refunded } = await refundedCases(h);
@@ -5802,7 +5810,7 @@ function cvRecord(order, item, evidence = {}, extra = {}) {
     };
 }
 
-test("CV/1: the case evidence policy is closed, frozen and versioned; the case policy keeps v1.0 and one command", async () => {
+test("CV/1: the case evidence policy is closed, frozen and versioned; the case policy keeps v1.0; add_case_evidence is TEST-only", async () => {
     const core = await cvCore();
     assert.ok(Object.isFrozen(core.CASE_EVIDENCE_POLICY) && Object.isFrozen(core.CASE_EVIDENCE_POLICY.kinds.ORDER_REFUND));
     assert.deepEqual(core.CASE_EVIDENCE_POLICY, {
@@ -5817,12 +5825,19 @@ test("CV/1: the case evidence policy is closed, frozen and versioned; the case p
         excludedKinds: { CUSTOMER_CLOSURE_CONFIRMATION: "LEGAL_REVIEW_PENDING" }
     });
     assert.equal(core.FINANCIAL_CASE_POLICY.reference, "UNAI-FINANCIAL-CASE-v1.0");
-    assert.deepEqual(Object.keys(core.FINANCIAL_CASE_POLICY.transitions), ["take_case"]);
+    assert.deepEqual(Object.keys(core.FINANCIAL_CASE_POLICY.transitions), ["take_case", "add_case_evidence"]);
+    assert.deepEqual(core.FINANCIAL_CASE_POLICY.transitions.add_case_evidence,
+        { from: "UNDER_REVIEW", to: "UNDER_REVIEW", roles: ["finance", "admin"] });
     const { refunded, core: live, actor } = await refundedCases();
     assert.ok(refunded.financialCases.every(item => item.policyVersion === "UNAI-FINANCIAL-CASE-v1.0"));
+    // Görev 206 (DQ-203-01): in TEST the command exists and refuses an empty payload; outside TEST the gate refuses it.
     await assert.rejects(live.dispatch(refunded, { kind: "add_case_evidence", requestId: "synthetic-cv1-request",
         expectedVersion: refunded.version, data: {} }, actor("finance", refunded, SERVER, "synthetic-finance-cv1")),
-    /UNKNOWN_ACTION/);
+    /INVALID_CASE_REFERENCE/);
+    const off = await refundedCases(liveSetup("PRODUCTION"));
+    await assert.rejects(off.core.dispatch(off.refunded, { kind: "add_case_evidence", requestId: "synthetic-cv1-request",
+        expectedVersion: off.refunded.version, data: {} }, off.actor("finance", off.refunded, SERVER, "synthetic-finance-cv1")),
+    /CASE_COMMAND_NOT_ENABLED/);
 });
 
 test("CV/2: checkCaseEvidence returns the request to attest, with the expected digest basis per kind", async () => {
@@ -6576,4 +6591,1124 @@ test("T-S/7 (A194-05): after the last await the commit re-runs the pre-check's e
     assert.doesNotMatch(source, /key !== "events"/);
     assert.match(source, /const EVIDENCE_SCAN_MAX_DEPTH = 64;/);
     assert.match(source, /const EVIDENCE_SCAN_MAX_NODES = 200000;/);
+});
+
+// ---- Görev 206 (Faz 2B-3): add_case_evidence, TEST only (Görev 203 test matrix AE/*; DQ-203-01…10, N-1…N-6) ----
+// A synthetic case console signs caseEvidenceBinding(record); a synthetic case evidence service vouches for an evidence
+// item it signed itself and states every CASE_ATTESTED_FIELDS value of the core's request. Both are test fixtures only.
+const aeCore = await import("./core.mjs");
+const aeSignRecord = binding => hmac(["case-evidence-console", binding]);
+const aeSignEvidence = evidence => hmac(["case-evidence-service", evidence.evidenceId, evidence.digest, evidence.orderId,
+    evidence.caseId, evidence.reviewId, evidence.evidenceKind, evidence.source, evidence.createdAt]);
+const aeAttest = (evidence, request, kind = "SYNTHETIC") => (evidence && signatureMatches(evidence.signature,
+    aeSignEvidence(evidence)) ? { status: "VERIFIED", verifier: { kind, id: "synthetic-case-evidence-service" }, ...request }
+    : null);
+const aeHash = value => createHash("sha256").update(JSON.stringify(value)).digest("hex");
+
+/** A TEST core with the synthetic case verifiers. `calls` lists every verifier call in order; `tamper.record` and
+ * `tamper.evidence` replace a verifier's answer for the next calls. Case-0001 (ORDER_REFUND) is taken by finance. */
+async function aeSetup(overrides = {}, inherited = null, factory = createCore) {
+    const calls = [];
+    const tamper = {};
+    const h = setup({
+        verifyCaseRecord: async (record, order, context) => {
+            calls.push("record");
+            if (tamper.record) return tamper.record(record, order, context);
+            return { verified: signatureMatches(record.signature, aeSignRecord(context.binding)), binding: context.binding };
+        },
+        verifyCaseEvidence: async (evidence, request, order) => {
+            calls.push("evidence");
+            if (tamper.evidence) return tamper.evidence(evidence, request, order);
+            return aeAttest(evidence, request);
+        },
+        ...overrides
+    }, inherited, factory);
+    const p = await refundedCases(h);
+    const taken = await takeCase(h, p.refunded);
+    return { ...p, calls, tamper, taken };
+}
+
+let aeCounter = 0;
+/** A well-formed, signed submission for `caseId` of `order`. `evidence` and `extra` override fields before signing;
+ * a `signature` given in either is kept as it is. */
+function aeRecord(order, { caseId = "case-0001", role = "finance", actorId = `synthetic-${role}-case-reviewer`,
+    n = ++aeCounter, evidence = {}, extra = {} } = {}) {
+    const item = order.financialCases.find(entry => entry.caseId === caseId) ?? order.financialCases[0];
+    const [evidenceKind, source] = item.caseType === "ORDER_REFUND"
+        ? ["PAYMENT_PROVIDER_RECORD", "payment_provider_reconciliation"] : ["REVISION_DELIVERY_RECORD", "producer_console"];
+    const entry = { evidenceId: `synthetic-ae-evidence-${n}`, evidenceKind, source, orderId: order.id, caseId,
+        reviewId: item.origin.reviewId, createdAt: item.createdAt, digest: dgDigest(`ae-${n}`), ...evidence };
+    if (!Object.hasOwn(evidence, "signature")) entry.signature = aeSignEvidence(entry);
+    const record = { kind: "CASE_EVIDENCE_SUBMISSION", orderId: order.id, caseId, reviewId: item.origin.reviewId,
+        caseType: item.caseType, evidencePolicyVersion: "UNAI-FINANCIAL-CASE-EVIDENCE-v1.1",
+        authorizationRef: `synthetic-ae-auth-${n}`, source: role === "admin" ? "admin_console" : "finance_console", actorId,
+        evidence: entry, ...extra };
+    if (!Object.hasOwn(extra, "signature")) record.signature = aeSignRecord(aeCore.caseEvidenceBinding(record));
+    return record;
+}
+const aeWithout = (record, key) => { const copy = structuredClone(record); delete copy[key]; return copy; };
+const aeEvidenceWithout = (record, key) => { const copy = structuredClone(record); delete copy.evidence[key]; return copy; };
+
+function aeSend(h, order, record, options = {}) {
+    const role = options.role ?? "finance";
+    const actorId = Object.hasOwn(options, "actorId") ? options.actorId : `synthetic-${role}-case-reviewer`;
+    return h.send(order, "add_case_evidence", role, { caseEvidence: record },
+        { actorId, ...(options.requestId ? { requestId: options.requestId } : {}) });
+}
+
+/** Refused with `expected`, and the verifiers were called exactly as `calls` lists (none by default). Tests then commit
+ * the corrected submission on the same snapshot: nothing of a refused one was committed or consumed. */
+async function aeRefused(s, order, record, expected, label, calls = []) {
+    s.calls.length = 0;
+    await assert.rejects(aeSend(s, order, record), expected, label);
+    assert.deepEqual(s.calls, calls, `${label}: verifier calls`);
+}
+
+test("AE/1: finance adds verified evidence to a case UNDER_REVIEW; only that case changes and nothing is decided or paid", async () => {
+    const s = await aeSetup();
+    const record = aeRecord(s.taken, { n: 1 });
+    s.calls.length = 0;
+    const added = await aeSend(s, s.taken, record, { requestId: "synthetic-ae1-request" });
+    assert.deepEqual(s.calls, ["record", "evidence"], "the console record first, then the evidence service");
+    assert.ok(Object.isFrozen(added));
+    assert.equal(added.version, s.taken.version + 1);
+    assert.equal(added.state, STATES.CLOSED);
+    const [item, other] = added.financialCases;
+    const before = s.taken.financialCases[0];
+    assert.equal(other, s.taken.financialCases[1], "the other case is the same object");
+    assert.deepEqual([item.status, item.policyVersion, item.moneyMovement, item.proposal, item.decisions, item.closure,
+        item.assignedActorId, item.items], ["UNDER_REVIEW", "UNAI-FINANCIAL-CASE-v1.0", "NONE", null, [], null,
+        before.assignedActorId, before.items]);
+    assert.equal(FINANCIAL_CASE_POLICY.approval.status, "NOT_ACTIVE");
+    const event = added.events.at(-1);
+    const stored = item.evidenceReferences[0];
+    assert.deepEqual(stored, {
+        evidenceId: "synthetic-ae-evidence-1", digest: dgDigest("ae-1"), evidenceKind: "PAYMENT_PROVIDER_RECORD",
+        source: "payment_provider_reconciliation", createdAt: before.createdAt, digestBasis: "RAW_BYTES",
+        evidencePolicyVersion: "UNAI-FINANCIAL-CASE-EVIDENCE-v1.1",
+        verifier: { kind: "SYNTHETIC", id: "synthetic-case-evidence-service" },
+        submittedBy: { actorId: "synthetic-finance-case-reviewer", actorType: "HUMAN", role: "finance" },
+        addedAt: FIXED_TIME, authorizationRef: "synthetic-ae-auth-1", idempotencyKey: "synthetic-ae1-request",
+        eventSequence: added.version, status: "ACTIVE", invalidation: null
+    });
+    assert.equal(item.evidenceReferences.length, 1);
+    assert.deepEqual(item.auditTrail.slice(0, -1), before.auditTrail);
+    assert.ok(before.auditTrail.every((entry, index) => item.auditTrail[index] === entry));
+    const audit = item.auditTrail.at(-1);
+    assert.deepEqual(audit, {
+        step: "EVIDENCE_ADDED", caseId: "case-0001", orderId: added.id, caseType: "ORDER_REFUND",
+        reviewId: before.origin.reviewId, from: "UNDER_REVIEW", to: "UNDER_REVIEW",
+        actorId: "synthetic-finance-case-reviewer", actorType: "HUMAN", role: "finance", at: FIXED_TIME,
+        authorizationRef: "synthetic-ae-auth-1", idempotencyKey: "synthetic-ae1-request",
+        policyVersion: "UNAI-FINANCIAL-CASE-v1.0", evidencePolicyVersion: "UNAI-FINANCIAL-CASE-EVIDENCE-v1.1", evidence: stored
+    });
+    // MIRROR-203: one audit object, its evidence the stored entry itself.
+    assert.equal(audit.evidence, stored);
+    assert.equal(event.audit, audit);
+    assert.ok(Object.isFrozen(audit) && Object.isFrozen(stored));
+    // No signature, content or free text is kept.
+    assert.doesNotMatch(JSON.stringify(added.financialCases), /synthetic-console|signature/);
+    assert.equal(event.kind, "add_case_evidence");
+    assert.deepEqual([event.from, event.to, event.role, event.at], [STATES.CLOSED, STATES.CLOSED, "finance", FIXED_TIME]);
+    assert.equal(event.financialCasesDigest, caseDigest(added.financialCases));
+    assert.equal(event.previousHash, s.taken.events.at(-1).hash);
+    const { hash, ...hashed } = event;
+    assert.equal(aeHash(hashed), hash);
+    assert.deepEqual([added.reviews, added.revisions, added.financialAssessments, added.notifications,
+        added.paymentReference], [s.taken.reviews, s.taken.revisions, s.taken.financialAssessments, s.taken.notifications,
+        s.taken.paymentReference]);
+});
+
+test("AE/2: admin adds evidence to an UNDELIVERED_REVISION case (JCS_UTF8); a second entry appends and keeps the first", async () => {
+    const s = await aeSetup();
+    const both = await takeCase(s, s.taken, caseRef(s.taken, "case-0002"), "admin");
+    const first = await aeSend(s, both, aeRecord(both, { caseId: "case-0002", role: "admin", n: 21 }), { role: "admin" });
+    const entry = first.financialCases[1].evidenceReferences[0];
+    assert.deepEqual([entry.evidenceKind, entry.source, entry.digestBasis, entry.submittedBy.role],
+        ["REVISION_DELIVERY_RECORD", "producer_console", "JCS_UTF8", "admin"]);
+    const second = await aeSend(s, first, aeRecord(first, { caseId: "case-0002", role: "admin", n: 22 }), { role: "admin" });
+    const refs = second.financialCases[1].evidenceReferences;
+    assert.equal(refs.length, 2);
+    assert.equal(refs[0], entry, "append-only: the first entry is the same object");
+    assert.equal(refs[1].evidenceId, "synthetic-ae-evidence-22");
+    assert.equal(second.financialCases[0], first.financialCases[0]);
+    assert.equal(second.financialCases[1].auditTrail.at(-1).evidence, refs[1]);
+    assert.equal(second.events.at(-2), first.events.at(-1));
+});
+
+test("AE-F/1 (F198-02): the submission and its evidence carry exactly the approved fields; nothing reaches a verifier", async () => {
+    const s = await aeSetup();
+    const base = aeRecord(s.taken, { n: 31 });
+    for (const key of aeCore.CASE_EVIDENCE_FIELDS) {
+        const expected = key === "orderId" || key === "caseId" ? /INVALID_CASE_REFERENCE/ : /EVIDENCE_MISMATCH/;
+        await aeRefused(s, s.taken, aeWithout(base, key), expected, `missing ${key}`);
+    }
+    await aeRefused(s, s.taken, { ...base, note: "x" }, /EVIDENCE_MISMATCH/, "extra field");
+    for (const key of aeCore.CASE_EVIDENCE_ITEM_FIELDS.filter(field => field !== "signature")) {
+        await aeRefused(s, s.taken, aeEvidenceWithout(base, key), /EVIDENCE_MISMATCH/, `missing evidence.${key}`);
+    }
+    await aeRefused(s, s.taken, { ...base, evidence: { ...base.evidence, content: "raw" } }, /EVIDENCE_MISMATCH/,
+        "extra evidence field");
+    for (const shape of [null, [], "record", 7]) {
+        await aeRefused(s, s.taken, shape, /INVALID_CASE_REFERENCE/, `caseEvidence ${JSON.stringify(shape)}`);
+    }
+    // The evidence service's own signature is optional and never bound or kept.
+    const unsigned = aeEvidenceWithout(base, "signature");
+    s.tamper.evidence = (evidence, request) => ({ status: "VERIFIED",
+        verifier: { kind: "SYNTHETIC", id: "synthetic-case-evidence-service" }, ...request });
+    const added = await aeSend(s, s.taken, { ...unsigned, signature: aeSignRecord(aeCore.caseEvidenceBinding(unsigned)) });
+    assert.equal(added.financialCases[0].evidenceReferences[0].evidenceId, "synthetic-ae-evidence-31");
+    // Pure: a field must be an own enumerable data property.
+    const { refunded } = await refundedCases();
+    const item = refunded.financialCases[0];
+    const record = cvRecord(refunded, item);
+    assert.ok(aeCore.checkCaseEvidence(record, refunded, item, "finance"));
+    const accessor = Object.defineProperty({ ...record }, "actorId", { get: () => record.actorId, enumerable: true });
+    const hidden = Object.defineProperty({ ...record }, "actorId", { value: record.actorId, enumerable: false });
+    const symbol = { ...record, [Symbol("extra")]: 1 };
+    const inheritedRecord = Object.assign(Object.create({ actorId: record.actorId }), aeWithout(record, "actorId"));
+    for (const [label, value] of [["accessor", accessor], ["hidden", hidden], ["symbol", symbol],
+        ["inherited", inheritedRecord]]) {
+        assert.throws(() => aeCore.checkCaseEvidence(value, refunded, item, "finance"), /EVIDENCE_MISMATCH/, label);
+    }
+});
+
+test("AE-F/2 (F198-02, DQ-203-09): actorId is the authenticated person; the console signature is a 1–4096 character string", async () => {
+    const s = await aeSetup();
+    await aeRefused(s, s.taken, aeRecord(s.taken, { n: 41, actorId: "synthetic-finance-other" }), /EVIDENCE_MISMATCH/,
+        "another actor than the principal");
+    await aeRefused(s, s.taken, aeRecord(s.taken, { n: 41, extra: { actorId: "bad id" } }), /EVIDENCE_MISMATCH/, "bad actorId");
+    for (const signature of [undefined, null, "", 7, "x".repeat(4097)]) {
+        await aeRefused(s, s.taken, aeRecord(s.taken, { n: 41, extra: { signature } }), /EVIDENCE_MISMATCH/,
+            `signature ${String(signature).slice(0, 12)}`);
+    }
+    // A well-formed but wrong signature reaches the console verifier only.
+    await aeRefused(s, s.taken, aeRecord(s.taken, { n: 41, extra: { signature: "0".repeat(64) } }), /UNTRUSTED_REVIEW/,
+        "unsigned", ["record"]);
+    // Pure bounds: 1 and 4096 characters pass the shape check, 0 and 4097 do not; a SYSTEM-shaped actor never passes.
+    const { refunded } = await refundedCases();
+    const item = refunded.financialCases[0];
+    for (const [signature, ok] of [["x", true], ["x".repeat(4096), true], ["", false], ["x".repeat(4097), false]]) {
+        const check = () => aeCore.checkCaseEvidence({ ...cvRecord(refunded, item), signature }, refunded, item, "finance");
+        if (ok) assert.ok(check(), `length ${signature.length}`);
+        else assert.throws(check, /EVIDENCE_MISMATCH/, `length ${signature.length}`);
+    }
+    assert.throws(() => aeCore.checkCaseEvidence({ ...cvRecord(refunded, item), actorId: "system-case-actor" }, refunded,
+        item, "finance"), /EVIDENCE_MISMATCH/);
+    const principal = { role: "finance", actorId: "synthetic-finance-cv" };
+    assert.ok(aeCore.checkCaseEvidenceSubmission(cvRecord(refunded, item), refunded, item, principal));
+    for (const other of [null, {}, { role: "finance", actorId: "synthetic-finance-other" }, { role: "admin",
+        actorId: "synthetic-finance-cv" }]) {
+        assert.throws(() => aeCore.checkCaseEvidenceSubmission(cvRecord(refunded, item), refunded, item, other),
+            /EVIDENCE_MISMATCH/, JSON.stringify(other));
+    }
+});
+
+test("AE-F/3: the submission is bound to this order, the canonical case, its review, type and the approved policies", async () => {
+    const s = await aeSetup();
+    const n = 51;
+    const before = new Date(Date.parse(s.taken.financialCases[0].createdAt) - 1).toISOString();
+    const cases = [
+        [{ extra: { orderId: "another-order-0001" } }, /INVALID_CASE_REFERENCE/],
+        [{ caseId: "case-0099" }, /UNKNOWN_CASE/],
+        [{ extra: { reviewId: "review-0099" } }, /INVALID_CASE_REFERENCE/],
+        [{ extra: { caseType: "UNDELIVERED_REVISION" } }, /INVALID_CASE_REFERENCE/],
+        [{ extra: { kind: "CLOSE_DECISION" } }, /EVIDENCE_MISMATCH/],
+        [{ extra: { authorizationRef: "bad ref" } }, /EVIDENCE_MISMATCH/],
+        [{ extra: { source: "admin_console" } }, /EVIDENCE_MISMATCH/],
+        [{ evidence: { orderId: "another-order-0001" } }, /EVIDENCE_MISMATCH/],
+        [{ evidence: { caseId: "case-0002" } }, /EVIDENCE_MISMATCH/],
+        [{ evidence: { reviewId: "review-0099" } }, /EVIDENCE_MISMATCH/],
+        [{ evidence: { digest: dgDigest("ae-51").toUpperCase() } }, /EVIDENCE_MISMATCH/],
+        [{ evidence: { createdAt: "2026-10-28T09:00:00" } }, /EVIDENCE_MISMATCH/],
+        [{ extra: { evidencePolicyVersion: "UNAI-FINANCIAL-CASE-EVIDENCE-v1.0" } }, /CASE_EVIDENCE_POLICY_MISMATCH/],
+        [{ evidence: { evidenceKind: "CUSTOMER_CLOSURE_CONFIRMATION", source: "customer_confirmation_service" } },
+            /EVIDENCE_KIND_NOT_ALLOWED/],
+        [{ evidence: { evidenceKind: "REVISION_DELIVERY_RECORD", source: "producer_console" } }, /EVIDENCE_KIND_NOT_ALLOWED/],
+        [{ evidence: { source: "producer_console" } }, /EVIDENCE_KIND_NOT_ALLOWED/],
+        [{ evidence: { createdAt: before } }, /EVIDENCE_STALE/]
+    ];
+    for (const [options, expected] of cases) {
+        await aeRefused(s, s.taken, aeRecord(s.taken, { n, ...options }), expected, JSON.stringify(options));
+    }
+    // The same evidence, id, digest and reference were never consumed: the clean submission commits.
+    const added = await aeSend(s, s.taken, aeRecord(s.taken, { n }));
+    assert.equal(added.financialCases[0].evidenceReferences[0].authorizationRef, "synthetic-ae-auth-51");
+    // A case whose own policy version is not the approved one fails closed (pure; no command writes another version).
+    const item = { ...s.taken.financialCases[0], policyVersion: "UNAI-FINANCIAL-CASE-v1.1" };
+    assert.throws(() => aeCore.checkCaseEvidenceSubmission(aeRecord(s.taken, { n: 52 }), s.taken, item,
+        { role: "finance", actorId: "synthetic-finance-case-reviewer" }), /INVALID_CASE_REFERENCE/);
+});
+
+test("AE-S/1 (DQ-203-05): only a verified finance or admin person, a CLOSED order and a case UNDER_REVIEW", async () => {
+    const s = await aeSetup();
+    const record = aeRecord(s.taken, { n: 61 });
+    await aeRefused(s, s.taken, aeRecord(s.taken, { caseId: "case-0002", n: 61 }), /CASE_STATE_INVALID/, "OPEN case");
+    for (const role of ["customer", "creative", "scheduler"]) {
+        s.calls.length = 0;
+        await assert.rejects(aeSend(s, s.taken, record, { role }), /UNAUTHORIZED/, role);
+        assert.deepEqual(s.calls, []);
+    }
+    s.calls.length = 0;
+    await assert.rejects(aeSend(s, s.taken, record, { actorId: undefined }), /ACTOR_REQUIRED/);
+    await assert.rejects(aeSend(s, s.taken, { ...record, actorId: "system-case-actor" }, { actorId: "system-case-actor" }),
+        /RESERVED_ACTOR/);
+    await assert.rejects(aeSend(s, s.taken, record, { role: "admin" }), /EVIDENCE_MISMATCH/, "finance record, admin person");
+    assert.deepEqual(s.calls, []);
+    // An order that is not CLOSED.
+    const paid = await paidOrder(s, "START", "ae-s1");
+    await assert.rejects(aeSend(s, paid, aeRecord(s.taken, { n: 62, extra: { orderId: paid.id } })), /INVALID_TRANSITION/);
+    assert.deepEqual(s.calls, []);
+    const added = await aeSend(s, s.taken, record);
+    assert.equal(added.financialCases[0].status, "UNDER_REVIEW");
+});
+
+test("AE-V/1 (DQ-203-02, N-1, F203-02): a missing verifier fails closed before any verifier call; inherited ones are not seen", async () => {
+    const valid = order => aeRecord(order, { n: 71 });
+    const noEvidence = await aeSetup({ verifyCaseEvidence: undefined });
+    await aeRefused(noEvidence, noEvidence.taken, valid(noEvidence.taken), /CASE_EVIDENCE_UNVERIFIABLE/, "no evidence service");
+    const notFunction = await aeSetup({ verifyCaseEvidence: { verify: true } });
+    await aeRefused(notFunction, notFunction.taken, valid(notFunction.taken), /CASE_EVIDENCE_UNVERIFIABLE/, "not a function");
+    const noRecord = await aeSetup({ verifyCaseRecord: undefined });
+    await aeRefused(noRecord, noRecord.taken, valid(noRecord.taken), /UNTRUSTED_REVIEW/, "no console verifier");
+    const neither = await aeSetup({ verifyCaseRecord: undefined, verifyCaseEvidence: undefined });
+    await aeRefused(neither, neither.taken, valid(neither.taken), /CASE_EVIDENCE_UNVERIFIABLE/, "neither");
+    // A polluted prototype never supplies a verifier; neither does an accessor.
+    const calls = [];
+    const inherited = await aeSetup({}, { verifyCaseEvidence: async (evidence, request) => {
+        calls.push("inherited");
+        return aeAttest(evidence, request);
+    } });
+    await aeRefused(inherited, inherited.taken, valid(inherited.taken), /CASE_EVIDENCE_UNVERIFIABLE/, "inherited");
+    assert.deepEqual(calls, []);
+    const accessor = await aeSetup({}, null, config => createCore(Object.defineProperty({ ...config }, "verifyCaseRecord",
+        { get: () => () => ({ verified: true, binding: "x" }), enumerable: true })));
+    await aeRefused(accessor, accessor.taken, valid(accessor.taken), /UNTRUSTED_REVIEW/, "accessor");
+});
+
+test("AE-V/2 (DQ-203-03): a failed console record verdict is UNTRUSTED_REVIEW and the evidence service is never asked", async () => {
+    const s = await aeSetup();
+    const record = aeRecord(s.taken, { n: 81 });
+    for (const [label, verdict] of [["bare true", () => true], ["null", () => null],
+        ["no binding", () => ({ verified: true })], ["other binding", (r, o, c) => ({ verified: true, binding: `${c.binding}x` })],
+        ["string true", (r, o, c) => ({ verified: "true", binding: c.binding })], ["refused", (r, o, c) => ({ verified: false,
+            binding: c.binding })]]) {
+        s.tamper.record = verdict;
+        await aeRefused(s, s.taken, record, /UNTRUSTED_REVIEW/, label, ["record"]);
+    }
+    // The console verifier receives the frozen snapshot of the record and exactly its binding.
+    s.tamper.record = (seen, order, context) => {
+        assert.ok(Object.isFrozen(seen) && Object.isFrozen(order));
+        assert.equal(context.binding, aeCore.caseEvidenceBinding(record));
+        assert.deepEqual(Object.keys(context), ["binding"]);
+        return { verified: true, binding: context.binding };
+    };
+    const added = await aeSend(s, s.taken, record);
+    assert.equal(added.version, s.taken.version + 1);
+});
+
+test("AE-V/3: a failed evidence attestation is UNTRUSTED_EVIDENCE; a throwing service commits nothing", async () => {
+    const s = await aeSetup();
+    const record = aeRecord(s.taken, { n: 91 });
+    const forged = { ...record, evidence: { ...record.evidence, signature: "0".repeat(64) } };
+    await aeRefused(s, s.taken, { ...forged, signature: aeSignRecord(aeCore.caseEvidenceBinding(forged)) },
+        /UNTRUSTED_EVIDENCE/, "evidence the service did not sign", ["record", "evidence"]);
+    const changes = [["status", { status: "PENDING" }], ["verifier", { verifier: null }],
+        ["verifier kind", { verifier: { kind: "OTHER", id: "synthetic-case-evidence-service" } }],
+        ["digestBasis", { digestBasis: "JCS_UTF8" }], ["purpose", { purpose: "CLOSE" }], ["caseId", { caseId: "case-0002" }],
+        ["createdAt", { createdAt: FIXED_TIME.replace("09:00", "09:01") }], ["decisionBinding", { decisionBinding: "x" }],
+        ["digest", { digest: dgDigest("ae-other") }]];
+    for (const [label, change] of changes) {
+        s.tamper.evidence = (evidence, request) => ({ ...aeAttest(evidence, request), ...change });
+        await aeRefused(s, s.taken, record, /UNTRUSTED_EVIDENCE/, label, ["record", "evidence"]);
+    }
+    s.tamper.evidence = (evidence, request) => {
+        const attestation = aeAttest(evidence, request);
+        const { digestBasis, ...own } = attestation;
+        return Object.assign(Object.create({ digestBasis }), own);
+    };
+    await aeRefused(s, s.taken, record, /UNTRUSTED_EVIDENCE/, "inherited digestBasis", ["record", "evidence"]);
+    s.tamper.evidence = () => { throw new Error("synthetic-case-evidence-service-down"); };
+    await aeRefused(s, s.taken, record, /synthetic-case-evidence-service-down/, "service down", ["record", "evidence"]);
+    delete s.tamper.evidence;
+    const added = await aeSend(s, s.taken, record);
+    assert.equal(added.financialCases[0].evidenceReferences[0].evidenceId, "synthetic-ae-evidence-91");
+});
+
+test("AE-V/4: the TEST-only synthetic boundary holds for add_case_evidence; a PRODUCTION-kind verifier is kept as { kind, id }", async () => {
+    const off = await aeSetup({ allowSyntheticEvidence: false });
+    const record = aeRecord(off.taken, { n: 101 });
+    await aeRefused(off, off.taken, record, /SYNTHETIC_VERIFIER_NOT_ALLOWED/, "synthetic", ["record", "evidence"]);
+    off.tamper.evidence = (evidence, request) => ({ ...aeAttest(evidence, request, "PRODUCTION"), extra: "not kept" });
+    const added = await aeSend(off, off.taken, record);
+    assert.deepEqual(added.financialCases[0].evidenceReferences[0].verifier,
+        { kind: "PRODUCTION", id: "synthetic-case-evidence-service" });
+});
+
+test("AE-U/1 (PA-1): evidence ids and digests are consumed once per core, shared by cases, orders and CLOSE, both ways", async () => {
+    const s = await aeSetup();
+    const first = await aeSend(s, s.taken, aeRecord(s.taken, { n: 111 }));
+    await aeRefused(s, first, aeRecord(first, { n: 112, evidence: { evidenceId: "synthetic-ae-evidence-111" } }),
+        /EVIDENCE_REFERENCE_USED/, "same id", ["record", "evidence"]);
+    await aeRefused(s, first, aeRecord(first, { n: 113, evidence: { digest: dgDigest("ae-111") } }),
+        /EVIDENCE_DIGEST_USED/, "same digest", ["record", "evidence"]);
+    // Another order of the same core.
+    const other = await refundedCases(s);
+    const otherTaken = await takeCase(s, other.refunded);
+    await aeRefused(s, otherTaken, aeRecord(otherTaken, { n: 114, evidence: { evidenceId: "synthetic-ae-evidence-111" } }),
+        /EVIDENCE_REFERENCE_USED/, "other order, same id", ["record", "evidence"]);
+    // CLOSE evidence first, then case evidence with its id or digest.
+    const closing = await inReview("DISPUTE", s);
+    const closeRecord = dgRecord(s, closing, { digest: dgDigest("ae-close") });
+    await s.resolveReview(closing.reviewed, "CLOSE", closeRecord);
+    await aeRefused(s, otherTaken, aeRecord(otherTaken, { n: 115, evidence: { evidenceId: closeRecord.evidence.evidenceId } }),
+        /EVIDENCE_REFERENCE_USED/, "CLOSE id", ["record", "evidence"]);
+    await aeRefused(s, otherTaken, aeRecord(otherTaken, { n: 116, evidence: { digest: dgDigest("ae-close") } }),
+        /EVIDENCE_DIGEST_USED/, "CLOSE digest", ["record", "evidence"]);
+    // Case evidence first, then a CLOSE with its digest.
+    const later = await inReview("DISPUTE", s);
+    await assert.rejects(s.resolveReview(later.reviewed, "CLOSE", dgRecord(s, later, { digest: dgDigest("ae-111") })),
+        /EVIDENCE_DIGEST_USED/);
+    const fresh = await aeSend(s, otherTaken, aeRecord(otherTaken, { n: 117 }));
+    assert.equal(fresh.financialCases[0].evidenceReferences.length, 1);
+});
+
+test("AE-U/2 (DQ-203-04, N-2): a case authorizationRef is single use and shares one namespace with review references", async () => {
+    const s = await aeSetup();
+    const first = await aeSend(s, s.taken, aeRecord(s.taken, { n: 121 }));
+    await aeRefused(s, first, aeRecord(first, { n: 122, extra: { authorizationRef: "synthetic-ae-auth-121" } }),
+        /CASE_REFERENCE_USED/, "same case");
+    const both = await takeCase(s, first, caseRef(first, "case-0002"), "admin");
+    await assert.rejects(aeSend(s, both, aeRecord(both, { caseId: "case-0002", role: "admin", n: 123,
+        extra: { authorizationRef: "synthetic-ae-auth-121" } }), { role: "admin" }), /CASE_REFERENCE_USED/, "other case");
+    // Review references are refused for case evidence…
+    const opening = s.refunded.reviews[0].opening.authorizationRef;
+    const deciding = s.refunded.reviews[0].resolution.authorizationRef;
+    for (const ref of [opening, deciding]) {
+        await aeRefused(s, both, aeRecord(both, { n: 124, extra: { authorizationRef: ref } }), /CASE_REFERENCE_USED/, ref);
+    }
+    // …and case references for reviews: opening and resolving.
+    const p = await producing("PLUS", {}, s);
+    await assert.rejects(s.openReview(p.order, "DISPUTE", s.reviewRecord(p.order, "DISPUTE",
+        { authorizationRef: "synthetic-ae-auth-121" })), /REVIEW_REFERENCE_USED/);
+    // Judged where the review references are, before the clock: a broken clock does not hide the reuse.
+    s.setNow("2026-10-28T09:00:00");
+    await assert.rejects(s.openReview(p.order, "DISPUTE", s.reviewRecord(p.order, "DISPUTE",
+        { authorizationRef: "synthetic-ae-auth-121" })), /REVIEW_REFERENCE_USED/);
+    s.setNow(FIXED_TIME);
+    const reviewed = await s.openReview(p.order, "DISPUTE");
+    await assert.rejects(s.resolveReview(reviewed, "CONTINUE", s.resolution(reviewed, reviewed.reviews[0].reviewId,
+        "CONTINUE", { authorizationRef: "synthetic-ae-auth-121" })), /REVIEW_REFERENCE_USED/);
+    const continued = await s.resolveReview(reviewed, "CONTINUE");
+    assert.equal(continued.reviews[0].status, "RESOLVED");
+    const added = await aeSend(s, both, aeRecord(both, { n: 125 }));
+    assert.equal(added.financialCases[0].evidenceReferences.length, 2);
+});
+
+test("AE-T/1 (DQ-203-06, N-3): createdAt is never after the trusted time, fixed before any verifier is awaited", async () => {
+    const s = await aeSetup();
+    const later = new Date(Date.parse(FIXED_TIME) + 1).toISOString();
+    await aeRefused(s, s.taken, aeRecord(s.taken, { n: 131, evidence: { createdAt: later } }), /EVIDENCE_TIME_INVALID/,
+        "1 ms in the future");
+    await aeRefused(s, s.taken, aeRecord(s.taken, { n: 131, evidence: { createdAt: "2099-01-01T00:00:00.000Z" } }),
+        /EVIDENCE_TIME_INVALID/, "2099");
+    s.setNow("2026-10-28T08:59:59.999Z");
+    await aeRefused(s, s.taken, aeRecord(s.taken, { n: 131 }), /CLOCK_REGRESSION/, "clock behind the order");
+    s.setNow("2026-10-28T09:00:00");
+    await aeRefused(s, s.taken, aeRecord(s.taken, { n: 131 }), /INVALID_CLOCK/, "zone-less clock");
+    // An offset form of the same instant is equal, so it commits; the time is the one taken before the verifiers.
+    s.setNow(FIXED_TIME);
+    s.tamper.record = (record, order, context) => {
+        s.setNow("2026-10-28T09:30:00.000Z");
+        return { verified: signatureMatches(record.signature, aeSignRecord(context.binding)), binding: context.binding };
+    };
+    const added = await aeSend(s, s.taken, aeRecord(s.taken, { n: 131, evidence: { createdAt: "2026-10-28T12:00:00+03:00" } }));
+    const stored = added.financialCases[0].evidenceReferences[0];
+    assert.deepEqual([stored.createdAt, stored.addedAt, added.events.at(-1).at], [FIXED_TIME, FIXED_TIME, FIXED_TIME]);
+    // Pure: with a trusted time the wrapper judges the upper bound too.
+    const item = s.taken.financialCases[0];
+    const principal = { role: "finance", actorId: "synthetic-finance-case-reviewer" };
+    const record = aeRecord(s.taken, { n: 132, evidence: { createdAt: later } });
+    assert.ok(aeCore.checkCaseEvidenceSubmission(record, s.taken, item, principal));
+    assert.ok(aeCore.checkCaseEvidenceSubmission(record, s.taken, item, principal, later));
+    assert.throws(() => aeCore.checkCaseEvidenceSubmission(record, s.taken, item, principal, FIXED_TIME), /EVIDENCE_TIME_INVALID/);
+    assert.throws(() => aeCore.checkCaseEvidenceSubmission(record, s.taken, item, principal, "2026-10-28T09:00:00"),
+        /INVALID_CLOCK/);
+});
+
+test("AE-I/1 (INV-203-01): only add_case_evidence fingerprints its payload; a replay returns the commit, other content conflicts", async () => {
+    const s = await aeSetup();
+    // take_case keeps the original 17-element intent: no payload element is appended for any other command.
+    const take = s.taken.events.at(-1);
+    assert.equal(take.fingerprint, aeHash(["take_case", ...Array(15).fill(null), caseRef(s.taken)]));
+    const record = aeRecord(s.taken, { n: 141 });
+    const added = await aeSend(s, s.taken, record, { requestId: "synthetic-ae-i1" });
+    assert.equal(added.events.at(-1).fingerprint, aeHash(["add_case_evidence", ...Array(16).fill(null), record]));
+    s.calls.length = 0;
+    const replayed = await aeSend(s, s.taken, record, { requestId: "synthetic-ae-i1" });
+    assert.equal(replayed, added, "the same request returns the committed order");
+    assert.deepEqual(s.calls, [], "a replay asks no verifier");
+    for (const changed of [aeRecord(s.taken, { n: 142 }), { ...record, evidence: { ...record.evidence,
+        digest: dgDigest("ae-i1-other") } }]) {
+        await assert.rejects(aeSend(s, added, changed, { requestId: "synthetic-ae-i1" }), /IDEMPOTENCY_CONFLICT/);
+    }
+    await assert.rejects(s.send(added, "take_case", "finance", { caseRef: caseRef(added) },
+        { requestId: "synthetic-ae-i1", actorId: "synthetic-finance-case-reviewer" }), /IDEMPOTENCY_CONFLICT/);
+    // A refused request records nothing: its id is free for a valid submission.
+    await aeRefused(s, added, aeRecord(added, { n: 143, extra: { note: 1 } }), /EVIDENCE_MISMATCH/, "refused");
+    const next = await aeSend(s, added, aeRecord(added, { n: 143 }));
+    assert.equal(next.version, added.version + 1);
+});
+
+test("AE-R/1 (races ×10): one order commits once; two orders sharing an id, digest or reference commit exactly one", async () => {
+    for (let round = 0; round < 10; round += 1) {
+        const s = await aeSetup();
+        const pair = await Promise.allSettled([aeSend(s, s.taken, aeRecord(s.taken, { n: `r${round}-a` })),
+            aeSend(s, s.taken, aeRecord(s.taken, { n: `r${round}-b` }))]);
+        assert.deepEqual(pair.map(result => result.status).sort(), ["fulfilled", "rejected"], `same order, round ${round}`);
+        assert.equal(pair.find(result => result.status === "rejected").reason.code, "VERSION_CONFLICT");
+        let left = pair.find(result => result.status === "fulfilled").value;
+        const second = await refundedCases(s);
+        let right = await takeCase(s, second.refunded);
+        // Both submissions pass every pre-check before either commits: the evidence service holds both at a barrier.
+        for (const [label, shared, code] of [
+            ["id", { evidence: { evidenceId: `synthetic-ae-race-id-${round}` } }, "EVIDENCE_REFERENCE_USED"],
+            ["digest", { evidence: { digest: dgDigest(`ae-race-${round}`) } }, "EVIDENCE_DIGEST_USED"],
+            ["reference", { extra: { authorizationRef: `synthetic-ae-race-ref-${round}` } }, "CASE_REFERENCE_USED"]]) {
+            let arrived = 0;
+            let release;
+            const gate = new Promise(resolve => { release = resolve; });
+            s.tamper.evidence = async (evidence, request) => {
+                arrived += 1;
+                if (arrived === 2) release();
+                await gate;
+                return aeAttest(evidence, request);
+            };
+            // A submission refused before the barrier opens it, so the other one never waits forever.
+            const results = await Promise.allSettled([
+                aeSend(s, left, aeRecord(left, { n: `r${round}-${label}-l`, ...shared })).finally(() => release()),
+                aeSend(s, right, aeRecord(right, { n: `r${round}-${label}-r`, ...shared })).finally(() => release())]);
+            delete s.tamper.evidence;
+            const fulfilled = results.filter(result => result.status === "fulfilled");
+            const rejected = results.filter(result => result.status === "rejected");
+            assert.equal(arrived, 2, `${label}: both reached the evidence service`);
+            assert.equal(fulfilled.length, 1, `${label}, round ${round}`);
+            assert.equal(rejected[0].reason.code, code, `${label}, round ${round}`);
+            const winner = fulfilled[0].value;
+            if (winner.id === left.id) left = winner; else right = winner;
+        }
+    }
+});
+
+test("AE-R/2: a commit on the same order while a verifier is awaited is VERSION_CONFLICT; nothing is consumed", async () => {
+    const s = await aeSetup();
+    const record = aeRecord(s.taken, { n: 201 });
+    let other = null;
+    s.tamper.record = async (seen, order, context) => {
+        delete s.tamper.record;
+        other = await takeCase(s, s.taken, caseRef(s.taken, "case-0002"), "admin");
+        return { verified: signatureMatches(seen.signature, aeSignRecord(context.binding)), binding: context.binding };
+    };
+    await assert.rejects(aeSend(s, s.taken, record), /VERSION_CONFLICT/);
+    assert.equal(other.version, s.taken.version + 1);
+    const added = await aeSend(s, other, record);
+    assert.equal(added.financialCases[0].evidenceReferences[0].authorizationRef, "synthetic-ae-auth-201");
+});
+
+test("AE-M/1 (DQ-203-08, MIRROR-203, N-4): an add_case_evidence mirror is the stored entry itself, of the same case", async () => {
+    const { probeEvidenceOnly } = await scProbeCore();
+    const s = await aeSetup();
+    const both = await takeCase(s, s.taken, caseRef(s.taken, "case-0002"), "admin");
+    const one = await aeSend(s, both, aeRecord(both, { n: 171 }));
+    const added = await aeSend(s, one, aeRecord(one, { caseId: "case-0002", role: "admin", n: 172 }), { role: "admin" });
+    const [first, second] = added.financialCases;
+    const stored = first.evidenceReferences[0];
+    const otherStored = second.evidenceReferences[0];
+    const trail = first.auditTrail.at(-1);
+    assert.equal(trail.step, "EVIDENCE_ADDED");
+    assert.equal(probeEvidenceOnly(added, added, null, []), true);
+    const withTrail = entry => ({ ...added, financialCases: [{ ...first, auditTrail: [...first.auditTrail.slice(0, -1), entry] },
+        second] });
+    assert.equal(probeEvidenceOnly(added, withTrail({ ...trail }), null, []), true, "the stored object itself");
+    assert.equal(probeEvidenceOnly(added, withTrail({ ...trail, evidence: { ...stored } }), null, []), false, "an equal copy");
+    assert.equal(probeEvidenceOnly(added, withTrail({ ...trail, evidence: otherStored }), null, []), false, "another case's entry");
+    // The same audit object placed in the other case's trail: the entry it holds is not that case's own (N-4).
+    const moved = { ...added, financialCases: [first, { ...second, auditTrail: [...second.auditTrail, trail] }] };
+    assert.equal(probeEvidenceOnly(added, moved, null, []), false, "a mirror moved to another case's trail");
+    const eventIndex = added.events.findIndex(event => event.audit === trail);
+    assert.ok(eventIndex > 0);
+    const withEvent = audit => ({ ...added, events: added.events.map((event, index) => (index === eventIndex
+        ? { ...event, audit } : event)) });
+    assert.equal(probeEvidenceOnly(added, withEvent({ ...trail }), null, []), true, "event: the stored object");
+    assert.equal(probeEvidenceOnly(added, withEvent({ ...trail, evidence: { ...stored } }), null, []), false, "event: a copy");
+    assert.equal(probeEvidenceOnly(added, withEvent({ ...trail, evidence: otherStored }), null, []), false,
+        "event: another case's entry");
+    assert.equal(probeEvidenceOnly(added, added, trail, []), true, "transition audit: the stored object");
+    assert.equal(probeEvidenceOnly(added, added, { ...trail, evidence: { ...stored } }, []), false, "transition audit: a copy");
+    assert.equal(probeEvidenceOnly(added, added, { ...trail, evidence: otherStored }, []), false,
+        "transition audit: another case's entry");
+    // Scoped to add_case_evidence (owner decision, Görev 206): other mirrors keep the key rule, CLOSE unchanged.
+    assert.equal(probeEvidenceOnly(added, withTrail({ step: "PROBE", evidence: { ...stored } }), null, []), true);
+});
+
+test("AE-M/2 (DQ-203-10, N-6): the case evidence audit is frozen before hashing; a mirror swapped while the commit awaits is refused", async () => {
+    const probe = await scProbeCore();
+    const s = await aeSetup({}, null, probe.createCore);
+    try {
+        let seen = null;
+        probe.setProbeAwaitHook((stage, scope) => {
+            if (stage === "cases" && seen === null) {
+                seen = [scope.audit.step, Object.isFrozen(scope.audit), Object.isFrozen(scope.audit.evidence)];
+                assert.throws(() => { scope.audit.note = "changed"; }, TypeError);
+            }
+        });
+        const added = await aeSend(s, s.taken, aeRecord(s.taken, { n: 181 }));
+        assert.deepEqual(seen, ["EVIDENCE_ADDED", true, true]);
+        assert.equal(added.events.at(-1).audit.note, undefined);
+        let fired = 0;
+        probe.setProbeAwaitHook((stage, scope) => {
+            if (stage === "hash" && fired === 0) {
+                fired += 1;
+                const item = scope.next.financialCases[0];
+                scope.next.financialCases[0] = { ...item, auditTrail: [...item.auditTrail.slice(0, -1),
+                    { ...scope.audit, evidence: { ...scope.audit.evidence } }] };
+            }
+        });
+        const record = aeRecord(added, { n: 182 });
+        await assert.rejects(aeSend(s, added, record), /EVIDENCE_STORAGE_INVALID/);
+        assert.equal(fired, 1);
+        probe.setProbeAwaitHook(() => {});
+        const next = await aeSend(s, added, record);
+        assert.equal(next.version, added.version + 1);
+    } finally {
+        probe.setProbeAwaitHook(null);
+    }
+});
+
+test("AE-B/1 (DQ-203-07, F198-03): the scan also counts own keys, primitives included; depth 64 and 200 000 objects stay", async () => {
+    const probe = await scProbeCore();
+    assert.deepEqual(probe.PROBE_SCAN_LIMITS, { depth: 64, nodes: 200000 });
+    assert.match(await coreSource(), /const EVIDENCE_SCAN_MAX_ENTRIES = 1000000;/);
+    const scan = length => probe.probeFindEvidence({ list: new Array(length).fill(0) });
+    // One key of the root plus `length` array elements: 1 000 000 entries is the budget itself.
+    assert.deepEqual(scan(999999).found, []);
+    assert.equal(scan(1000000).found, null);
+    assert.equal(scan(10).used, 2, "objects are counted as before");
+    const { refunded, store } = await scSetup();
+    await assert.rejects(store(refunded, { mode: "decisions", put: [new Array(1000001).fill(0)] }), /EVIDENCE_STORAGE_INVALID/);
+    const next = await store(refunded, { mode: "decisions", put: [new Array(1000).fill(0)] });
+    assert.equal(next.version, refunded.version + 1);
+});
+
+test("AE-P/1: outside TEST add_case_evidence is refused by the central gate for every role, before any verifier", async () => {
+    for (const environment of ["PRODUCTION", "STAGING", undefined]) {
+        const calls = [];
+        const h = setup({ allowSyntheticEvidence: false, environment,
+            verifyCaseRecord: async () => { calls.push("record"); return null; },
+            verifyCaseEvidence: async () => { calls.push("evidence"); return null; } });
+        const { refunded } = await refundedCases(h);
+        for (const role of ["finance", "admin"]) {
+            await assert.rejects(aeSend(h, refunded, aeRecord(refunded, { role, n: `p-${environment}-${role}` }), { role }),
+                /CASE_COMMAND_NOT_ENABLED/, `${environment}/${role}`);
+        }
+        assert.deepEqual(calls, []);
+        const after = await takeCase(h, refunded).catch(error => error.code);
+        assert.equal(after, "CASE_COMMAND_NOT_ENABLED");
+    }
+});
+
+test("AE-O/1: refusals follow one order: state, shape, reference, time, record verifier, evidence verifier, gate", async () => {
+    const s = await aeSetup();
+    const used = await aeSend(s, s.taken, aeRecord(s.taken, { n: 191 }));
+    const future = new Date(Date.parse(FIXED_TIME) + 1).toISOString();
+    await aeRefused(s, used, aeRecord(used, { caseId: "case-0002", n: 192, extra: { note: 1 } }), /CASE_STATE_INVALID/,
+        "OPEN case and a bad shape");
+    await aeRefused(s, used, aeRecord(used, { n: 193, extra: { note: 1, authorizationRef: "synthetic-ae-auth-191" } }),
+        /EVIDENCE_MISMATCH/, "bad shape and a used reference");
+    await aeRefused(s, used, aeRecord(used, { n: 194, extra: { authorizationRef: "synthetic-ae-auth-191" },
+        evidence: { createdAt: future } }), /CASE_REFERENCE_USED/, "used reference and a future time");
+    const reused = aeRecord(used, { n: 195, evidence: { evidenceId: "synthetic-ae-evidence-191" } });
+    s.tamper.record = () => null;
+    s.tamper.evidence = () => null;
+    await aeRefused(s, used, reused, /UNTRUSTED_REVIEW/, "record before evidence", ["record"]);
+    delete s.tamper.record;
+    await aeRefused(s, used, reused, /UNTRUSTED_EVIDENCE/, "evidence before the registries", ["record", "evidence"]);
+    delete s.tamper.evidence;
+    await aeRefused(s, used, reused, /EVIDENCE_REFERENCE_USED/, "the registries last", ["record", "evidence"]);
+    const bare = await aeSetup({ verifyCaseEvidence: undefined });
+    await aeRefused(bare, bare.taken, aeRecord(bare.taken, { n: 196, evidence: { createdAt: future } }),
+        /EVIDENCE_TIME_INVALID/, "a future time before a missing service");
+});
+
+test("AE-C/1: CLOSE beside case evidence keeps its shape: the resolution, audit and event share one evidence object", async () => {
+    const s = await aeSetup();
+    await aeSend(s, s.taken, aeRecord(s.taken, { n: 211 }));
+    const closing = await inReview("DISPUTE", s);
+    const closed = await s.resolveReview(closing.reviewed, "CLOSE", dgRecord(s, closing, { digest: dgDigest("ae-c1") }));
+    const plain = setup();
+    const reference = await inReview("DISPUTE", plain);
+    const referenceClosed = await plain.resolveReview(reference.reviewed, "CLOSE",
+        dgRecord(plain, reference, { digest: dgDigest("ae-c1-ref") }));
+    const resolution = closed.reviews.at(-1).resolution;
+    assert.equal(resolution.evidence, closed.events.at(-1).audit.evidence);
+    assert.deepEqual(Object.keys(resolution), Object.keys(referenceClosed.reviews.at(-1).resolution));
+    assert.deepEqual(Object.keys(resolution.evidence), Object.keys(referenceClosed.reviews.at(-1).resolution.evidence));
+    assert.deepEqual(Object.keys(closed.events.at(-1)), Object.keys(referenceClosed.events.at(-1)));
+    assert.equal(closed.financialCases.length, 0);
+});
+
+// ---- Görev 210 (Faz 2B-3 security remediation): OD-207-01…04, DQ-208-01…05 ----
+// RM/1–4: four eyes and the case owner (originDeciderActorId first, assignedActorId second, both before authorizationRef);
+// RM/5: GEN-3 for CLOSE-shaped and case-naming mirrors; RM/6: TRAIL-1; RM/7: the pre-check of the transition audit
+// (M-38); RM/8–9: the own-data attestation snapshot (DQ-208-03).
+
+test("RM/1 (DQ-208-02, OF-209-01): the review's decider never adds its case's evidence, even as the case's owner", async () => {
+    const s = await aeSetup();
+    const decider = s.refunded.financialCases[1].originDeciderActorId;
+    assert.equal(decider, s.refunded.reviews[0].resolution.actorId);
+    const both = await takeCase(s, s.taken, caseRef(s.taken, "case-0002"), "finance", { actorId: decider });
+    assert.equal(both.financialCases[1].assignedActorId, decider);
+    s.calls.length = 0;
+    await assert.rejects(aeSend(s, both, aeRecord(both, { caseId: "case-0002", actorId: decider, n: 301 }), { actorId: decider }),
+        /FOUR_EYES_VIOLATION/);
+    assert.deepEqual(s.calls, []);
+    // OF-209-01 (TEST-only, open): nobody else may add evidence to that case, and take_case is unchanged (DQ-208-04).
+    await assert.rejects(aeSend(s, both, aeRecord(both, { caseId: "case-0002", n: 302 })), /UNAUTHORIZED/);
+    assert.deepEqual(s.calls, []);
+});
+
+test("RM/2 (DQ-208-01): only the person the case is assigned to adds its evidence; another finance or an admin is UNAUTHORIZED", async () => {
+    const s = await aeSetup();
+    assert.equal(s.taken.financialCases[0].assignedActorId, "synthetic-finance-case-reviewer");
+    for (const [role, actorId] of [["finance", "synthetic-finance-other"], ["admin", "synthetic-admin-case-reviewer"]]) {
+        s.calls.length = 0;
+        await assert.rejects(aeSend(s, s.taken, aeRecord(s.taken, { role, actorId, n: 311 }), { role, actorId }),
+            /UNAUTHORIZED/, `${role} ${actorId}`);
+        assert.deepEqual(s.calls, [], `${role}: no verifier is asked`);
+    }
+    const added = await aeSend(s, s.taken, aeRecord(s.taken, { n: 311 }));
+    assert.equal(added.financialCases[0].evidenceReferences[0].submittedBy.actorId, "synthetic-finance-case-reviewer");
+});
+
+test("RM/3: a decider who is not the owner gets FOUR_EYES_VIOLATION first", async () => {
+    const s = await aeSetup();
+    const decider = s.taken.financialCases[0].originDeciderActorId;
+    assert.notEqual(decider, s.taken.financialCases[0].assignedActorId);
+    s.calls.length = 0;
+    await assert.rejects(aeSend(s, s.taken, aeRecord(s.taken, { actorId: decider, n: 321 }), { actorId: decider }),
+        /FOUR_EYES_VIOLATION/, "both violations");
+    assert.deepEqual(s.calls, []);
+});
+
+test("RM/4: four eyes and ownership come after the actor binding and before the reference, the time and the verifiers", async () => {
+    const s = await aeSetup();
+    const used = await aeSend(s, s.taken, aeRecord(s.taken, { n: 331 }));
+    const other = "synthetic-finance-other";
+    const decider = used.financialCases[0].originDeciderActorId;
+    const future = new Date(Date.parse(FIXED_TIME) + 1).toISOString();
+    const cases = [
+        ["OPEN case and the decider", aeRecord(used, { caseId: "case-0002", actorId: decider, n: 332 }), decider, /CASE_STATE_INVALID/],
+        ["bad shape and not the owner", aeRecord(used, { actorId: other, n: 333, extra: { note: 1 } }), other, /EVIDENCE_MISMATCH/],
+        ["record of another actor and not the owner", aeRecord(used, { n: 334 }), other, /EVIDENCE_MISMATCH/],
+        ["not the owner and a used reference", aeRecord(used, { actorId: other, n: 335,
+            extra: { authorizationRef: "synthetic-ae-auth-331" } }), other, /UNAUTHORIZED/],
+        ["the decider and a used reference", aeRecord(used, { actorId: decider, n: 336,
+            extra: { authorizationRef: "synthetic-ae-auth-331" } }), decider, /FOUR_EYES_VIOLATION/],
+        ["not the owner and a future time", aeRecord(used, { actorId: other, n: 337, evidence: { createdAt: future } }), other,
+            /UNAUTHORIZED/]
+    ];
+    for (const [label, record, actorId, expected] of cases) {
+        s.calls.length = 0;
+        await assert.rejects(aeSend(s, used, record, { actorId }), expected, label);
+        assert.deepEqual(s.calls, [], `${label}: no verifier is asked`);
+    }
+    // The owner is still refused for the used reference itself.
+    await aeRefused(s, used, aeRecord(used, { n: 338, extra: { authorizationRef: "synthetic-ae-auth-331" } }),
+        /CASE_REFERENCE_USED/, "owner, used reference");
+});
+
+test("RM/5 (OD-207-01, GEN-3): a CLOSE or case-naming mirror must be the stored object of the place it names", async () => {
+    const { probeEvidenceOnly } = await scProbeCore();
+    const h = setup();
+    const p = await inReview("DISPUTE", h);
+    const closed = await h.resolveReview(p.reviewed, "CLOSE", dgRecord(h, p, { digest: dgDigest("rm5-close") }));
+    const event = closed.events.at(-1);
+    const audit = event.audit;
+    assert.equal(audit.evidence, closed.reviews[0].resolution.evidence, "a real CLOSE shares one evidence object");
+    assert.equal(probeEvidenceOnly(closed, closed, null, []), true);
+    assert.equal(probeEvidenceOnly(closed, closed, audit, []), true);
+    const withEvent = changed => ({ ...closed, events: [...closed.events.slice(0, -1), { ...event, audit: changed }] });
+    const copy = { ...audit, evidence: { ...audit.evidence } };
+    assert.equal(probeEvidenceOnly(closed, withEvent(copy), null, []), false, "CLOSE event audit: an equal copy");
+    assert.equal(probeEvidenceOnly(closed, closed, copy, []), false, "CLOSE transition audit: an equal copy");
+    assert.equal(probeEvidenceOnly(closed, withEvent({ ...audit, reviewId: "review-0099" }), null, []), false,
+        "CLOSE audit naming another review");
+    // An audit naming an unknown case has no place, even when its review holds that very object (no fallback).
+    assert.equal(probeEvidenceOnly(closed, withEvent({ ...audit, caseId: "case-0099" }), null, []), false,
+        "audit naming an unknown case and the right review");
+    // A case-naming audit belongs to the case it names; an unknown case has no place (no fallback to its review).
+    const s = await aeSetup();
+    const added = await aeSend(s, s.taken, aeRecord(s.taken, { n: 341 }));
+    const trailAudit = added.financialCases[0].auditTrail.at(-1);
+    const caseEvent = added.events.at(-1);
+    const withCaseEvent = changed => ({ ...added, events: [...added.events.slice(0, -1), { ...caseEvent, audit: changed }] });
+    assert.equal(probeEvidenceOnly(added, withCaseEvent({ ...trailAudit, step: "RELABELLED" }), null, []), true,
+        "a relabelled audit still holding the stored object");
+    assert.equal(probeEvidenceOnly(added, withCaseEvent({ ...trailAudit, step: "RELABELLED",
+        evidence: { ...trailAudit.evidence } }), null, []), false, "a relabelled audit naming the case: a copy");
+    const { reviewId: dropped, ...caseOnly } = trailAudit;
+    assert.equal(probeEvidenceOnly(added, withCaseEvent({ ...caseOnly, step: "RELABELLED", evidence: { ...trailAudit.evidence } }),
+        null, []), false, "a relabelled audit naming only the case: a copy");
+    assert.equal(probeEvidenceOnly(added, withCaseEvent({ ...trailAudit, caseId: "case-0099" }), null, []), false,
+        "an audit naming an unknown case");
+    // A real CLOSE still commits beside case evidence (AE-C/1) and DIFF/1 stays identical.
+    const later = await inReview("DISPUTE", s);
+    const next = await s.resolveReview(later.reviewed, "CLOSE", dgRecord(s, later, { digest: dgDigest("rm5-later") }));
+    assert.equal(next.state, STATES.CLOSED);
+});
+
+test("RM/6 (OD-207-03, TRAIL-1): earlier case audit trail entries can never be removed, replaced, reordered or relabelled", async () => {
+    const probe = await scProbeCore();
+    const s = await aeSetup({}, null, probe.createCore);
+    const first = await aeSend(s, s.taken, aeRecord(s.taken, { n: 351 }));
+    const tampers = [
+        ["replace the opening with an equal copy", trail => [{ ...trail[0] }, ...trail.slice(1)]],
+        ["relabel the opening", trail => [{ ...trail[0], step: "RELABELLED" }, ...trail.slice(1)]],
+        ["change the opening's actor", trail => [{ ...trail[0], actorId: "synthetic-finance-other" }, ...trail.slice(1)]],
+        ["remove the taking", trail => [trail[0], ...trail.slice(2)]],
+        ["reorder", trail => [trail[1], trail[0], ...trail.slice(2)]],
+        ["replace an earlier evidence step with a placeless copy", trail => trail.map((entry, index) => {
+            if (index !== 2) return entry;
+            const { caseId, reviewId, ...rest } = entry;
+            return { ...rest, step: "EVIDENCE_INVALIDATED", evidence: { ...entry.evidence, status: "INVALIDATED" } };
+        })],
+        ["not an array", trail => ({ ...trail })]
+    ];
+    try {
+        for (const [label, change] of tampers) {
+            let fired = 0;
+            probe.setProbeAwaitHook((stage, scope) => {
+                if (stage === "hash" && fired === 0) {
+                    fired += 1;
+                    const item = scope.next.financialCases[0];
+                    scope.next.financialCases[0] = { ...item, auditTrail: change(item.auditTrail) };
+                }
+            });
+            s.calls.length = 0;
+            await assert.rejects(aeSend(s, first, aeRecord(first, { n: 352 })), /EVIDENCE_HISTORY_CHANGED/, label);
+            assert.equal(fired, 1, `${label} ran`);
+        }
+        probe.setProbeAwaitHook(() => {});
+        const next = await aeSend(s, first, aeRecord(first, { n: 352 }));
+        assert.ok(first.financialCases[0].auditTrail.every((entry, index) => next.financialCases[0].auditTrail[index] === entry));
+    } finally {
+        probe.setProbeAwaitHook(null);
+    }
+});
+
+test("RM/7 (M-38): a transition audit holding unknown evidence is refused by the pre-check, before the commit awaits", async () => {
+    const { probeEvidenceOnly } = await scProbeCore();
+    const { refunded, store } = await scSetup();
+    const a = scItem("rm7-a");
+    const b = scItem("rm7-b");
+    assert.equal(probeEvidenceOnly(refunded, refunded, { step: "PROBE", evidence: b }, []), false, "unknown audit evidence");
+    assert.equal(probeEvidenceOnly(refunded, refunded, { step: "PROBE", evidence: b }, [b]), true, "claimed audit evidence");
+    await scRefusedBeforeAwait(store, refunded, { claims: [a], mode: "audit", mirror: b }, /EVIDENCE_STORAGE_INVALID/,
+        "unknown audit evidence");
+    await scCleanAfter(store, refunded, a);
+});
+
+test("RM/8 (DQ-208-03): accessor or inherited attestation fields are UNTRUSTED_EVIDENCE and no getter ever runs", async () => {
+    const s = await aeSetup();
+    const record = aeRecord(s.taken, { n: 361 });
+    let reads = 0;
+    const getter = value => ({ get() { reads += 1; return value; }, enumerable: true });
+    const shapes = [
+        ["accessor status", (evidence, request) => Object.defineProperty({ ...aeAttest(evidence, request) }, "status",
+            getter("VERIFIED"))],
+        ["accessor digestBasis", (evidence, request) => Object.defineProperty({ ...aeAttest(evidence, request) },
+            "digestBasis", getter(request.digestBasis))],
+        ["accessor verifier", (evidence, request) => Object.defineProperty({ ...aeAttest(evidence, request) }, "verifier",
+            getter({ kind: "SYNTHETIC", id: "synthetic-case-evidence-service" }))],
+        ["accessor verifier kind", (evidence, request) => ({ ...aeAttest(evidence, request),
+            verifier: Object.defineProperty({ id: "synthetic-case-evidence-service" }, "kind", getter("SYNTHETIC")) })],
+        ["inherited status", (evidence, request) => {
+            const { status, ...own } = aeAttest(evidence, request);
+            return Object.assign(Object.create({ status }), own);
+        }],
+        ["inherited verifier", (evidence, request) => {
+            const { verifier, ...own } = aeAttest(evidence, request);
+            return Object.assign(Object.create({ verifier }), own);
+        }]
+    ];
+    for (const [label, shape] of shapes) {
+        s.tamper.evidence = shape;
+        await aeRefused(s, s.taken, record, /UNTRUSTED_EVIDENCE/, label, ["record", "evidence"]);
+    }
+    assert.equal(reads, 0, "no getter of an attestation was invoked");
+    delete s.tamper.evidence;
+    const added = await aeSend(s, s.taken, record);
+    assert.equal(added.version, s.taken.version + 1);
+});
+
+test("RM/9 (DQ-208-03): the checks and the claim gate judge one stable copy; later changes to the attestation change nothing", async () => {
+    const probe = await scProbeCore();
+    const s = await aeSetup({}, null, probe.createCore);
+    let returned = null;
+    s.tamper.evidence = (evidence, request) => {
+        returned = { ...aeAttest(evidence, request), note: "kept out",
+            verifier: { kind: "SYNTHETIC", id: "synthetic-case-evidence-service", extra: "kept out" } };
+        return returned;
+    };
+    try {
+        probe.setProbeAwaitHook(stage => {
+            if (stage === "cases" && returned) {
+                returned.status = "REVOKED";
+                returned.verifier.id = "synthetic-other-service";
+                returned.digest = dgDigest("rm9-other");
+            }
+        });
+        const added = await aeSend(s, s.taken, aeRecord(s.taken, { n: 371 }));
+        const stored = added.financialCases[0].evidenceReferences[0];
+        assert.deepEqual(stored.verifier, { kind: "SYNTHETIC", id: "synthetic-case-evidence-service" });
+        assert.equal(stored.digest, dgDigest("ae-371"));
+        assert.ok(!JSON.stringify(added).includes("kept out"));
+        assert.equal(returned.status, "REVOKED", "the verifier's own object was changed, the commit was not");
+    } finally {
+        probe.setProbeAwaitHook(null);
+    }
+});
+
+// ============================================================================================================
+// Görev 214 (Faz 2B-3, OD-211-01..05, FD-212-01..06): regression tests of the security remediation.
+// RM/10 is the approved snapshot test (FD-212-06); RM/9 is unchanged. No Proxy attestation test is added (FD-212-04).
+// ============================================================================================================
+
+/** Runs `run` once with an await hook that applies `change` at `stage` the first time; returns the outcome. */
+async function rmWithHook(probe, stage, change, run) {
+    let fired = 0;
+    probe.setProbeAwaitHook((at, scope) => {
+        if (at === stage && fired === 0) {
+            fired += 1;
+            change(scope);
+        }
+    });
+    try {
+        return await run().then(value => ({ value, fired }), error => ({ error, fired }));
+    } finally {
+        probe.setProbeAwaitHook(null);
+    }
+}
+
+test("RM/10 (FD-212-06, OD-211-03): a polluted Object.prototype never supplies the attestation's status or verifier", async () => {
+    const s = await aeSetup();
+    const record = aeRecord(s.taken, { n: 1001 });
+    const shapes = [
+        ["neither stated", (evidence, request) => {
+            const { status, verifier, ...own } = aeAttest(evidence, request);
+            return own;
+        }],
+        ["status not stated", (evidence, request) => {
+            const { status, ...own } = aeAttest(evidence, request);
+            return own;
+        }],
+        ["null-prototype attestation stating neither", (evidence, request) => {
+            const { status, verifier, ...own } = aeAttest(evidence, request);
+            return Object.assign(Object.create(null), own);
+        }],
+        ["verifier without its own kind and id", (evidence, request) => ({ ...aeAttest(evidence, request), verifier: {} })]
+    ];
+    Object.prototype.status = "VERIFIED";
+    Object.prototype.verifier = { kind: "PRODUCTION", id: "synthetic-polluted-verifier" };
+    Object.prototype.kind = "SYNTHETIC";
+    Object.prototype.id = "synthetic-polluted-verifier";
+    try {
+        for (const [label, shape] of shapes) {
+            s.tamper.evidence = shape;
+            await aeRefused(s, s.taken, record, /UNTRUSTED_EVIDENCE/, label, ["record", "evidence"]);
+        }
+    } finally {
+        delete Object.prototype.status;
+        delete Object.prototype.verifier;
+        delete Object.prototype.kind;
+        delete Object.prototype.id;
+    }
+    delete s.tamper.evidence;
+    const added = await aeSend(s, s.taken, record);
+    assert.equal(added.version, s.taken.version + 1, "nothing of a refused submission was consumed");
+    assert.deepEqual(added.financialCases[0].evidenceReferences[0].verifier,
+        { kind: "SYNTHETIC", id: "synthetic-case-evidence-service" });
+});
+
+test("RM/11 (OD-211-02, I-213-01): nested, array, function and cyclic attestation values are refused unread and unfrozen", async () => {
+    const s = await aeSetup();
+    const record = aeRecord(s.taken, { n: 1101 });
+    let reads = 0;
+    const nested = Object.defineProperty({}, "x", { get() { reads += 1; return "v"; }, enumerable: true });
+    const cyclic = {};
+    cyclic.self = cyclic;
+    const ownVerifier = { kind: "SYNTHETIC", id: "synthetic-case-evidence-service" };
+    const shapes = [
+        ["a nested object with a getter", { decisionBinding: nested }],
+        ["a cyclic value", { digestBasis: cyclic }],
+        ["an array", { digest: [dgDigest("ae-1101")] }],
+        ["a function", { createdAt: () => "2026-01-01T00:00:00Z" }],
+        ["an object status", { status: { toString: () => "VERIFIED" } }],
+        ["an object verifier kind", { verifier: { kind: nested, id: "synthetic-case-evidence-service" } }],
+        ["a number verifier id", { verifier: { kind: "SYNTHETIC", id: 12345678 } }],
+        ["an array verifier", { verifier: Object.assign(["x"], ownVerifier) }],
+        ["a string verifier", { verifier: "SYNTHETIC" }]
+    ];
+    for (const [label, change] of shapes) {
+        s.tamper.evidence = (evidence, request) => ({ ...aeAttest(evidence, request), ...change });
+        await aeRefused(s, s.taken, record, /UNTRUSTED_EVIDENCE/, label, ["record", "evidence"]);
+    }
+    assert.equal(reads, 0, "no getter of a nested value ran");
+    assert.equal(Object.isFrozen(nested), false, "a verifier-owned nested object was not frozen");
+    assert.equal(Object.isFrozen(cyclic), false, "a verifier-owned cyclic object was not frozen");
+    // A valid attestation whose verifier object belongs to the service: kept as { kind, id }, the service's object unfrozen.
+    s.tamper.evidence = (evidence, request) => ({ ...aeAttest(evidence, request), verifier: ownVerifier });
+    const added = await aeSend(s, s.taken, record);
+    assert.equal(added.version, s.taken.version + 1);
+    assert.equal(Object.isFrozen(ownVerifier), false, "the verifier's own object is not frozen");
+    const stored = added.financialCases[0].evidenceReferences[0].verifier;
+    assert.deepEqual(stored, { kind: "SYNTHETIC", id: "synthetic-case-evidence-service" });
+    assert.notEqual(stored, ownVerifier);
+    assert.equal(Object.getPrototypeOf(stored), Object.prototype, "the stored verifier is plain data");
+});
+
+test("RM/12 (OD-211-05): a present caseId or reviewId is a string that agrees with its place; valid CLOSE is unchanged", async () => {
+    const { probeEvidenceOnly } = await scProbeCore();
+    const h = setup();
+    const p = await inReview("DISPUTE", h);
+    const closed = await h.resolveReview(p.reviewed, "CLOSE", dgRecord(h, p, { digest: dgDigest("rm12-close") }));
+    const event = closed.events.at(-1);
+    const audit = event.audit;
+    assert.equal(probeEvidenceOnly(closed, closed, null, []), true, "a real CLOSE");
+    assert.equal(probeEvidenceOnly(closed, closed, audit, []), true, "a real CLOSE transition audit");
+    const withEvent = changed => ({ ...closed, events: [...closed.events.slice(0, -1), { ...event, audit: changed }] });
+    for (const [label, labels] of [["caseId null", { caseId: null }], ["caseId number", { caseId: 1 }],
+        ["caseId object", { caseId: { caseId: "case-0001" } }], ["reviewId null", { reviewId: null }],
+        ["reviewId array", { reviewId: [audit.reviewId] }], ["reviewId number", { reviewId: 7 }]]) {
+        // A copy under an invalid label was accepted by the key rule before (A211-02); now it names no place.
+        assert.equal(probeEvidenceOnly(closed, withEvent({ ...audit, ...labels, evidence: { ...audit.evidence } }), null, []),
+            false, `event audit: ${label}`);
+        assert.equal(probeEvidenceOnly(closed, closed, { ...audit, ...labels, evidence: { ...audit.evidence } }, []), false,
+            `transition audit: ${label}`);
+        assert.equal(probeEvidenceOnly(closed, withEvent({ ...audit, ...labels }), null, []), false,
+            `event audit holding the stored object: ${label}`);
+    }
+    // Holder labels against the stored case and review (A211-03).
+    const s = await aeSetup();
+    const both = await takeCase(s, s.taken, caseRef(s.taken, "case-0002"), "admin");
+    const added = await aeSend(s, both, aeRecord(both, { n: 1201 }));
+    const [first, second] = added.financialCases;
+    const trail = first.auditTrail.at(-1);
+    assert.equal(probeEvidenceOnly(added, added, null, []), true, "a real add_case_evidence");
+    assert.equal(probeEvidenceOnly(added, added, trail, []), true, "a real case transition audit");
+    const withTrail = entry => ({ ...added, financialCases: [{ ...first, auditTrail: [...first.auditTrail.slice(0, -1), entry] },
+        second] });
+    assert.equal(probeEvidenceOnly(added, withTrail({ ...trail }), null, []), true, "the stored object, labels agreeing");
+    assert.equal(probeEvidenceOnly(added, withTrail({ ...trail, caseId: "case-0002" }), null, []), false,
+        "a trail entry naming another case");
+    assert.equal(probeEvidenceOnly(added, withTrail({ ...trail, caseId: "case-0099" }), null, []), false,
+        "a trail entry naming an unknown case");
+    assert.equal(probeEvidenceOnly(added, withTrail({ ...trail, reviewId: "review-0099" }), null, []), false,
+        "a trail entry naming another review");
+    assert.equal(probeEvidenceOnly(added, withTrail({ ...trail, caseId: null }), null, []), false,
+        "a trail entry with a null caseId");
+    const caseEvent = added.events.at(-1);
+    const withCaseEvent = changed => ({ ...added, events: [...added.events.slice(0, -1), { ...caseEvent, audit: changed }] });
+    assert.equal(probeEvidenceOnly(added, withCaseEvent({ ...trail, reviewId: "review-0099" }), null, []), false,
+        "an event audit whose reviewId contradicts its case");
+    assert.equal(probeEvidenceOnly(added, added, { ...trail, reviewId: "review-0099" }, []), false,
+        "a transition audit whose reviewId contradicts its case");
+    // Unlabelled mirrors keep the key rule (OF-209-03, unchanged); a relabelled step with agreeing labels stays (RM/5).
+    assert.equal(probeEvidenceOnly(added, withTrail({ step: "PROBE", evidence: { ...first.evidenceReferences[0] } }),
+        null, []), true);
+    assert.equal(probeEvidenceOnly(added, withCaseEvent({ ...trail, step: "RELABELLED" }), null, []), true);
+    // A real CLOSE still commits beside case evidence.
+    const later = await inReview("DISPUTE", s);
+    const next = await s.resolveReview(later.reviewed, "CLOSE", dgRecord(s, later, { digest: dgDigest("rm12-later") }));
+    assert.equal(next.state, STATES.CLOSED);
+});
+
+test("RM/13 (OD-211-01, FD-212-01/02): after the last await only the planned add_case_evidence transition commits", async () => {
+    const probe = await scProbeCore();
+    const s = await aeSetup({}, null, probe.createCore);
+    const both = await takeCase(s, s.taken, caseRef(s.taken, "case-0002"), "admin");
+    const replaceCase = (scope, change) => {
+        const item = scope.next.financialCases[0];
+        scope.next.financialCases[0] = { ...item, ...change(item, scope) };
+    };
+    const changes = [
+        ["the new entry replaced by a forged one holding the stored entry", scope => replaceCase(scope, item => ({
+            auditTrail: [...item.auditTrail.slice(0, -1), { ...scope.audit, actorId: "synthetic-forged-actor" }] }))],
+        ["the new entry replaced by an equal copy", scope => replaceCase(scope, item => ({
+            auditTrail: [...item.auditTrail.slice(0, -1), { ...scope.audit }] }))],
+        ["an extra entry after the new one", scope => replaceCase(scope, item => ({
+            auditTrail: [...item.auditTrail, scope.next.financialCases[1].auditTrail[0]] }))],
+        ["an extra entry before the new one", scope => replaceCase(scope, item => ({
+            auditTrail: [...item.auditTrail.slice(0, -1), scope.next.financialCases[1].auditTrail[0], scope.audit] }))],
+        ["the new audit appended twice", scope => replaceCase(scope, item => ({
+            auditTrail: [...item.auditTrail, scope.audit] }))],
+        ["the new entry dropped", scope => replaceCase(scope, item => ({ auditTrail: item.auditTrail.slice(0, -1) }))],
+        ["the case status", scope => replaceCase(scope, () => ({ status: "APPROVED" }))],
+        ["the assigned actor", scope => replaceCase(scope, () => ({ assignedActorId: "synthetic-forged-actor" }))],
+        ["the money movement", scope => replaceCase(scope, () => ({ moneyMovement: "PAID" }))],
+        ["the order state", scope => { scope.next.state = STATES.COMPLETED; }],
+        ["another case changed", scope => {
+            scope.next.financialCases[1] = { ...scope.next.financialCases[1], moneyMovement: "PAID" };
+        }],
+        ["the cases replaced by an equal array", scope => { scope.next.financialCases = [...scope.next.financialCases]; }],
+        ["a field added to the order", scope => { scope.next.probeNote = "added"; }]
+    ];
+    try {
+        for (const stage of ["cases", "hash"]) {
+            for (const [label, change] of changes) {
+                s.calls.length = 0;
+                const { error, fired } = await rmWithHook(probe, stage, change,
+                    () => aeSend(s, both, aeRecord(both, { n: 1301 })));
+                assert.equal(fired, 1, `${stage}: ${label} ran`);
+                assert.equal(error?.code, "EVIDENCE_HISTORY_CHANGED", `${stage}: ${label}: ${error?.code ?? error}`);
+            }
+            // The planned case is frozen before the first suspension point: changing it in place throws.
+            const inPlace = await rmWithHook(probe, stage, scope => {
+                scope.next.financialCases[0].moneyMovement = "PAID";
+            }, () => aeSend(s, both, aeRecord(both, { n: 1301 })));
+            assert.equal(inPlace.fired, 1);
+            assert.ok(inPlace.error instanceof TypeError, `${stage}: in place`);
+        }
+        // Nothing of a refused transition was consumed; the clean submission commits exactly the planned transition.
+        const added = await aeSend(s, both, aeRecord(both, { n: 1301 }));
+        const [item] = added.financialCases;
+        const before = both.financialCases[0];
+        assert.equal(item.auditTrail.length, before.auditTrail.length + 1);
+        assert.equal(item.auditTrail.at(-1), added.events.at(-1).audit, "the new entry is this event's audit");
+        assert.equal(item.evidenceReferences.at(-1), item.auditTrail.at(-1).evidence);
+        assert.ok(before.auditTrail.every((entry, index) => item.auditTrail[index] === entry));
+        assert.deepEqual([item.status, item.assignedActorId, item.moneyMovement, added.state],
+            [before.status, before.assignedActorId, before.moneyMovement, both.state]);
+        assert.equal(added.financialCases[1], both.financialCases[1]);
+        assert.ok(Object.isFrozen(item));
+        // An Object.prototype.toJSON that tries to change the case while it is digested changes nothing (A211/G14).
+        // (A toJSON that substitutes what is hashed is the open serialization risk R1/R2, FD-212-03; not tested here.)
+        Object.defineProperty(Object.prototype, "toJSON", { configurable: true, writable: true, enumerable: false,
+            value: function () {
+                if (Object.hasOwn(this, "auditTrail") && Object.hasOwn(this, "moneyMovement") && !Object.isFrozen(this)) {
+                    this.moneyMovement = "PAID";
+                }
+                return this;
+            } });
+        let polluted;
+        try {
+            polluted = await aeSend(s, added, aeRecord(added, { n: 1302 }));
+        } finally {
+            delete Object.prototype.toJSON;
+        }
+        assert.equal(polluted.version, added.version + 1);
+        assert.deepEqual(polluted.financialCases.map(entry => entry.moneyMovement), ["NONE", "NONE"]);
+    } finally {
+        probe.setProbeAwaitHook(null);
+    }
 });
