@@ -15,6 +15,10 @@ CATALOG = json.loads((ROOT / "v2/music/data/catalog.json").read_text(encoding="u
 SOURCES = {p: (ROOT / p).read_bytes() for p in (
     "v2/index.html", "v2/music/index.html", "v2/music/work/index.html", "v2/studio/index.html",
     "v2/i18n/config.json", "v2/i18n/tr.json", "v2/i18n/en.json", "v2/i18n/de.json", *render_site.TR_PAGES)}
+# Görev 228: stüdyo Shopier ürünleri (external-links.js ile birebir; test_external_links denetler).
+SHOPIER = {key: "https://www.shopier.com/unalbuyuksungur/" + num for key, num in (
+    ("shopierOzelSarki", "52596551"), ("shopierOzelSarkiHaftaSonu", "52596592"),
+    ("shopierOzelSarkiPlus", "52596612"), ("shopierOzelSarkiPlusHaftaSonu", "52596627"))}
 
 
 class MultilingualTests(unittest.TestCase):
@@ -101,7 +105,7 @@ class MultilingualTests(unittest.TestCase):
             with self.subTest(locale=locale):
                 self.assertIn(f'<html lang="{locale}">', studio)
                 m = messages[locale]
-                # Görev 227: iki paket kartı (adlar çevrilmez), fiyatlar ve statik HTML'de pasif satın alma düğmeleri.
+                # Görev 227/228: iki paket kartı (adlar çevrilmez), fiyatlar ve statik HTML'de etkin Shopier bağlantıları.
                 self.assertEqual(studio.count('<article class="studio-package"'), 2)
                 for slug, name, price, keys, product in (
                         ("ozel-sarki", "ÖZEL ŞARKI", "690 TL", ("rev3", "alt8", "mp3"), "shopierOzelSarki"),
@@ -111,15 +115,15 @@ class MultilingualTests(unittest.TestCase):
                     self.assertIn(f'<p class="studio-price">{price}</p>', card)
                     for key in keys:
                         self.assertIn(f"<li>{html.escape(m['studio.pkg.' + key], quote=False)}</li>", card)
-                    buttons = re.findall(r"<button\b[^>]*>", card)
-                    self.assertEqual([re.search(r'data-purchase-link="(\w+)"', b)[1] for b in buttons],
-                                     [product, product + "HaftaSonu"])
-                    for button in buttons:
-                        self.assertRegex(button, r'\bdisabled aria-disabled="true"')
-                        self.assertIn(f'aria-describedby="studio-{slug}"', button)
-                    self.assertRegex(card, rf"data-purchase-off>{re.escape(m['studio.buySoon'])}</span>")
-                    self.assertRegex(card, rf"data-purchase-on\s+hidden>{re.escape(m['studio.buy'])}</span>")
-                    self.assertIn(f">{m['studio.buyWeekend']}</button>", card)
+                    links = re.findall(r'<a class="studio-buy-[a-z]+" href="([^"]+)"[^>]*'
+                                       r'data-purchase-link="(\w+)">([^<]+)</a>', card)
+                    self.assertEqual(links, [(SHOPIER[product], product, m["studio.buy"]),
+                                             (SHOPIER[product + "HaftaSonu"], product + "HaftaSonu",
+                                              m["studio.buyWeekend"])])
+                    self.assertEqual(card.count('target="_blank"'), 2)
+                    self.assertEqual(card.count('rel="noopener noreferrer"'), 2)
+                    self.assertEqual(card.count(f'aria-describedby="studio-{slug}"'), 2)
+                    self.assertNotRegex(card, r"<button\b|disabled")  # Görev 228: pasif durum kalmadı
                 weekend = studio.split('<aside class="studio-weekend"', 1)[1].split("</aside>", 1)[0]
                 self.assertIn('<h3 id="studio-weekend">Hafta Sonu Teslim</h3>', weekend)
                 self.assertIn(html.escape(m["studio.weekendText"], quote=False), weekend)
@@ -154,9 +158,16 @@ class MultilingualTests(unittest.TestCase):
                             "studio.usageText", "studio.notifyText", "studio.notifyCta"):
                     self.assertIn(m[key], text, key)
                 # Görev 227: eski START/PLUS/PREMIUM ve "MP3 teslim (mümkünse WAV)" kalktı; form, ödeme sayfası,
-                # e-posta alanı, iframe veya HTML'de Shopier ürün URL'si yok (URL'ler yalnız external-links.js'te).
+                # e-posta alanı veya iframe yok. Görev 228: sayfadaki Shopier adresleri yalnız dört ürün bağlantısı.
                 self.assertNotRegex(text, r"\bSTART\b|\bPREMIUM\b|mümkünse WAV|WAV where possible|acil tarife")
-                self.assertNotRegex(studio.lower(), r'<form\b|checkout|shopier\.com|type="email"|<iframe\b')
+                self.assertNotRegex(studio.lower(), r'<form\b|checkout|type="email"|<iframe\b')
+                self.assertEqual(sorted(re.findall(r"https://www\.shopier\.com/[^\"\s<]*", studio)),
+                                 sorted(SHOPIER.values()))
+                # Görev 228: SSS kaynakla senkron (çalışma saati ve hafta sonu teslimi, fiyatlar).
+                for key in ("studio.faq.a02", "studio.faq.a03"):
+                    self.assertIn(html.escape(m[key], quote=False), faq, key)
+                self.assertIn("6 çalışma saati" if locale == "tr" else
+                              {"en": "6 working hours", "de": "6 Arbeitsstunden"}[locale], m["studio.faq.a02"])
                 self.assertEqual(studio.count('aria-current="page"'), 1)
                 self.assertIn('href="../music/"', studio)
                 self.assertIn('href="./" aria-current="page"', studio)

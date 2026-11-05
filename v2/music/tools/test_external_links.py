@@ -32,6 +32,13 @@ EXPECTED = {
     "etsy": "https://pixelandpetaldigital.etsy.com",
     "spotifyPlaylist": "https://open.spotify.com/playlist/6od7MgDo7kL9DHUgiT40rT",
 }
+# Görev 228: stüdyo satın alma ürünleri (Shopier); yalnız stüdyo sayfasında, statik HTML'de de yazılı.
+PURCHASE = {
+    "shopierOzelSarki": "https://www.shopier.com/unalbuyuksungur/52596551",
+    "shopierOzelSarkiHaftaSonu": "https://www.shopier.com/unalbuyuksungur/52596592",
+    "shopierOzelSarkiPlus": "https://www.shopier.com/unalbuyuksungur/52596612",
+    "shopierOzelSarkiPlusHaftaSonu": "https://www.shopier.com/unalbuyuksungur/52596627",
+}
 
 
 def source_links():
@@ -40,7 +47,7 @@ def source_links():
 
 class ExternalLinksTests(unittest.TestCase):
     def test_canonical_source_is_exactly_the_approved_allowlist(self):
-        self.assertEqual(source_links(), EXPECTED)
+        self.assertEqual(source_links(), {**EXPECTED, **PURCHASE})
         self.assertNotRegex(SOURCE.lower(), r"mailto:|tel:")
 
     def test_pages_use_the_single_canonical_source(self):
@@ -74,15 +81,20 @@ class ExternalLinksTests(unittest.TestCase):
                 self.assertIn("data-external-link=", anchor, f"{name}: {anchor}")
                 self.assertIn("data-external-label=", anchor, f"{name}: {anchor}")
 
-    def test_studio_purchase_keys_are_inactive_until_urls_exist(self):
-        """Görev 227: dört Shopier ürün anahtarı şimdilik null; düğme statik HTML'de pasif, URL gelince etkinleşir."""
-        keys = ["shopierOzelSarki", "shopierOzelSarkiHaftaSonu", "shopierOzelSarkiPlus", "shopierOzelSarkiPlusHaftaSonu"]
-        self.assertEqual(re.findall(r'^\s{8}(shopier\w+): Object\.freeze\(\{[^\n]* url: null \}\)', SOURCE, re.M), keys)
-        self.assertRegex(SOURCE, r'querySelectorAll\("button\[data-purchase-link\]"\)')
-        self.assertIn('typeof link.url !== "string"', SOURCE)
+    def test_studio_purchase_links_are_active_and_match_the_source(self):
+        """Görev 228: dört Shopier ürünü etkin; statik HTML'deki adresler external-links.js ile birebir aynı."""
+        self.assertEqual({k: v for k, v in source_links().items() if k in PURCHASE}, PURCHASE)
+        self.assertIn('querySelectorAll("a[data-purchase-link]")', SOURCE)
         self.assertIn('anchor.rel = "noopener noreferrer"', SOURCE.split("function applyPurchaseLinks", 1)[1])
         studio = (ROOT / "v2/studio/index.html").read_text(encoding="utf-8")
-        self.assertEqual(sorted(re.findall(r'data-purchase-link="(\w+)"', studio)), sorted(keys))
+        anchors = re.findall(r"<a\b[^>]*data-purchase-link[^>]*>", studio)
+        self.assertEqual(len(anchors), 4)
+        for anchor in anchors:
+            key = re.search(r'data-purchase-link="(\w+)"', anchor)[1]
+            self.assertIn(f'href="{PURCHASE[key]}"', anchor)
+            self.assertIn('target="_blank"', anchor)
+            self.assertIn('rel="noopener noreferrer"', anchor)
+        self.assertNotRegex(studio, r"\bdisabled\b|aria-disabled|data-purchase-off")  # pasif durum kalmadı
         self.assertNotRegex(SOURCE.lower() + studio.lower(), r"bookings|outlook\.(office|live)")
 
     def test_preserved_catalog_invariants(self):

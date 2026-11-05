@@ -150,7 +150,7 @@
     color: var(--background);
 }
 
-/* Görev 227: paket fiyatı, satın alma düğmeleri (pasif: disabled) ve Hafta Sonu Teslim kutusu */
+/* Görev 227/228: paket fiyatı, satın alma bağlantıları ve Hafta Sonu Teslim kutusu */
 .studio-price {
     margin: 0 0 20px;
     font: clamp(30px, 4vw, 40px)/1.1 var(--font-serif);
@@ -187,9 +187,6 @@
 }
 
 .studio-buy-weekend {
-    padding: 0;
-    border: 0;
-    background: none;
     color: var(--gold);
     font: 15px/1.4 var(--font-sans);
     text-decoration: underline;
@@ -201,20 +198,6 @@
 .studio-buy-weekend:focus-visible {
     outline: 2px solid var(--gold);
     outline-offset: 3px;
-}
-
-.studio-buy-button[disabled] {
-    border-color: var(--line);
-    background: transparent;
-    color: var(--muted);
-    cursor: not-allowed;
-}
-
-.studio-buy-weekend[disabled] {
-    color: var(--muted);
-    opacity: .7;
-    text-decoration: none;
-    cursor: not-allowed;
 }
 
 .studio-weekend {
