@@ -19,6 +19,16 @@ SOURCES = {p: (ROOT / p).read_bytes() for p in (
 SHOPIER = {key: "https://www.shopier.com/unalbuyuksungur/" + num for key, num in (
     ("shopierOzelSarki", "52596551"), ("shopierOzelSarkiHaftaSonu", "52596592"),
     ("shopierOzelSarkiPlus", "52596612"), ("shopierOzelSarkiPlusHaftaSonu", "52596627"))}
+# Görev 230: stüdyo meta açıklaması ve "Sorunuz mu var?" kutusunun Instagram butonu (dile göre).
+STUDIO_COPY = {
+    "tr": ("Hikâyenizden size özel şarkı. Özel Şarkı 690 TL, Özel Şarkı Plus 990 TL. Shopier ile güvenli ödeme, "
+           "randevuyla üretim, randevudan itibaren en geç 48 saatte ilk teslim.", "Instagram'dan yaz"),
+    "en": ("A custom song from your story. Özel Şarkı 690 TL, Özel Şarkı Plus 990 TL. Secure payment via Shopier, "
+           "production by appointment, first delivery within 48 hours of your appointment.", "Message on Instagram"),
+    "de": ("Ein persönlicher Song aus Ihrer Geschichte. Özel Şarkı 690 TL, Özel Şarkı Plus 990 TL. Sichere Zahlung über "
+           "Shopier, Produktion nach Termin, erste Lieferung innerhalb von 48 Stunden nach Ihrem Termin.",
+           "Auf Instagram schreiben"),
+}
 
 
 class MultilingualTests(unittest.TestCase):
@@ -160,13 +170,18 @@ class MultilingualTests(unittest.TestCase):
                     self.assertIn(m[key], text, key)
                 # Görev 229: iletişim kutusu (mailto + Instagram anahtarı); açılış öncesi ifadeler kalmadı.
                 self.assertIn(f'<a href="mailto:destek@unalbuyuksungur.com">destek@unalbuyuksungur.com</a>', studio)
-                self.assertIn('data-external-link="instagram"', studio)
                 rendered_text = rendered.decode("utf-8").lower()
                 self.assertNotRegex(rendered_text, r"çok yakında|sipariş açılışından|very soon|when orders open"
                                                    r"|sehr bald|besteller")
+                # Görev 230: meta açıklamada 48 saatin randevudan itibaren olduğu ve iletişim butonu metni.
+                meta, cta = STUDIO_COPY[locale]
+                self.assertEqual(m["studio.meta"], meta)
                 for attr in ('name="description"', 'property="og:description"', 'name="twitter:description"'):
-                    self.assertIn(f'<meta {attr} content="{html.escape(m["studio.meta"], quote=True)}">',
+                    self.assertIn(f'<meta {attr} content="{html.escape(meta, quote=True)}">',
                                   rendered.decode("utf-8"), attr)
+                notify = html.unescape(studio.split('<section class="studio-notify"', 1)[1].split("</section>", 1)[0])
+                self.assertRegex(notify, r'<a class="studio-notify-link" data-external-link="instagram"\s+'
+                                         rf'data-external-label="{re.escape(cta)}">{re.escape(cta)}</a>')
                 # Görev 227: eski START/PLUS/PREMIUM ve "MP3 teslim (mümkünse WAV)" kalktı; form, ödeme sayfası,
                 # e-posta alanı veya iframe yok. Görev 228: sayfadaki Shopier adresleri yalnız dört ürün bağlantısı.
                 self.assertNotRegex(text, r"\bSTART\b|\bPREMIUM\b|mümkünse WAV|WAV where possible|acil tarife")
