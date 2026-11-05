@@ -35,7 +35,9 @@ STUDIO_COPY = {
 class MultilingualTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.pages = render_site.render(CATALOG, SOURCES)
+        cls.pages = render_site.render(CATALOG, SOURCES)  # varsayılan: render_site.STUDIO_ORDERS_OPEN
+        # Görev 232: siparişler açıkken stüdyo sayfası kaynakla aynı davranır (Shopier ve yasal bağlantılar).
+        cls.open_pages = render_site.render(CATALOG, SOURCES, studio_orders_open=True)
 
     def test_key_parity_fallback_and_locale_constraints(self):
         config, messages = render_site.load_messages(SOURCES.__getitem__)
@@ -108,12 +110,13 @@ class MultilingualTests(unittest.TestCase):
             render_site.render(CATALOG, SOURCES, "staging")
 
     def test_studio_packages_and_inactive_ordering(self):
+        """Siparişler AÇIK (studio_orders_open=True) iken stüdyo sayfası; kapalı durum ayrı testte."""
         messages = {locale: json.loads((ROOT / f"v2/i18n/{locale}.json").read_text(encoding="utf-8"))
                     for locale in ("tr", "en", "de")}
         for locale in ("tr", "en", "de"):
             prefix = "" if locale == "tr" else locale + "/"
             studio = (ROOT / "v2/studio/index.html").read_text(encoding="utf-8") if locale == "tr" else \
-                self.pages[f"v2/{locale}/studio/index.html"].decode("utf-8")
+                self.open_pages[f"v2/{locale}/studio/index.html"].decode("utf-8")
             with self.subTest(locale=locale):
                 self.assertIn(f'<html lang="{locale}">', studio)
                 m = messages[locale]
@@ -159,7 +162,7 @@ class MultilingualTests(unittest.TestCase):
                     for key, value in messages["tr"].items():
                         if key.startswith("studio.faq") and value != messages[locale][key]:
                             self.assertNotIn(html.escape(value, quote=False), faq, key)
-                rendered = self.pages["v2/" + ("" if locale == "tr" else locale + "/") + "studio/index.html"]
+                rendered = self.open_pages["v2/" + ("" if locale == "tr" else locale + "/") + "studio/index.html"]
                 self.assertEqual(rendered.count(b'"@type":"FAQPage"'), 1 if locale == "tr" else 0)  # yalnız TR
                 if locale == "tr":
                     self.assertEqual(rendered.count(b'"@type":"Question"'), 17)
@@ -170,7 +173,8 @@ class MultilingualTests(unittest.TestCase):
                             "studio.usageText", "studio.notify", "studio.notifyText", "studio.notifyText2",
                             "studio.notifyCta"):
                     self.assertIn(m[key], text, key)
-                # Görev 229: iletişim kutusu (mailto + Instagram anahtarı); açılış öncesi ifadeler kalmadı.
+                # Görev 229: iletişim kutusu (mailto + Instagram anahtarı). Görev 232: açılış öncesi ifadeler
+                # yalnız siparişler açıkken yoktur (kapalı durum: test_studio_orders_switch).
                 self.assertIn(f'<a href="mailto:destek@unalbuyuksungur.com">destek@unalbuyuksungur.com</a>', studio)
                 rendered_text = rendered.decode("utf-8").lower()
                 self.assertNotRegex(rendered_text, r"çok yakında|sipariş açılışından|very soon|when orders open"
@@ -198,6 +202,41 @@ class MultilingualTests(unittest.TestCase):
                 self.assertEqual(studio.count('aria-current="page"'), 1)
                 self.assertIn('href="../music/"', studio)
                 self.assertIn('href="./" aria-current="page"', studio)
+
+    def test_studio_orders_switch(self):
+        """Görev 232: anahtar kapalıyken "Çok yakında" var, shopier.com ve yasal bağlantı yok; açıkken tersi."""
+        self.assertIs(render_site.STUDIO_ORDERS_OPEN, False)  # canlıya "Çok yakında" ile çıkış
+        closed = render_site.render(CATALOG, SOURCES, studio_orders_open=False)
+        soon = {"tr": ("Çok yakında", "Siparişler çok yakında açılıyor. Sorularınız için"),
+                "en": ("Coming soon", "Orders are opening soon. For questions, write to"),
+                "de": ("Demnächst", "Bestellungen sind in Kürze möglich. Bei Fragen schreiben Sie an")}
+        for locale, (label, note) in soon.items():
+            rel = "v2/" + ("" if locale == "tr" else locale + "/") + "studio/index.html"
+            with self.subTest(locale=locale):
+                page, opened = closed[rel].decode("utf-8"), self.open_pages[rel].decode("utf-8")
+                self.assertEqual(page, self.pages[rel].decode("utf-8"))  # varsayılan build = kapalı
+                # Kapalı: dört pasif buton, not, shopier.com ve yasal bağlantı yok; fiyat/SSS/iletişim kutusu yerinde.
+                self.assertNotIn("shopier.com", page)
+                self.assertNotIn("data-purchase-link", page)
+                self.assertNotIn("yasal/", page)
+                buttons = re.findall(r'<span class="studio-buy-(button|weekend) is-soon" role="link" '
+                                     r'aria-disabled="true" aria-describedby="studio-ozel-sarki(?:-plus)?">([^<]+)</span>',
+                                     page)
+                self.assertEqual([b[1] for b in buttons], [label, "Hafta Sonu Teslim · " + label] * 2)
+                self.assertEqual(page.count(label), 4)
+                self.assertIn(f'<p class="studio-soon-note" role="note">{note} '
+                              '<a href="mailto:destek@unalbuyuksungur.com">destek@unalbuyuksungur.com</a></p>\r\n'
+                              '            <div class="studio-grid">', page)
+                for fixed in ('<p class="studio-price">690 TL</p>', '<p class="studio-price">990 TL</p>',
+                              '<ol class="studio-steps">', '<section class="studio-notify"', 'class="faq-item"'):
+                    self.assertIn(fixed, page)
+                self.assertEqual(page.count('<details class="faq-item">'), 17)
+                # Açık: bugünkü davranış — Shopier ve yasal bağlantılar var, "Çok yakında" ve not yok.
+                self.assertEqual(len(re.findall(r'href="https://www\.shopier\.com/', opened)), 4)
+                self.assertEqual(len(re.findall(r'href="[^"]*yasal/', opened)), 3)
+                self.assertNotIn(label, opened)
+                self.assertNotIn("studio-soon-note", opened)
+                self.assertNotIn("is-soon", opened)
 
     def test_home_music_showcase(self):
         """Görev 224: Müzik vitrini statik HTML; sayılar katalogdan, kartlar FEATURED_WORKS listesinden (eser kimliği)."""

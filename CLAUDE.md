@@ -16,6 +16,11 @@
 - `release/v2-live` yalnızca sahip onayından sonra, komutta açıkça istendiğinde `git merge --ff-only develop/v2-digital-world` ile güncellenir.
 - Cloudflare build komutu: `python3 v2/music/tools/build_publication.py --profile production --out _site`
 
+## Stüdyo sipariş anahtarı
+- Tek yer: `v2/music/tools/render_site.py` içindeki `STUDIO_ORDERS_OPEN` sabiti (varsayılan `False`). Build zamanında uygulanır.
+- `False`: stüdyo sayfasında dört Shopier butonu "Çok yakında" (EN "Coming soon", DE "Demnächst") etiketli pasif butondur; üretilen HTML'de shopier.com geçmez, paket kartlarının üstünde "Siparişler çok yakında açılıyor" notu görünür, sayfadaki yasal metin bağlantıları gizlenir (`/yasal/...` sayfaları noindex olarak doğrudan adresle erişilebilir kalır).
+- Siparişleri açmak için: sabiti `STUDIO_ORDERS_OPEN = True` yapın, `test_multilingual.py` içindeki `assertIs(render_site.STUDIO_ORDERS_OPEN, False)` satırını `True` olarak güncelleyin, testleri ve production build'i çalıştırıp `develop/v2-digital-world`'e push edin. Kaynak `v2/studio/index.html` her zaman açık hâli (Shopier bağlantıları) taşır.
+
 ## Raporlama ve test
 - Raporlar Türkçe, komutta verilen RAPOR formatında yazılır.
 - Testler gerçek riski kapsayacak kadar olmalı; aşırı büyük test dosyaları oluşturulmaz.

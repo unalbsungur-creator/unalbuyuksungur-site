@@ -205,6 +205,34 @@
     outline-offset: 3px;
 }
 
+/* Görev 232: siparişler kapalıyken (render_site.STUDIO_ORDERS_OPEN = False) pasif butonlar ve not */
+.studio-buy .is-soon {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+.studio-buy-button.is-soon:hover {
+    background: var(--gold);
+}
+
+.studio-buy-weekend.is-soon {
+    text-decoration: none;
+}
+
+.studio-soon-note {
+    max-width: 960px;
+    margin: 0 0 24px;
+    padding: 14px 18px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    color: var(--text);
+}
+
+.studio-soon-note a {
+    color: var(--gold);
+    text-underline-offset: 3px;
+}
+
 .studio-weekend {
     max-width: 960px;
     margin-top: 28px;

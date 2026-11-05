@@ -33,6 +33,17 @@ TR_PAGES.update({f"v2/blog/{slug}/index.html": (f"blog/{slug}/", url) for slug, 
 # Görev 226: taslak yasal metinler — yalnız TR, kaynakta noindex, sitemap'e girmez (yalnız önizleme).
 LEGAL_PAGES = ("on-bilgilendirme", "mesafeli-satis", "hizmet-kosullari", "iade", "kvkk")
 TR_PAGES.update({f"v2/yasal/{slug}/index.html": (f"yasal/{slug}/", None) for slug in LEGAL_PAGES})
+# Görev 232: STÜDYO SİPARİŞ ANAHTARI — tek yer burasıdır. False iken build, stüdyo sayfasındaki dört Shopier
+# bağlantısını "Çok yakında" etiketli pasif butonlara çevirir (üretilen HTML'de shopier.com geçmez), paket kartlarının
+# üstüne "Siparişler çok yakında açılıyor" notunu ekler ve sayfadaki yasal metin bağlantılarını gizler (/yasal/...
+# sayfaları noindex olarak doğrudan adresle erişilebilir kalır). True iken kaynak sayfa olduğu gibi yayınlanır.
+STUDIO_ORDERS_OPEN = False
+BUY_LINK = re.compile(r'<a class="(?P<cls>studio-buy-button|studio-buy-weekend)" href="https://www\.shopier\.com/[^"]*"'
+                      r'\s+target="_blank"\s+rel="noopener noreferrer"\s+(?P<desc>aria-describedby="[^"]*")'
+                      r'\s+data-purchase-link="\w+">[^<]*</a>')
+BUY_SOON = {"studio-buy-button": "Çok yakında", "studio-buy-weekend": "Hafta Sonu Teslim · Çok yakında"}
+LEGAL_FOOTER_LINK = re.compile(r' · <a class="footer-privacy"\s+href="[^"]*yasal/hizmet-kosullari/">[^<]*</a>')
+LEGAL_LINK = re.compile(r'<a href="[^"]*yasal/[^"]*">([^<]*)</a>')
 # Görev 226: stüdyo SSS'si (details/summary); TR sayfaya FAQPage JSON-LD bu öğelerden üretilir.
 FAQ_ITEM = re.compile(r'<details class="faq-item">\s*<summary>(.*?)</summary>\s*'
                       r'<div class="faq-answer">(.*?)</div>\s*</details>', re.S)
@@ -200,6 +211,27 @@ def music_showcase(text, catalog, locale, messages):
     return text.replace(marker, "\n".join(cards))
 
 
+def studio_orders_closed(text):
+    """Görev 232: kaynak (TR) stüdyo sayfasında satın alma bağlantılarını pasifleştirir ve not ekler."""
+    text, count = BUY_LINK.subn(lambda m: f'<span class="{m["cls"]} is-soon" role="link" aria-disabled="true" '
+                                          f'{m["desc"]}>{BUY_SOON[m["cls"]]}</span>', text)
+    if count != 4 or "shopier.com" in text:
+        raise LocaleError(f"[STUDIO-ORDERS] expected four Shopier purchase links, found {count}")
+    newline = "\r\n" if "\r\n" in text else "\n"
+    note = ('            <p class="studio-soon-note" role="note">Siparişler çok yakında açılıyor. Sorularınız için '
+            '<a href="mailto:destek@unalbuyuksungur.com">destek@unalbuyuksungur.com</a></p>' + newline)
+    return replace_once(text, '            <div class="studio-grid">', note + '            <div class="studio-grid">')
+
+
+def hide_legal_links(text):
+    """Görev 232: siparişler kapalıyken stüdyo sayfasındaki yasal metin bağlantıları gösterilmez (metin kalır)."""
+    text, footer = LEGAL_FOOTER_LINK.subn("", text)
+    text, inline = LEGAL_LINK.subn(r"\1", text)
+    if footer != 1 or inline != 2 or "yasal/" in text:
+        raise LocaleError("[STUDIO-ORDERS] unexpected legal links on the studio page")
+    return text
+
+
 def replace_once(text, old, new):
     if text.count(old) != 1:
         raise LocaleError(f"[I18N-TEMPLATE] expected one {old[:75]!r}, found {text.count(old)}")
@@ -214,9 +246,13 @@ def relative_route(source, locale, route):
     return rel
 
 
-def render_page(text, locale, surface, messages, config, work=None, profile="preview", catalog=None):
+def render_page(text, locale, surface, messages, config, work=None, profile="preview", catalog=None,
+                orders_open=None):
     """Localize a source HTML document while keeping stable catalog facts and shared assets."""
     original, route = SURFACES[surface]
+    orders_open = STUDIO_ORDERS_OPEN if orders_open is None else orders_open
+    if surface == "studio" and not orders_open:
+        text = studio_orders_closed(text)
     if surface == "home":
         if catalog is None:
             raise LocaleError("[HOME-FEATURED] the home page needs the catalog")
@@ -352,12 +388,14 @@ def render_page(text, locale, surface, messages, config, work=None, profile="pre
         canonical = locale_url(locale, seo_route, profile)
         text = replace_once(text, f'<link rel="canonical" href="{canonical}">',
                             f'<link rel="canonical" href="{canonical}">\n' + alternates(seo_route, profile))
+    if surface == "studio" and not orders_open:
+        text = hide_legal_links(text)  # yerelleştirmeden sonra: SSS cümlesinin çevirisi parçalarla eşleşir
     if surface in SHELL_ROUTES:
         text = shell_seo(text, locale, surface, profile, config)
     return text.encode("utf-8")
 
 
-def render(catalog, sources, profile="preview"):
+def render(catalog, sources, profile="preview", studio_orders_open=None):
     if profile not in render_pages.PROFILES:
         raise LocaleError(f"[I18N-PROFILE] unknown profile: {profile!r}")
     config, messages = load_messages(lambda rel: sources[rel])
@@ -374,12 +412,12 @@ def render(catalog, sources, profile="preview"):
     for surface in SHELL_ROUTES:
         source = SURFACES[surface][0]
         pages[source] = render_page(sources[source].decode("utf-8"), "tr", surface, messages, config,
-                                    profile=profile, catalog=catalog)
+                                    profile=profile, catalog=catalog, orders_open=studio_orders_open)
     for locale in ("en", "de"):
         for surface, (source, route) in SURFACES.items():
             pages["v2/" + locale + "/" + route] = render_page(
                 sources[source].decode("utf-8"), locale, surface, messages, config, profile=profile,
-                catalog=catalog)
+                catalog=catalog, orders_open=studio_orders_open)
     for rel in TR_PAGES:
         pages[rel] = tr_page_seo(sources[rel].decode("utf-8"), rel, profile).encode("utf-8")
     return pages
