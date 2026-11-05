@@ -3305,12 +3305,12 @@
     },
     {
       "id": "c-0015",
-      "sourceFileName": "Biliyorum.jpg",
+      "sourceFileName": "biliyorum-yeni-kapak.jpg",
       "format": "jpeg",
-      "width": 3000,
-      "height": 3000,
-      "bytes": 1525994,
-      "sha256": "a0c32e548a5d15a935110f99d6fb4a6888117673e36f7bfe2ca0cc54b51d2826",
+      "width": 1254,
+      "height": 1254,
+      "bytes": 415171,
+      "sha256": "f8347ecab951d613bfa068935344cfde0edab1e0eb905875e3d5777a650e2da4",
       "webImages": [
         {
           "path": "images/c-0015-400.webp",
@@ -5452,14 +5452,6 @@
         "w-0018"
       ],
       "description": "Tarihler kapak yazılarından alındı ve 11 burçta dosya adıyla eşleşiyor; kullanıcı tarafından ayrıca onaylanmadı. Koç dosya adı kesik ('Koç 4.jpg'); aralık yalnızca kapaktan okundu. Koç bitişi (20 Nisan) ile Boğa başlangıcı (20 Nisan) çakışıyor."
-    },
-    {
-      "id": "oi-0004",
-      "topic": "Biliyorum kapağı",
-      "refs": [
-        "c-0015"
-      ],
-      "description": "Kapakta sanatçı adı 'Ünal Buyüksungur' olarak görünüyor (ü eksik olabilir). Görsel dikey; kareye siyah bantlarla tamamlanmış."
     },
     {
       "id": "oi-0005",

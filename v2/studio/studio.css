@@ -52,12 +52,15 @@
 
 .studio-grid {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 20px;
+    max-width: 960px;
     margin: 32px 0;
 }
 
 .studio-package {
+    display: flex;
+    flex-direction: column;
     min-width: 0;
     padding: clamp(22px, 3vw, 36px);
     border: 1px solid var(--line);
@@ -145,6 +148,93 @@
 .studio-notify-link:focus-visible {
     background: var(--gold);
     color: var(--background);
+}
+
+/* Görev 227: paket fiyatı, satın alma düğmeleri (pasif: disabled) ve Hafta Sonu Teslim kutusu */
+.studio-price {
+    margin: 0 0 20px;
+    font: clamp(30px, 4vw, 40px)/1.1 var(--font-serif);
+    color: var(--text);
+}
+
+.studio-buy {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 14px;
+    margin-top: auto;
+    padding-top: 28px;
+}
+
+.studio-buy-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 48px;
+    padding: 0 26px;
+    border: 1px solid var(--gold);
+    border-radius: 999px;
+    background: var(--gold);
+    color: var(--background);
+    font: 600 16px/1.2 var(--font-sans);
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.studio-buy-button:hover,
+.studio-buy-button:focus-visible {
+    background: var(--gold-soft);
+}
+
+.studio-buy-weekend {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--gold);
+    font: 15px/1.4 var(--font-sans);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+}
+
+.studio-buy-button:focus-visible,
+.studio-buy-weekend:focus-visible {
+    outline: 2px solid var(--gold);
+    outline-offset: 3px;
+}
+
+.studio-buy-button[disabled] {
+    border-color: var(--line);
+    background: transparent;
+    color: var(--muted);
+    cursor: not-allowed;
+}
+
+.studio-buy-weekend[disabled] {
+    color: var(--muted);
+    opacity: .7;
+    text-decoration: none;
+    cursor: not-allowed;
+}
+
+.studio-weekend {
+    max-width: 960px;
+    margin-top: 28px;
+    padding: clamp(20px, 3vw, 28px);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--gold);
+    border-radius: 8px;
+}
+
+.studio-weekend h3 {
+    margin: 0 0 10px;
+    font: 22px/1.3 var(--font-serif);
+    color: var(--gold);
+}
+
+.studio-weekend p {
+    margin: 0;
+    color: var(--muted);
 }
 
 /* Görev 226: Sık Sorulanlar — JS gerektirmeyen açılır-kapanır liste (details/summary) */

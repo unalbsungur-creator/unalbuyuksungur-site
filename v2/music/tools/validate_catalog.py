@@ -39,9 +39,6 @@ WEB_SIZES = [400, 800, 1200]
 WEB_IMAGES_DIR = "images"
 # Kontrol 26: küçük resim karşılaştırmasında izin verilen en yüksek ortalama fark (0-255)
 THUMB_SIZE, THUMB_MAX_DIFF = 16, 12.0
-# Görev 225: kapağı sahibin verdiği yeni görselle yenilenen CoverAsset'ler. Web görselleri arşivdeki kaynak
-# dosyadan değil yeni görselden üretildi; kontrol 26 bunları kendi 1200 px WebP'sine göre eşleştirir.
-REPLACED_COVERS = {"c-0015"}
 
 # Kullanıcı tarafından onaylanmış katalog kararları (Görev 05).
 # Eserler, değişmeyen kaynak kapak dosya adlarıyla tanımlanır.
@@ -68,7 +65,8 @@ SPECIAL_DAY_FILES = ["Anneler Günü.jpg", "Babalar Günü.jpg",
 # Aynı bestenin versiyonları: dosya adı -> isOriginal beklentisi. Görev 25 kullanıcı kararıyla her kayıt
 # kendi bağımsız Work'ündedir (aynı Work altında olamaz); isOriginal kararları korunur.
 VERSION_GROUPS = [
-    {"Biliyorum.jpg": True, "Biliyorum (Rock Ballad Version).jpg": False},
+    # Görev 227: c-0015 kaynağı sahibin yeni kare kapağı (eski Biliyorum.jpg arşivde covers/_replaced/).
+    {"biliyorum-yeni-kapak.jpg": True, "Biliyorum (Rock Ballad Version).jpg": False},
     {"Turizmci.jpg": True, "Turizmci ( Pop Versiyon ).jpg": False},
     {"Yenik Yüreğim ( Pop Version ).jpg": True,
      "Yenik Yüreğim ( Thrash Metal Version ).jpg": False},
@@ -194,6 +192,7 @@ def thumbnail(path):
 
 
 def list_archive_covers(archive):
+    # Yalnız covers/ kökündeki dosyalar sayılır; covers/_replaced/ (Görev 227, değiştirilen kapaklar) dahil değil.
     covers_dir = archive / "covers"
     return sorted(p.name for p in covers_dir.iterdir()
                   if p.is_file() and p.suffix.lower() in IMAGE_EXTENSIONS)
@@ -679,11 +678,7 @@ def run(catalog, schema, archive, music_root):
         source_thumbs = {}
         for cover in covers.values():
             path = archive / "covers" / cover["sourceFileName"]
-            if cover["id"] in REPLACED_COVERS:
-                largest = max(cover.get("webImages", []), key=lambda item: item["width"], default=None)
-                if largest and web_path(largest).is_file():
-                    source_thumbs[cover["id"]] = thumbnail(web_path(largest))
-            elif path.is_file():
+            if path.is_file():
                 source_thumbs[cover["id"]] = thumbnail(path)
 
         def diff(a, b):

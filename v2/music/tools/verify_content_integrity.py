@@ -130,11 +130,14 @@ SPOTIFY_DECISIONS = {
     "r-0029": "https://open.spotify.com/track/0pzadgEdDUNpxLhtSTneKb",  # Elimi Sıktın
     "r-0053": "https://open.spotify.com/track/5DcxqmKthQEozgGvcg4UCU",  # Seninle
 }
-# Görev 225: sahibin verdiği yeni Biliyorum kapağı (kare, siyah bantsız). Yalnızca web görselleri yenilendi
-# (aynı ayar: Pillow, RGB, Lanczos, WebP quality=80, method=6); kaynak alanları arşivdeki Biliyorum.jpg'yi
-# tanımlamaya devam eder. Yol -> (bayt, SHA-256).
+# Görev 225: sahibin verdiği yeni Biliyorum kapağı (kare, siyah bantsız); web görselleri bu dosyadan üretildi
+# (Pillow, RGB, Lanczos, WebP quality=80, method=6). Görev 227: yeni dosya arşivde c-0015'in kaynağı oldu
+# (eski Biliyorum.jpg arşivde covers/_replaced/ altında). Görev 21/25 yedeklerine göre kalıcı fark kaydı:
+# "source" -> kaynak alanları, yol -> (bayt, SHA-256).
 COVER_DECISIONS = {
     "c-0015": {
+        "source": {"sourceFileName": "biliyorum-yeni-kapak.jpg", "width": 1254, "height": 1254, "bytes": 415171,
+                   "sha256": "f8347ecab951d613bfa068935344cfde0edab1e0eb905875e3d5777a650e2da4"},
         "images/c-0015-400.webp": (30730, "203eb2520a9fde4776d17d03a8636507db87e28efebe2e8a5a236574336f5782"),
         "images/c-0015-800.webp": (98490, "674af8098e00d042b719d5059dec48c4c702e9da4198d6d37cfafc8b2e6e00c5"),
         "images/c-0015-1200.webp": (176938, "5dbac967756792065b01874305d4a7bcc353f24b663c709007492d206c3c2c31"),
@@ -144,7 +147,9 @@ COVER_DECISIONS = {
 AGLAMA_CORRECTION = ("content/stories/w-0001.txt",
                      "1998/ Flört bitince gözler kapaklarını açtığı ve damlalar gelmeye başladı",
                      "1998/ Flört bitince gözler kapaklarını açtı ve damlalar gelmeye başladı")
-EXPECTED_OPEN_ISSUES = ["oi-0001", "oi-0002", "oi-0003", "oi-0004", "oi-0005", "oi-0006", "oi-0007", "oi-0008",
+# Görev 227: oi-0004 (Biliyorum kapağı) çözüldü: yeni kare kapak (Görev 225/227); listeden çıkarıldı.
+CLOSED_OPEN_ISSUES = ["oi-0004"]
+EXPECTED_OPEN_ISSUES = ["oi-0001", "oi-0002", "oi-0003", "oi-0005", "oi-0006", "oi-0007", "oi-0008",
                         "oi-0010", "oi-0011"]
 
 # Onaylı içerik (Görev 20–21; Görev 22–25'te doğrulandı): dosya baytlarının SHA-256 değeri.
@@ -335,9 +340,11 @@ def apply_later_decisions(data):
         if recording["id"] in SPOTIFY_DECISIONS:
             recording["links"]["spotify"] = SPOTIFY_DECISIONS[recording["id"]]
     for cover in data["covers"]:
+        cover.update(COVER_DECISIONS.get(cover["id"], {}).get("source", {}))
         for item in cover["webImages"]:
             if item["path"] in COVER_DECISIONS.get(cover["id"], {}):
                 item["bytes"], item["sha256"] = COVER_DECISIONS[cover["id"]][item["path"]]
+    data["openIssues"] = [o for o in data["openIssues"] if o["id"] not in CLOSED_OPEN_ISSUES]
     data["updatedAt"] = VIDEO_DECISIONS_UPDATED_AT
     return data
 
@@ -453,7 +460,7 @@ def repo_checks(report, catalog):
 
     ids = [o["id"] for o in catalog["openIssues"]]
     problems = [] if ids == EXPECTED_OPEN_ISSUES else [f"açık konular: {ids}"]
-    report.check("Açık konular: 10; oi-0009 kapalı, oi-0001 ve oi-0008 açık", problems)
+    report.check("Açık konular: 9; oi-0004 (Görev 227) ve oi-0009 kapalı, oi-0001 ve oi-0008 açık", problems)
 
     # Kayıt videoları onaylı kararlarla birebir: yanlış/eksik/fazla/yinelenen video ya da yanlış kayıt (versiyon) FAIL.
     problems = []
@@ -561,7 +568,7 @@ def archive_checks(report, catalog, archive):
         digest, path = line.split(" *", 1)
         backup[path.strip()] = digest.strip()
     webp = {p: h for p, h in backup.items() if p.startswith("v2/music/images/") and p.endswith(".webp")}
-    replaced = {"v2/music/" + p: h for items in COVER_DECISIONS.values() for p, (_b, h) in items.items()}
+    replaced = {"v2/music/" + p: v[1] for items in COVER_DECISIONS.values() for p, v in items.items() if p != "source"}
     problems = [p for p, h in webp.items() if sha256(REPO_ROOT / p) != replaced.get(p, h)]
     problems += [f"{p}: yedekte yok" for p in replaced if p not in webp]
     if len(webp) != 204:

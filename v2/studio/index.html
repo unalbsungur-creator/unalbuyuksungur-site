@@ -57,57 +57,72 @@
         <section class="studio-section" aria-labelledby="studio-process">
             <h2 id="studio-process">Nasıl çalışır?</h2>
             <ol class="studio-steps">
-                <li>Paketini seç</li>
-                <li>Hikâyeni anlat</li>
-                <li>Üretim başlangıç zamanını birlikte belirleyelim</li>
-                <li>İlk 2 şarkı alternatifi</li>
-                <li>Her revizyon turunda 2 yeni alternatif</li>
-                <li>Seçtiğin nihai şarkının teslimi</li>
+                <li>Paketini seç ve ödemeni Shopier üzerinden güvenle yap.</li>
+                <li>E-postana gelen bağlantıdan üretimin başlayacağı zamanı seç ve hikâyeni anlat.</li>
+                <li>İlk 2 şarkı alternatifi, randevu başlangıcından itibaren en geç 48 saat içinde gelir.</li>
+                <li>Değişiklik isteklerini tek mesajda ilet; her revizyonda en geç 6 çalışma saati içinde 2 yeni alternatif gelir.</li>
+                <li>Seçtiğin nihai şarkı paketine uygun formatta teslim edilir.</li>
             </ol>
         </section>
         <section class="studio-section" aria-labelledby="studio-packages">
             <h2 id="studio-packages">Paketler</h2>
             <div class="studio-grid">
-                <article class="studio-package" aria-labelledby="studio-start">
-                    <h3 id="studio-start">START</h3>
+                <article class="studio-package" aria-labelledby="studio-ozel-sarki">
+                    <h3 id="studio-ozel-sarki">ÖZEL ŞARKI</h3>
+                    <p class="studio-price">690 TL</p>
                     <ul>
-                        <li><strong>3</strong> revizyon hakkı</li>
-                        <li><strong>8</strong> toplam alternatif</li>
+                        <li>3 revizyon hakkı</li>
+                        <li>Toplam 8 şarkı alternatifi</li>
+                        <li>MP3 teslim</li>
                     </ul>
+                    <div class="studio-buy">
+                        <button class="studio-buy-button" type="button" disabled aria-disabled="true"
+                            aria-describedby="studio-ozel-sarki" data-purchase-link="shopierOzelSarki"><span
+                                data-purchase-off>Siparişler çok yakında</span><span data-purchase-on
+                                hidden>Satın al</span></button>
+                        <button class="studio-buy-weekend" type="button" disabled aria-disabled="true"
+                            aria-describedby="studio-ozel-sarki" data-purchase-link="shopierOzelSarkiHaftaSonu">Hafta Sonu Teslim ile satın al</button>
+                    </div>
                 </article>
-                <article class="studio-package" aria-labelledby="studio-plus">
-                    <h3 id="studio-plus">PLUS</h3>
+                <article class="studio-package" aria-labelledby="studio-ozel-sarki-plus">
+                    <h3 id="studio-ozel-sarki-plus">ÖZEL ŞARKI PLUS</h3>
+                    <p class="studio-price">990 TL</p>
                     <ul>
-                        <li><strong>5</strong> revizyon hakkı</li>
-                        <li><strong>12</strong> toplam alternatif</li>
+                        <li>5 revizyon hakkı</li>
+                        <li>Toplam 12 şarkı alternatifi</li>
+                        <li>320 kbps MP3 ve WAV teslim</li>
                     </ul>
-                </article>
-                <article class="studio-package" aria-labelledby="studio-premium">
-                    <h3 id="studio-premium">PREMIUM</h3>
-                    <ul>
-                        <li><strong>10</strong> revizyon hakkı</li>
-                        <li><strong>22</strong> toplam alternatif</li>
-                    </ul>
+                    <div class="studio-buy">
+                        <button class="studio-buy-button" type="button" disabled aria-disabled="true"
+                            aria-describedby="studio-ozel-sarki-plus" data-purchase-link="shopierOzelSarkiPlus"><span
+                                data-purchase-off>Siparişler çok yakında</span><span data-purchase-on
+                                hidden>Satın al</span></button>
+                        <button class="studio-buy-weekend" type="button" disabled aria-disabled="true"
+                            aria-describedby="studio-ozel-sarki-plus" data-purchase-link="shopierOzelSarkiPlusHaftaSonu">Hafta Sonu Teslim ile satın al</button>
+                    </div>
                 </article>
             </div>
-            <p class="studio-note">Fiyatlar sipariş açılışında duyurulacak.</p>
+            <p class="studio-note">Tüm vergiler dahil son fiyattır. Süreç içinde ek ücret alınmaz.</p>
+            <aside class="studio-weekend" aria-labelledby="studio-weekend">
+                <h3 id="studio-weekend">Hafta Sonu Teslim</h3>
+                <p>Çalışma saatlerimiz hafta içi 09.00–18.00'dir. Perşembe veya cuma başlayan randevularda teslim normalde pazartesi aynı saate kayar. Şarkınızı hafta sonunda almak isterseniz Hafta Sonu Teslim seçeneğini tercih edebilirsiniz: Özel Şarkı 990 TL, Özel Şarkı Plus 1.390 TL.</p>
+            </aside>
         </section>
         <section class="studio-section studio-columns" aria-labelledby="studio-included">
             <div>
                 <h2 id="studio-included">Pakete dahil</h2>
                 <ul class="studio-list">
                     <li>1 nihai şarkı</li>
-                    <li>MP3 teslim (mümkünse WAV)</li>
-                    <li>Tamamlanmış final versiyon</li>
+                    <li>İsteğe bağlı söz onayı (sözler müzikten önce onayına sunulur)</li>
+                    <li>Özel Şarkı'da MP3, Özel Şarkı Plus'ta 320 kbps MP3 ve WAV</li>
                 </ul>
             </div>
             <div>
                 <h2 id="studio-excluded">Dahil değil</h2>
                 <ul class="studio-list studio-list--excluded">
                     <li>Ham proje dosyaları</li>
-                    <li>Platformlara dağıtım</li>
-                    <li>Sınırsız revizyon</li>
-                    <li>Tamamen yeni hikâye/söz ile yeni şarkı</li>
+                    <li>Müzik platformlarına dağıtım</li>
+                    <li>Hikâyeyi veya konuyu tamamen değiştiren yeni bir şarkı</li>
                 </ul>
             </div>
         </section>
@@ -217,7 +232,7 @@
                 <details class="faq-item">
                     <summary>Bilgilerim ve hikâyem güvende mi?</summary>
                     <div class="faq-answer">
-                        <p>Bilgileriniz yalnızca şarkınızı hazırlamak ve teslim etmek için kullanılır, üçüncü kişilerle paylaşılmaz. Şarkınız izniniz olmadan örnek çalışma olarak yayınlanmaz. Şarkıda geçmesini istemediğiniz bilgileri forma yazmamanızı rica ederiz.</p>
+                        <p>Bilgileriniz yalnızca şarkınızı hazırlamak ve teslim etmek için kullanılır. Pazarlama amacıyla kimseyle paylaşılmaz; yalnızca ödeme, randevu, e-posta ve müzik üretim altyapısını sağlayan hizmet sağlayıcılarıyla, hizmetin gerektirdiği ölçüde işlenir (ayrıntılar <a href="../yasal/kvkk/">KVKK Aydınlatma Metni</a>'nde). Şarkınız izniniz olmadan örnek çalışma olarak yayınlanmaz. Şarkıda geçmesini istemediğiniz bilgileri forma yazmamanızı rica ederiz.</p>
                     </div>
                 </details>
                 <details class="faq-item">

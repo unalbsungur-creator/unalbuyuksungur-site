@@ -74,6 +74,17 @@ class ExternalLinksTests(unittest.TestCase):
                 self.assertIn("data-external-link=", anchor, f"{name}: {anchor}")
                 self.assertIn("data-external-label=", anchor, f"{name}: {anchor}")
 
+    def test_studio_purchase_keys_are_inactive_until_urls_exist(self):
+        """Görev 227: dört Shopier ürün anahtarı şimdilik null; düğme statik HTML'de pasif, URL gelince etkinleşir."""
+        keys = ["shopierOzelSarki", "shopierOzelSarkiHaftaSonu", "shopierOzelSarkiPlus", "shopierOzelSarkiPlusHaftaSonu"]
+        self.assertEqual(re.findall(r'^\s{8}(shopier\w+): Object\.freeze\(\{[^\n]* url: null \}\)', SOURCE, re.M), keys)
+        self.assertRegex(SOURCE, r'querySelectorAll\("button\[data-purchase-link\]"\)')
+        self.assertIn('typeof link.url !== "string"', SOURCE)
+        self.assertIn('anchor.rel = "noopener noreferrer"', SOURCE.split("function applyPurchaseLinks", 1)[1])
+        studio = (ROOT / "v2/studio/index.html").read_text(encoding="utf-8")
+        self.assertEqual(sorted(re.findall(r'data-purchase-link="(\w+)"', studio)), sorted(keys))
+        self.assertNotRegex(SOURCE.lower() + studio.lower(), r"bookings|outlook\.(office|live)")
+
     def test_preserved_catalog_invariants(self):
         catalog = (ROOT / "v2/music/data/catalog.json").read_text(encoding="utf-8")
         self.assertEqual(len(re.findall(r'"id": "w-\d{4}"', catalog)), 68)

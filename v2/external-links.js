@@ -15,7 +15,13 @@
         blog: Object.freeze({ platform: "ÜNALBLOG", display: "ÜNALBLOG", url: "https://unalbsungur.blogspot.com/" }),
         shopier: Object.freeze({ platform: "Shopier", display: "Shopier Mağazam", url: "https://www.shopier.com/unalbuyuksungur/" }),
         etsy: Object.freeze({ platform: "Etsy", display: "Pixel & Petal Digital", url: "https://pixelandpetaldigital.etsy.com" }),
-        spotifyPlaylist: Object.freeze({ platform: "Spotify", display: "Ünal Büyüksungur", url: "https://open.spotify.com/playlist/6od7MgDo7kL9DHUgiT40rT" })
+        spotifyPlaylist: Object.freeze({ platform: "Spotify", display: "Ünal Büyüksungur", url: "https://open.spotify.com/playlist/6od7MgDo7kL9DHUgiT40rT" }),
+        // Görev 227: stüdyo satın alma ürünleri (Shopier). null = sipariş henüz açık değil; düğme pasif kalır.
+        // Ürün URL'si girildiğinde stüdyo sayfasındaki düğme kendiliğinden etkinleşir.
+        shopierOzelSarki: Object.freeze({ platform: "Shopier", display: "Özel Şarkı", url: null }),
+        shopierOzelSarkiHaftaSonu: Object.freeze({ platform: "Shopier", display: "Özel Şarkı — Hafta Sonu Teslim", url: null }),
+        shopierOzelSarkiPlus: Object.freeze({ platform: "Shopier", display: "Özel Şarkı Plus", url: null }),
+        shopierOzelSarkiPlusHaftaSonu: Object.freeze({ platform: "Shopier", display: "Özel Şarkı Plus — Hafta Sonu Teslim", url: null })
     });
 
     function applyExternalLinks(root) {
@@ -31,7 +37,30 @@
         });
     }
 
+    // Görev 227: statik HTML'de pasif (disabled) satın alma düğmeleri; anahtarın URL'si varsa yeni sekmede
+    // açılan bağlantıya dönüşür. URL null ise statik pasif hal ("Siparişler çok yakında") olduğu gibi kalır.
+    function applyPurchaseLinks(root) {
+        (root || document).querySelectorAll("button[data-purchase-link]").forEach(function (button) {
+            var link = LINKS[button.getAttribute("data-purchase-link")];
+            if (!link || typeof link.url !== "string" || !/^https:\/\//.test(link.url)) return;
+            var label = button.querySelector("[data-purchase-on]") || button;
+            var anchor = document.createElement("a");
+            anchor.className = button.className;
+            anchor.href = link.url;
+            anchor.target = "_blank";
+            anchor.rel = "noopener noreferrer";
+            anchor.textContent = label.textContent.trim();
+            if (button.hasAttribute("aria-describedby")) anchor.setAttribute("aria-describedby", button.getAttribute("aria-describedby"));
+            button.replaceWith(anchor);
+        });
+    }
+
+    function applyAll() {
+        applyExternalLinks(document);
+        applyPurchaseLinks(document);
+    }
+
     Object.defineProperty(window, "V2_EXTERNAL_LINKS", { value: LINKS, writable: false, configurable: false });
-    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", function () { applyExternalLinks(document); });
-    else applyExternalLinks(document);
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", applyAll);
+    else applyAll();
 }());

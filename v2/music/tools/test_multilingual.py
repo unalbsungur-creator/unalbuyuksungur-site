@@ -100,11 +100,35 @@ class MultilingualTests(unittest.TestCase):
                 self.pages[f"v2/{locale}/studio/index.html"].decode("utf-8")
             with self.subTest(locale=locale):
                 self.assertIn(f'<html lang="{locale}">', studio)
-                for package, revisions, alternatives in (("START", 3, 8), ("PLUS", 5, 12), ("PREMIUM", 10, 22)):
-                    card = studio.split(f'<h3 id="studio-{package.lower()}">{package}</h3>', 1)[1].split('</article>', 1)[0]
-                    self.assertIn(f'<strong>{revisions}</strong> {messages[locale]["studio.revisionCount"]}', card)
-                    self.assertIn(f'<strong>{alternatives}</strong> {messages[locale]["studio.alternatives"]}', card)
-                    self.assertNotRegex(card, r"\bTL\b|₺|EUR|€")  # Görev 221: fiyatlar kaldırıldı
+                m = messages[locale]
+                # Görev 227: iki paket kartı (adlar çevrilmez), fiyatlar ve statik HTML'de pasif satın alma düğmeleri.
+                self.assertEqual(studio.count('<article class="studio-package"'), 2)
+                for slug, name, price, keys, product in (
+                        ("ozel-sarki", "ÖZEL ŞARKI", "690 TL", ("rev3", "alt8", "mp3"), "shopierOzelSarki"),
+                        ("ozel-sarki-plus", "ÖZEL ŞARKI PLUS", "990 TL", ("rev5", "alt12", "wav"),
+                         "shopierOzelSarkiPlus")):
+                    card = studio.split(f'<h3 id="studio-{slug}">{name}</h3>', 1)[1].split("</article>", 1)[0]
+                    self.assertIn(f'<p class="studio-price">{price}</p>', card)
+                    for key in keys:
+                        self.assertIn(f"<li>{html.escape(m['studio.pkg.' + key], quote=False)}</li>", card)
+                    buttons = re.findall(r"<button\b[^>]*>", card)
+                    self.assertEqual([re.search(r'data-purchase-link="(\w+)"', b)[1] for b in buttons],
+                                     [product, product + "HaftaSonu"])
+                    for button in buttons:
+                        self.assertRegex(button, r'\bdisabled aria-disabled="true"')
+                        self.assertIn(f'aria-describedby="studio-{slug}"', button)
+                    self.assertRegex(card, rf"data-purchase-off>{re.escape(m['studio.buySoon'])}</span>")
+                    self.assertRegex(card, rf"data-purchase-on\s+hidden>{re.escape(m['studio.buy'])}</span>")
+                    self.assertIn(f">{m['studio.buyWeekend']}</button>", card)
+                weekend = studio.split('<aside class="studio-weekend"', 1)[1].split("</aside>", 1)[0]
+                self.assertIn('<h3 id="studio-weekend">Hafta Sonu Teslim</h3>', weekend)
+                self.assertIn(html.escape(m["studio.weekendText"], quote=False), weekend)
+                self.assertRegex(m["studio.weekendText"], r"9[.:]00.*18[.:]00.*990 TL.*1[.,]390 TL")
+                steps = studio.split('<ol class="studio-steps">', 1)[1].split("</ol>", 1)[0]
+                self.assertEqual(re.findall(r"<li>(.*?)</li>", steps),
+                                 [html.escape(m[f"studio.step{i}"], quote=False) for i in range(1, 6)])
+                # Bookings randevu bağlantısı yalnız ödeme sonrası e-postayla gönderilir; sayfada yayınlanmaz.
+                self.assertNotRegex(studio.lower(), r"bookings|outlook\.(office|live)|office365|calendly")
                 # Görev 226: SSS en altta, footer'dan hemen önce; Görev 221 kısıtları SSS dışındaki tanıtım içindir.
                 faq = studio.split('<section class="studio-section studio-faq"', 1)[1].split("</section>", 1)[0]
                 self.assertRegex(studio.split(faq, 1)[1], r"^</section>\s*</main>\s*<footer")
@@ -125,13 +149,14 @@ class MultilingualTests(unittest.TestCase):
                     self.assertEqual(rendered.count(b'"@type":"Question"'), 17)
                 studio = studio.replace(faq, "")
                 text = " ".join(html.unescape(studio).split())
-                for key in ("studio.status", "studio.service.song", "studio.service.video", "studio.step1",
-                            "studio.step6", "studio.pricesNote", "studio.inc1", "studio.inc2", "studio.exc1",
-                            "studio.exc4", "studio.usageText", "studio.notifyText", "studio.notifyCta"):
-                    self.assertIn(messages[locale][key], text, key)
-                # Görev 221: fiyat, çalışma saati, acil tarife, teslim süresi ve satın alma çağrısı yok.
-                self.assertNotRegex(text, r"\d+[.,]?\d* ?TL|09:00|18:00|acil tarife|teslim süresi|satın al")
-                self.assertNotRegex(studio.lower(), r'<form\b|checkout|shopier|type="email"|<iframe\b')
+                for key in ("studio.status", "studio.service.song", "studio.service.video", "studio.priceNote",
+                            "studio.inc1", "studio.inc2", "studio.inc3", "studio.exc1", "studio.exc2", "studio.exc3",
+                            "studio.usageText", "studio.notifyText", "studio.notifyCta"):
+                    self.assertIn(m[key], text, key)
+                # Görev 227: eski START/PLUS/PREMIUM ve "MP3 teslim (mümkünse WAV)" kalktı; form, ödeme sayfası,
+                # e-posta alanı, iframe veya HTML'de Shopier ürün URL'si yok (URL'ler yalnız external-links.js'te).
+                self.assertNotRegex(text, r"\bSTART\b|\bPREMIUM\b|mümkünse WAV|WAV where possible|acil tarife")
+                self.assertNotRegex(studio.lower(), r'<form\b|checkout|shopier\.com|type="email"|<iframe\b')
                 self.assertEqual(studio.count('aria-current="page"'), 1)
                 self.assertIn('href="../music/"', studio)
                 self.assertIn('href="./" aria-current="page"', studio)
@@ -226,7 +251,7 @@ class MultilingualTests(unittest.TestCase):
                 path = render_site.relative_route(f"v2/{prefix}studio/index.html", target, "studio/")
                 self.assertRegex(studio, rf'<a data-locale="{target}" href="{re.escape(path)}"')
         css = (ROOT / "v2/studio/studio.css").read_text(encoding="utf-8")
-        self.assertIn("grid-template-columns: repeat(3, minmax(0, 1fr))", css)
+        self.assertIn("grid-template-columns: repeat(2, minmax(0, 1fr))", css)  # Görev 227: iki paket kartı
         self.assertIn("@media (max-width: 900px)", css)
         self.assertIn("grid-template-columns: 1fr", css)
         self.assertIn("@media (max-width: 860px)", (ROOT / "v2/music/catalog.css").read_text(encoding="utf-8"))
