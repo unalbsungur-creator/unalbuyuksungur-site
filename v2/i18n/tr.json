@@ -259,5 +259,16 @@
     "studio.faq.a16c": "'nde). Şarkınız izniniz olmadan örnek çalışma olarak yayınlanmaz. Şarkıda geçmesini istemediğiniz bilgileri forma yazmamanızı rica ederiz.",
     "studio.faq.q17": "Sorum olursa nasıl ulaşırım?",
     "studio.faq.a17a": "destek@unalbuyuksungur.com adresinden veya",
-    "studio.faq.a17b": "üzerinden bana yazabilirsiniz."
+    "studio.faq.a17b": "üzerinden bana yazabilirsiniz.",
+    "privacy.title": "Gizlilik | Ünal Büyüksungur",
+    "privacy.meta": "Ünal Büyüksungur Digital World gizlilik bilgisi.",
+    "privacy.p1": "Bu sitede kişisel veri toplayan bir form bulunmaz. Site çerez ya da analiz (analytics) aracı kullanmaz.",
+    "privacy.p2": "Dil tercihiniz yalnızca tarayıcınızda (localStorage) saklanır; sunucuya gönderilmez.",
+    "privacy.p3": "Eser sayfalarındaki videolar, oynat düğmesine bastığınızda YouTube'un çerezsiz oynatıcısıyla (youtube-nocookie.com) yüklenir. Perspective sayfası yazı tiplerini Google Fonts'tan yükler. Gömülü YouTube içerikleri ve dış bağlantılar (Spotify, Apple Music, Instagram, Shopier, Etsy, Blogspot vb.) kendi gizlilik politikalarına tabidir.",
+    "privacy.contact": "İletişim",
+    "privacy.contact1": "İletişim için",
+    "privacy.contact2": "üzerinden ya da",
+    "privacy.contact3": "adresinden ulaşabilirsiniz.",
+    "nav.song": "ŞARKI",
+    "nav.soon": "YAKINDA"
 }

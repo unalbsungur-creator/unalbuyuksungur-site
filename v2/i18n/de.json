@@ -259,5 +259,16 @@
     "studio.faq.a16c": " (auf Türkisch)). Ihr Song wird ohne Ihre Erlaubnis nicht als Beispielarbeit veröffentlicht. Bitte schreiben Sie nichts in das Formular, was nicht im Song vorkommen soll.",
     "studio.faq.q17": "Wie erreiche ich Sie bei Fragen?",
     "studio.faq.a17a": "Schreiben Sie mir an destek@unalbuyuksungur.com oder über",
-    "studio.faq.a17b": "."
+    "studio.faq.a17b": ".",
+    "privacy.title": "Datenschutz | Ünal Büyüksungur",
+    "privacy.meta": "Datenschutzhinweise für Ünal Büyüksungur Digital World.",
+    "privacy.p1": "Diese Website enthält keine Formulare, die personenbezogene Daten erfassen. Sie verwendet keine Cookies oder Analysedienste.",
+    "privacy.p2": "Ihre Spracheinstellung wird nur in Ihrem Browser (localStorage) gespeichert und nicht an den Server übermittelt.",
+    "privacy.p3": "Videos auf den Werkseiten werden erst beim Abspielen über den datenschutzfreundlichen YouTube-Player (youtube-nocookie.com) geladen. Die Perspective-Seite lädt Schriften von Google Fonts. Für eingebettete YouTube-Inhalte und externe Links (Spotify, Apple Music, Instagram, Shopier, Etsy, Blogspot usw.) gelten deren eigene Datenschutzrichtlinien.",
+    "privacy.contact": "Kontakt",
+    "privacy.contact1": "Sie erreichen mich über",
+    "privacy.contact2": "oder unter",
+    "privacy.contact3": ".",
+    "nav.song": "SONG",
+    "nav.soon": "BALD"
 }

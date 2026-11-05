@@ -259,5 +259,16 @@
     "studio.faq.a16c": " (in Turkish)). Your song is not published as a sample without your permission. Please do not write anything on the form that you do not want to appear in the song.",
     "studio.faq.q17": "How can I reach you if I have a question?",
     "studio.faq.a17a": "You can write to me at destek@unalbuyuksungur.com or on",
-    "studio.faq.a17b": "."
+    "studio.faq.a17b": ".",
+    "privacy.title": "Privacy | Ünal Büyüksungur",
+    "privacy.meta": "Privacy information for Ünal Büyüksungur Digital World.",
+    "privacy.p1": "This site has no forms that collect personal data. The site uses no cookies or analytics tools.",
+    "privacy.p2": "Your language preference is stored only in your browser (localStorage); it is not sent to the server.",
+    "privacy.p3": "Videos on the work pages load from YouTube's privacy-enhanced player (youtube-nocookie.com) only when you press play. The Perspective page loads its fonts from Google Fonts. Embedded YouTube content and external links (Spotify, Apple Music, Instagram, Shopier, Etsy, Blogspot, etc.) are subject to their own privacy policies.",
+    "privacy.contact": "Contact",
+    "privacy.contact1": "You can reach me on",
+    "privacy.contact2": "or at",
+    "privacy.contact3": ".",
+    "nav.song": "SONG",
+    "nav.soon": "SOON"
 }

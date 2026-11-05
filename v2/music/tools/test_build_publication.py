@@ -33,7 +33,7 @@ PAGES = {f"v2/music/work/{w['id']}.html" for w in CATALOG["works"]}  # Görev 73
 LOCALE_PAGES = {f"v2/{locale}/music/work/{w['id']}.html" for locale in ("en", "de")
                 for w in CATALOG["works"]}
 LOCALE_SHELLS = {f"v2/{locale}/{route}index.html" for locale in ("en", "de")
-                 for route in ("", "music/", "music/work/", "studio/")}
+                 for route in ("", "music/", "music/work/", "studio/", "privacy/")}
 # Görev 220: TR kabuk sayfaları da profile göre SEO etiketleriyle üretilir.
 ALL_PAGES = PAGES | LOCALE_PAGES | LOCALE_SHELLS | set(bp.RENDERED_SHELLS)
 # Görev 221: yalnız Türkçe blog, yazı ve gizlilik sayfaları da üretilir.
@@ -106,17 +106,17 @@ class BuildPublicationTests(unittest.TestCase):
     def test_output_is_exactly_the_allowlist(self):
         manifest = self.build()
         web = expected_web_files()
-        self.assertEqual(len(web), 382)  # V1 favicon, V2 favicon ile aynı paket yoluna düşer (alias)
+        self.assertEqual(len(web), 384)  # V1 favicon, V2 favicon ile aynı paket yoluna düşer (alias)
         self.assertEqual(len(PAGES), 68)
         generated = {"_headers", "_redirects", "robots.txt"}
         self.assertEqual(set(self.tree()), published(web) | published(ALL_PAGES) | generated)
-        self.assertEqual(len(self.tree()), 609)
+        self.assertEqual(len(self.tree()), 613)
         self.assertEqual([n for n in self.tree() if n.startswith(("v2/", "legacy/"))], [])
-        self.assertEqual((manifest["webFiles"], manifest["copiedFiles"], manifest["renderedPages"]), (606, 381, 225))
-        self.assertEqual(manifest["totalOutputFiles"], 609)
+        self.assertEqual((manifest["webFiles"], manifest["copiedFiles"], manifest["renderedPages"]), (610, 383, 227))
+        self.assertEqual(manifest["totalOutputFiles"], 613)
         self.assertEqual(manifest["profile"], "preview")
-        self.assertEqual(manifest["groups"], {"site": 35, "data": 2, "lyrics": 64, "stories": 64, "webp": 204,
-                                               "legacyImages": 12, "pages": 225})
+        self.assertEqual(manifest["groups"], {"site": 37, "data": 2, "lyrics": 64, "stories": 64, "webp": 204,
+                                               "legacyImages": 12, "pages": 227})
         self.assertEqual([(a["path"], a["source"], a["sameAs"]) for a in manifest["aliases"]],
                          [("images/favicon.jpg.jpeg", "v2/legacy/v1-images/favicon.jpg.jpeg",
                            "v2/images/favicon.jpg.jpeg")])
@@ -162,7 +162,7 @@ class BuildPublicationTests(unittest.TestCase):
     def test_output_bytes_identical_to_source(self):
         manifest = self.build()
         tree = self.tree()
-        self.assertEqual(len(manifest["files"]), 381)
+        self.assertEqual(len(manifest["files"]), 383)
         self.assertEqual(tree["images/favicon.jpg.jpeg"], (REPO / "images/favicon.jpg.jpeg").read_bytes())
         for entry in manifest["files"]:
             source = (REPO / entry["source"]).read_bytes()
@@ -190,6 +190,8 @@ class BuildPublicationTests(unittest.TestCase):
                                                             "v2/de/music/index.html"}
                       else "v2/studio/index.html" if rel in {"v2/studio/index.html", "v2/en/studio/index.html",
                                                              "v2/de/studio/index.html"}
+                      else "v2/privacy/index.html" if rel in {"v2/privacy/index.html", "v2/en/privacy/index.html",
+                                                              "v2/de/privacy/index.html"}
                       else "v2/music/work/index.html")
             self.assertEqual((entry["template"], entry["templateSha256"]),
                              (source, bp.sha256((REPO / source).read_bytes())))
@@ -247,7 +249,7 @@ class BuildPublicationTests(unittest.TestCase):
         """Görev 220: ana alan adında noindex yok (yalnız pages.dev), robots/sitemap üretilir, URL'ler köktedir."""
         manifest = self.build(profile="production")
         tree = self.tree()
-        self.assertEqual((manifest["profile"], manifest["totalOutputFiles"]), ("production", 610))
+        self.assertEqual((manifest["profile"], manifest["totalOutputFiles"]), ("production", 614))
         headers = tree["_headers"].decode("utf-8")
         self.assertTrue(headers.startswith(bp.MARKER + "\n"))
         self.assertIn("https://unalbuyuksungur-v2.pages.dev/*\n  X-Robots-Tag: noindex\n", headers)
@@ -257,7 +259,7 @@ class BuildPublicationTests(unittest.TestCase):
         self.assertEqual(tree["robots.txt"],
                          b"User-agent: *\nAllow: /\nSitemap: https://unalbuyuksungur.com/sitemap.xml\n")
         sitemap = tree["sitemap.xml"].decode("utf-8")
-        self.assertEqual(sitemap.count("<url>"), 3 * (3 + len(CATALOG["works"])))
+        self.assertEqual(sitemap.count("<url>"), 3 * (4 + len(CATALOG["works"])))  # Görev 231: + gizlilik
         self.assertNotIn("/blog/", sitemap)  # Görev 222: /blog/ noindex
         self.assertIn(b'<meta name="robots" content="noindex, follow">', tree["blog/index.html"])
         for slug in bp.render_site.BLOG_POSTS:
@@ -426,12 +428,12 @@ class BuildPublicationTests(unittest.TestCase):
 
     def test_cli_exit_codes(self):
         run = [sys.executable, "-I", str(SCRIPT), "--root", str(self.root), "--out", "_site"]
-        ok = subprocess.run(run + ["--expect-count", "606"], capture_output=True, text=True, encoding="utf-8")
+        ok = subprocess.run(run + ["--expect-count", "610"], capture_output=True, text=True, encoding="utf-8")
         self.assertEqual(ok.returncode, 0, ok.stderr)
-        self.assertIn("381/381", ok.stdout)
-        self.assertIn("üretilen sayfa 225 (preview)", ok.stdout)
+        self.assertIn("383/383", ok.stdout)
+        self.assertIn("üretilen sayfa 227 (preview)", ok.stdout)
         manifest = json.loads((self.root / "_site-manifest.json").read_text(encoding="utf-8"))
-        self.assertEqual(manifest["totalOutputFiles"], 609)
+        self.assertEqual(manifest["totalOutputFiles"], 613)
         bad = subprocess.run(run + ["--profile", "staging"], capture_output=True, text=True, encoding="utf-8")
         self.assertEqual(bad.returncode, 2)  # argparse: geçersiz profil seçimi
         (self.root / "v2/music/catalog.css").unlink()

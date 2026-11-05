@@ -61,6 +61,9 @@ DEFAULT_ROOT = Path(__file__).resolve().parents[3]
 SITE_FILES = (
     "v2/index.html",
     "v2/external-links.js",
+    # Görev 231: tüm header'lardaki "Müzik Stüdyosu" alt menüsünün ortak stili ve davranışı
+    "v2/site-nav.css",
+    "v2/site-nav.js",
     "v2/i18n/config.json",
     "v2/i18n/tr.json",
     "v2/i18n/en.json",
@@ -91,7 +94,8 @@ SITE_FILES = (
     "v2/perspective/index.html",
     "v2/perspective/style.css",
     "v2/perspective/script.js",
-    # Görev 221: yalnız Türkçe blog ve gizlilik sayfaları (render_site.TR_PAGES) ve blog görselleri
+    # Görev 221: yalnız Türkçe blog sayfaları (render_site.TR_PAGES) ve blog görselleri;
+    # gizlilik sayfası Görev 231'den beri TR/EN/DE kabuk sayfasıdır (render_site.SHELL_ROUTES).
     "v2/blog/index.html",
     "v2/blog/blog.css",
     "v2/blog/yapay-zeka-ile-uretildi-diye-degersiz-mi/index.html",
@@ -111,7 +115,7 @@ SITE_FILES = (
     "v2/images/blog/ne-yapayim-1200.webp",
 )
 # Görev 220: TR kabuk sayfaları kopyalanmaz, profile göre SEO etiketleriyle üretilir (render_site.SHELL_ROUTES).
-RENDERED_SHELLS = ("v2/index.html", "v2/music/index.html", "v2/studio/index.html")
+RENDERED_SHELLS = ("v2/index.html", "v2/music/index.html", "v2/studio/index.html", "v2/privacy/index.html")
 # Görev 221: yalnız Türkçe sayfalar da kopyalanmaz; canonical/OG etiketleriyle üretilir.
 RENDERED_PAGES = RENDERED_SHELLS + tuple(render_site.TR_PAGES)
 # 404 sayfası her adresten sunulur; kök-mutlak bağlantıya yalnız bu sayfada izin verilir.
@@ -477,6 +481,7 @@ def build(root, out, expect_count=None, manifest_path=None, log=print, profile="
                       else "v2/index.html" if re.fullmatch(r"v2/((en|de)/)?index\.html", rel)
                       else "v2/music/index.html" if re.fullmatch(r"v2/((en|de)/)?music/index\.html", rel)
                       else "v2/studio/index.html" if re.fullmatch(r"v2/((en|de)/)?studio/index\.html", rel)
+                      else "v2/privacy/index.html" if re.fullmatch(r"v2/((en|de)/)?privacy/index\.html", rel)
                       else render_pages.TEMPLATE)
             page_entries.append({"path": path, "source": rel, "bytes": len(pages[rel]),
                                  "sha256": sha256(pages[rel]), "template": source,

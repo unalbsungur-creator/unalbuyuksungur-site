@@ -14,11 +14,12 @@ import render_pages
 ROOT = "v2/"
 # Görev 220: TR/EN/DE kabuk sayfalarının canonical, hreflang, Open Graph ve Twitter etiketleri build sırasında
 # profile göre üretilir; kaynak sayfalar bu etiketleri taşımaz. og:image, hero görselinin 1200×630 türevidir.
-SHELL_ROUTES = {"home": "", "catalog": "music/", "studio": "studio/"}
+# Görev 231: gizlilik sayfası TR/EN/DE kabuk sayfasıdır (önceden yalnız TR + sabit EN/DE özet bölümleri).
+SHELL_ROUTES = {"home": "", "catalog": "music/", "studio": "studio/", "privacy": "privacy/"}
 OG_IMAGE = {"path": "images/og/unal-digital-world-og-1200x630.jpg", "type": "image/jpeg",
             "width": "1200", "height": "630"}
 SEO_TAG = re.compile(r'<link rel="(canonical|alternate)"|<meta (property="og:(?!locale")|name="twitter:)')
-# Görev 221: yalnız Türkçe sayfalar (blog, gizlilik). EN/DE karşılıkları yoktur; hreflang üretilmez.
+# Görev 221: yalnız Türkçe sayfalar (blog; gizlilik Görev 231 ile üç dilli oldu). EN/DE karşılıkları yoktur; hreflang üretilmez.
 # Blog yazı sayfalarının canonical'ı Blogspot'taki orijinal adrestir (sitemap'e girmez).
 BLOG_POSTS = {
     "yapay-zeka-ile-uretildi-diye-degersiz-mi": "https://unalbsungur.blogspot.com/2026/05/yapay-zeka-ile-uretildi-diye-degersiz-mi.html",
@@ -27,7 +28,7 @@ BLOG_POSTS = {
 }
 # Görev 224: ana sayfa Müzik vitrininde öne çıkan eserler (eser kimliğiyle; sıra korunur).
 FEATURED_WORKS = ("w-0023", "w-0013", "w-0014", "w-0016")  # Çat Çat Çat, Benimle Yaşlanacaktın, Biliyorum, Bir Kedim Var
-TR_PAGES = {"v2/blog/index.html": ("blog/", None), "v2/privacy/index.html": ("privacy/", None)}
+TR_PAGES = {"v2/blog/index.html": ("blog/", None)}
 TR_PAGES.update({f"v2/blog/{slug}/index.html": (f"blog/{slug}/", url) for slug, url in BLOG_POSTS.items()})
 # Görev 226: taslak yasal metinler — yalnız TR, kaynakta noindex, sitemap'e girmez (yalnız önizleme).
 LEGAL_PAGES = ("on-bilgilendirme", "mesafeli-satis", "hizmet-kosullari", "iade", "kvkk")
@@ -41,6 +42,7 @@ SURFACES = {
     "catalog": ("v2/music/index.html", "music/index.html"),
     "work": ("v2/music/work/index.html", "music/work/index.html"),
     "studio": ("v2/studio/index.html", "studio/index.html"),
+    "privacy": ("v2/privacy/index.html", "privacy/index.html"),
 }
 TEXT_NODE = re.compile(r">([^<>]+)<")
 ATTRIBUTE = re.compile(r'\b(?P<name>aria-label|data-external-label|alt|placeholder)="(?P<value>[^"]*)"')
@@ -221,7 +223,8 @@ def render_page(text, locale, surface, messages, config, work=None, profile="pre
         text = music_showcase(text, catalog, locale, messages)
     if surface == "studio" and locale == "tr":
         text = faq_json_ld(text)
-    seo_route = {"home": "", "catalog": "music/", "work": "music/work/", "studio": "studio/"}[surface]
+    seo_route = {"home": "", "catalog": "music/", "work": "music/work/", "studio": "studio/",
+                 "privacy": "privacy/"}[surface]
     if work is not None:
         if not WORK_ID.fullmatch(work["id"]):
             raise LocaleError("[I18N-WORK] invalid work id")
@@ -232,9 +235,9 @@ def render_page(text, locale, surface, messages, config, work=None, profile="pre
     if locale != "tr":
         text = replace_once(text, '<html lang="tr"', f'<html lang="{locale}"')
         text = localize_text(text, locale, messages)
-        if surface in ("home", "catalog", "studio"):
+        if surface in ("home", "catalog", "studio", "privacy"):
             description_key = {"home": "home.meta", "catalog": "music.description",
-                               "studio": "studio.meta"}[surface]
+                               "studio": "studio.meta", "privacy": "privacy.meta"}[surface]
             # Görev 221: the attribute may be wrapped onto the next line (\s+), which previously left it untranslated.
             text = re.sub(r'(<meta name="description"\s+content=")[^"]*(")',
                           lambda m: m[1] + html.escape(lookup(messages, locale, description_key), quote=True) + m[2],
@@ -277,22 +280,27 @@ def render_page(text, locale, surface, messages, config, work=None, profile="pre
         elif surface == "work":
             text = replace_once(text, "Eser | Müzik Dünyam | Ünal Büyüksungur",
                                 ("Work | My Music" if locale == "en" else "Werk | Meine Musik") + " | Ünal Büyüksungur")
-        # Görev 221: blog/ and privacy/ are Turkish-only pages; EN/DE pages link to the Turkish ones.
+        # Görev 221: blog/ is Turkish-only; EN/DE pages link to the Turkish one.
+        # Görev 231: privacy/ is localized, so EN/DE pages link to their own privacy page (no rewrite).
+        # Görev 231: shared header submenu assets (site-nav.css/js) live at the site root.
         changes = {
             "home": {"images/": "../images/", "external-links.js": "../external-links.js",
-                     "i18n/": "../i18n/", "blog/": "../blog/", "privacy/": "../privacy/",
+                     "i18n/": "../i18n/", "blog/": "../blog/", "site-nav.": "../site-nav.",
                      "music/images/": "../music/images/"},
             "catalog": {"catalog.css": "../../music/catalog.css", "catalog.js": "../../music/catalog.js",
                         "../images/": "../../images/", "../external-links.js": "../../external-links.js",
-                        "../i18n/": "../../i18n/", "../privacy/": "../../privacy/"},
+                        "../i18n/": "../../i18n/", "../site-nav.": "../../site-nav."},
             "work": {"../catalog.css": "../../../music/catalog.css", "work.css": "../../../music/work/work.css",
                       "work.js": "../../../music/work/work.js", "../../external-links.js": "../../../external-links.js",
                       "../../images/": "../../../images/", "../../i18n/": "../../../i18n/",
-                      "../../privacy/": "../../../privacy/"},
+                      "../../site-nav.": "../../../site-nav."},
             "studio": {"../music/catalog.css": "../../music/catalog.css",
                        "studio.css": "../../studio/studio.css", "../images/": "../../images/",
-                       "../i18n/": "../../i18n/", "../privacy/": "../../privacy/",
+                       "../i18n/": "../../i18n/", "../site-nav.": "../../site-nav.",
                        "../external-links.js": "../../external-links.js", "../yasal/": "../../yasal/"},
+            "privacy": {"../music/catalog.css": "../../music/catalog.css", "../blog/": "../../blog/",
+                        "../images/": "../../images/", "../i18n/": "../../i18n/", "../site-nav.": "../../site-nav.",
+                        "../external-links.js": "../../external-links.js"},
         }[surface]
 
         def asset(m):

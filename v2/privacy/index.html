@@ -10,7 +10,10 @@
     <meta property="og:locale" content="tr_TR">
     <link rel="stylesheet" href="../music/catalog.css">
     <link rel="stylesheet" href="../blog/blog.css">
+    <link rel="stylesheet" href="../i18n/selector.css">
     <script>document.documentElement.classList.add("js");</script>
+    <script src="../i18n/runtime.js" defer></script>
+    <link rel="stylesheet" href="../site-nav.css">
 </head>
 
 <body>
@@ -23,12 +26,24 @@
         <nav class="site-nav" id="site-nav" aria-label="Ana menü">
             <ul class="nav-list">
                 <li><a href="../music/">Müzik</a></li>
-                <li><a href="../studio/">Müzik Stüdyosu</a></li>
+                <li class="nav-has-sub">
+                    <a class="nav-sub-trigger" aria-haspopup="true" aria-expanded="false" aria-controls="studio-submenu"
+                        href="../studio/">Müzik Stüdyosu</a>
+                    <div class="nav-sub" id="studio-submenu">
+                        <a class="nav-sub-btn" href="../studio/"><svg class="nav-sub-icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></g></svg><span>ŞARKI</span></a>
+                        <span class="nav-sub-btn is-disabled" role="link" aria-disabled="true"><svg class="nav-sub-icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="10" width="18" height="10" rx="1.5"/><path d="M3 10l1.2-4.6 16-.4L21 10"/><path d="M8.2 5.2 6.8 10M13.4 5.1 12 10M18.4 5 17 10"/></g></svg><span>VİDEO</span><small class="nav-sub-soon">YAKINDA</small></span>
+                    </div>
+                </li>
                 <li><a href="../#projeler">Dijital Projeler</a></li>
                 <li><a href="../#yazilar">Yazılar</a></li>
                 <li><a href="../#magaza">Mağaza</a></li>
                 <li><a href="../#hakkimda">Hakkımda</a></li>
             </ul>
+        </nav>
+        <nav class="language-switcher" aria-label="Site dili">
+            <a data-locale="tr" href="./" hreflang="tr" lang="tr" aria-label="Türkçe" aria-current="true">TR</a>
+            <a data-locale="en" href="../en/privacy/" hreflang="en" lang="en" aria-label="English">EN</a>
+            <a data-locale="de" href="../de/privacy/" hreflang="de" lang="de" aria-label="Deutsch">DE</a>
         </nav>
     </header>
     <main id="icerik" class="blog-main">
@@ -40,24 +55,10 @@
                 (youtube-nocookie.com) yüklenir. Perspective sayfası yazı tiplerini Google Fonts'tan yükler. Gömülü
                 YouTube içerikleri ve dış bağlantılar (Spotify, Apple Music, Instagram, Shopier, Etsy, Blogspot vb.)
                 kendi gizlilik politikalarına tabidir.</p>
+            <h2>İletişim</h2>
             <p>İletişim için <a data-external-link="instagram" data-external-label="Instagram profilini aç">Instagram</a>
-                veya <a data-external-link="linkedin" data-external-label="LinkedIn profilini aç">LinkedIn</a> üzerinden
-                ulaşabilirsiniz.</p>
-
-            <h2 lang="en">Privacy</h2>
-            <p lang="en">This site has no forms that collect personal data and uses no cookies or analytics. Your
-                language preference is stored only in your browser (localStorage). Videos load from YouTube's
-                privacy-enhanced player (youtube-nocookie.com) when you press play; the Perspective page loads fonts
-                from Google Fonts. Embedded YouTube content and external links are subject to their own privacy
-                policies. You can reach me on Instagram or LinkedIn.</p>
-
-            <h2 lang="de">Datenschutz</h2>
-            <p lang="de">Diese Website enthält keine Formulare, die personenbezogene Daten erfassen, und verwendet
-                keine Cookies oder Analysedienste. Ihre Spracheinstellung wird nur in Ihrem Browser (localStorage)
-                gespeichert. Videos werden erst beim Abspielen über den datenschutzfreundlichen YouTube-Player
-                (youtube-nocookie.com) geladen; die Perspective-Seite lädt Schriften von Google Fonts. Für eingebettete
-                YouTube-Inhalte und externe Links gelten deren eigene Datenschutzrichtlinien. Kontakt über Instagram
-                oder LinkedIn.</p>
+                üzerinden ya da <a href="mailto:destek@unalbuyuksungur.com">destek@unalbuyuksungur.com</a>
+                adresinden ulaşabilirsiniz.</p>
         </article>
     </main>
     <footer class="site-footer">
@@ -84,6 +85,7 @@
             onScroll();
         })();
     </script>
+    <script src="../site-nav.js"></script>
 </body>
 
 </html>

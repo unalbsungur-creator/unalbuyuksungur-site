@@ -94,7 +94,8 @@ class ExternalLinksTests(unittest.TestCase):
             self.assertIn(f'href="{PURCHASE[key]}"', anchor)
             self.assertIn('target="_blank"', anchor)
             self.assertIn('rel="noopener noreferrer"', anchor)
-        self.assertNotRegex(studio, r"\bdisabled\b|aria-disabled|data-purchase-off")  # pasif durum kalmadı
+        main = studio.split("<main", 1)[1].split("</main>", 1)[0]  # Görev 231: header'daki pasif "Video" hariç
+        self.assertNotRegex(main, r"\bdisabled\b|aria-disabled|data-purchase-off")  # pasif durum kalmadı
         self.assertNotRegex(SOURCE.lower() + studio.lower(), r"bookings|outlook\.(office|live)")
 
     def test_preserved_catalog_invariants(self):

@@ -2,6 +2,7 @@
 
 import json
 import html
+import posixpath
 import re
 import shutil
 import subprocess
@@ -14,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[3]
 CATALOG = json.loads((ROOT / "v2/music/data/catalog.json").read_text(encoding="utf-8"))
 SOURCES = {p: (ROOT / p).read_bytes() for p in (
     "v2/index.html", "v2/music/index.html", "v2/music/work/index.html", "v2/studio/index.html",
-    "v2/i18n/config.json", "v2/i18n/tr.json", "v2/i18n/en.json", "v2/i18n/de.json", *render_site.TR_PAGES)}
+    "v2/privacy/index.html", "v2/i18n/config.json", "v2/i18n/tr.json", "v2/i18n/en.json", "v2/i18n/de.json", *render_site.TR_PAGES)}
 # Görev 228: stüdyo Shopier ürünleri (external-links.js ile birebir; test_external_links denetler).
 SHOPIER = {key: "https://www.shopier.com/unalbuyuksungur/" + num for key, num in (
     ("shopierOzelSarki", "52596551"), ("shopierOzelSarkiHaftaSonu", "52596592"),
@@ -49,14 +50,15 @@ class MultilingualTests(unittest.TestCase):
     def test_static_locales_and_metadata(self):
         ids = {w["id"] for w in CATALOG["works"]}
         self.assertEqual(len(ids), 68)
-        # Turkish: 68 works + 3 rendered shells (Görev 220) + 5 Turkish-only pages (Görev 221: blog, posts,
-        # privacy) + 5 draft legal pages (Görev 226); EN/DE: 68 works + 4 shells each.
-        self.assertEqual(len(self.pages), 225)
+        # Turkish: 68 works + 4 rendered shells (Görev 220; privacy since Görev 231) + 4 Turkish-only pages
+        # (Görev 221: blog, posts) + 5 draft legal pages (Görev 226); EN/DE: 68 works + 5 shells each.
+        self.assertEqual(len(self.pages), 227)
         for locale in ("en", "de"):
             home = self.pages[f"v2/{locale}/index.html"].decode("utf-8")
             catalog = self.pages[f"v2/{locale}/music/index.html"].decode("utf-8")
             studio = self.pages[f"v2/{locale}/studio/index.html"].decode("utf-8")
-            for page, route in ((home, ""), (catalog, "music/"), (studio, "studio/")):
+            privacy = self.pages[f"v2/{locale}/privacy/index.html"].decode("utf-8")
+            for page, route in ((home, ""), (catalog, "music/"), (studio, "studio/"), (privacy, "privacy/")):
                 with self.subTest(locale=locale, route=route):
                     self.assertIn(f'<html lang="{locale}">', page)
                     self.assertIn(f'<link rel="canonical" href="{render_site.locale_url(locale, route, "preview")}">', page)
@@ -231,7 +233,8 @@ class MultilingualTests(unittest.TestCase):
                 render_site.FEATURED_WORKS = original
 
     def test_turkish_only_pages_and_links(self):
-        """Görev 221: blog, yazı ve gizlilik sayfaları yalnız TR; EN/DE sayfaları TR sayfalarına bağlanır."""
+        """Görev 221: blog ve yazı sayfaları yalnız TR; EN/DE sayfaları TR sayfalarına bağlanır.
+        Görev 231: gizlilik üç dillidir; EN/DE sayfaları kendi dilindeki gizlilik sayfasına bağlanır."""
         production = render_site.render(CATALOG, SOURCES, "production")
         blog = production["v2/blog/index.html"].decode("utf-8")
         self.assertIn('<link rel="canonical" href="https://unalbuyuksungur.com/blog/">', blog)
@@ -259,17 +262,79 @@ class MultilingualTests(unittest.TestCase):
             home = self.pages[f"v2/{locale}/index.html"].decode("utf-8")
             self.assertIn(note, home)
             self.assertEqual(home.count('href="../blog/#'), 3)
-            self.assertIn('href="../privacy/"', home)
-            self.assertIn('href="../../privacy/"', self.pages[f"v2/{locale}/studio/index.html"].decode("utf-8"))
-            self.assertIn('href="../../../privacy/"',
+            self.assertIn('href="privacy/"', home)
+            self.assertIn('href="../privacy/"', self.pages[f"v2/{locale}/studio/index.html"].decode("utf-8"))
+            self.assertIn('href="../../privacy/"',
                           self.pages[f"v2/{locale}/music/work/w-0001.html"].decode("utf-8"))
         # Menü: Galeri yok, Mağaza var (3 dilde aynı sıra).
         for source in ("v2/index.html", "v2/music/index.html", "v2/music/work/index.html", "v2/studio/index.html",
-                       *render_site.TR_PAGES):
+                       "v2/privacy/index.html", *render_site.TR_PAGES):
             nav = SOURCES[source].decode("utf-8").split('<ul class="nav-list">', 1)[1].split("</ul>", 1)[0]
             visible = re.sub(r"<!--.*?-->", "", nav, flags=re.S)
             self.assertEqual(re.findall(r">([^<]+)</a>", visible),
                              ["Müzik", "Müzik Stüdyosu", "Dijital Projeler", "Yazılar", "Mağaza", "Hakkımda"], source)
+
+    def test_privacy_page_single_language_and_contact(self):
+        """Görev 231: gizlilik sayfası her dilde tek dil (önceden TR sayfanın sonunda sabit EN/DE bölümler vardı);
+        LinkedIn yok, iletişimde Instagram ve destek e-postası var."""
+        foreign = {"tr": (r"Datenschutz", r"Kontakt", r"\bSie\b", r"Privacy", r"\bContact\b", r"You can"),
+                   "en": (r"Gizlilik", r"İletişim", r"ulaşabilirsiniz", r"Datenschutz", r"Kontakt", r"\bSie\b"),
+                   "de": (r"Gizlilik", r"İletişim", r"ulaşabilirsiniz", r"Privacy", r"\bContact\b", r"You can")}
+        contact = {"tr": "İletişim için Instagram üzerinden ya da destek@unalbuyuksungur.com adresinden ulaşabilirsiniz.",
+                   "en": "You can reach me on Instagram or at destek@unalbuyuksungur.com.",
+                   "de": "Sie erreichen mich über Instagram oder unter destek@unalbuyuksungur.com."}
+        self.assertNotIn("linkedin", SOURCES["v2/privacy/index.html"].decode("utf-8").lower())
+        for locale, words in foreign.items():
+            with self.subTest(locale=locale):
+                page = self.pages[f"v2/{'' if locale == 'tr' else locale + '/'}privacy/index.html"].decode("utf-8")
+                self.assertIn(f'<html lang="{locale}">', page)
+                article = page.split('<article class="post privacy">', 1)[1].split("</article>", 1)[0]
+                self.assertNotRegex(article, r"\slang=")  # dile özel gömülü bölüm yok
+                for word in words:
+                    self.assertNotRegex(page, word)
+                self.assertNotIn("linkedin", page.lower())
+                self.assertIn('href="mailto:destek@unalbuyuksungur.com"', article)
+                self.assertIn('data-external-link="instagram"', article)
+                last = html.unescape(re.sub(r"<[^>]+>", "", article.rsplit("<p>", 1)[1]))
+                self.assertEqual(" ".join(last.split()), contact[locale])
+
+    def test_studio_submenu_in_every_header(self):
+        """Görev 231: her header'da Müzik Stüdyosu alt paneli; Şarkı stüdyoya gider, Video pasif ("Yakında")."""
+        labels = {"tr": ("ŞARKI", "VİDEO", "YAKINDA"), "en": ("SONG", "VIDEO", "SOON"), "de": ("SONG", "VIDEO", "BALD")}
+        pages = {rel: data.decode("utf-8") for rel, data in self.pages.items()}
+        pages["v2/music/work/index.html"] = SOURCES["v2/music/work/index.html"].decode("utf-8")  # kopyalanan şablon
+        for rel, page in pages.items():
+            locale = rel.split("/")[1] if rel.split("/")[1] in ("en", "de") else "tr"
+            with self.subTest(rel=rel):
+                blocks = re.findall(r'<li class="nav-has-sub">(.*?)</li>', page, re.S)
+                self.assertEqual(len(blocks), 1)
+                block, base = blocks[0], posixpath.dirname(rel)
+                trigger = re.search(r'<a class="nav-sub-trigger" aria-haspopup="true" aria-expanded="false" '
+                                    r'aria-controls="studio-submenu"\s+href="([^"]*)"', block)
+                song = re.search(r'<a class="nav-sub-btn( is-active)?" href="([^"]*)"[^>]*><svg [^>]*>.*?</svg>'
+                                 r'<span>([^<]+)</span></a>', block, re.S)
+                video = re.search(r'<span class="nav-sub-btn is-disabled" role="link" aria-disabled="true"><svg [^>]*>'
+                                  r'.*?</svg><span>([^<]+)</span><small class="nav-sub-soon">([^<]+)</small></span>',
+                                  block, re.S)
+                self.assertTrue(trigger and song and video, block)
+                self.assertEqual(song[2], trigger[1])
+                self.assertEqual(posixpath.normpath(posixpath.join(base, song[2])),
+                                 "v2/studio" if locale == "tr" else f"v2/{locale}/studio")
+                self.assertEqual(bool(song[1]), "/studio/" in rel)  # stüdyo sayfasında dolu altın (aktif)
+                self.assertEqual((song[3], video[1], video[2]), labels[locale])
+                self.assertNotIn("href", video[0])
+                for pattern, target in ((r'<link rel="stylesheet" href="([^"]*site-nav\.css)">', "v2/site-nav.css"),
+                                        (r'<script src="([^"]*site-nav\.js)"></script>', "v2/site-nav.js")):
+                    asset = re.search(pattern, page)
+                    self.assertTrue(asset)
+                    self.assertEqual(posixpath.normpath(posixpath.join(base, asset[1])), target)
+        script = (ROOT / "v2/site-nav.js").read_text(encoding="utf-8")
+        self.assertIn('event.key === "Escape"', script)
+        self.assertIn('setAttribute("aria-expanded"', script)
+        self.assertIn('event.pointerType === "touch"', script)
+        css = (ROOT / "v2/site-nav.css").read_text(encoding="utf-8")
+        self.assertIn(".nav-has-sub:focus-within > .nav-sub", css)
+        self.assertIn(".nav-has-sub:hover > .nav-sub", css)
 
     def test_studio_navigation_and_responsive_styles(self):
         for locale in ("tr", "en", "de"):
