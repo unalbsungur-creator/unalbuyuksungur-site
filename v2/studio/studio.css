@@ -133,6 +133,11 @@
     color: var(--muted);
 }
 
+.studio-notify p a {
+    color: var(--gold);
+    text-underline-offset: 3px;
+}
+
 .studio-notify-link {
     display: inline-flex;
     align-items: center;

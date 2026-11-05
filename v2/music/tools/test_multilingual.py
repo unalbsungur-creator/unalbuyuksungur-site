@@ -155,8 +155,18 @@ class MultilingualTests(unittest.TestCase):
                 text = " ".join(html.unescape(studio).split())
                 for key in ("studio.status", "studio.service.song", "studio.service.video", "studio.priceNote",
                             "studio.inc1", "studio.inc2", "studio.inc3", "studio.exc1", "studio.exc2", "studio.exc3",
-                            "studio.usageText", "studio.notifyText", "studio.notifyCta"):
+                            "studio.usageText", "studio.notify", "studio.notifyText", "studio.notifyText2",
+                            "studio.notifyCta"):
                     self.assertIn(m[key], text, key)
+                # Görev 229: iletişim kutusu (mailto + Instagram anahtarı); açılış öncesi ifadeler kalmadı.
+                self.assertIn(f'<a href="mailto:destek@unalbuyuksungur.com">destek@unalbuyuksungur.com</a>', studio)
+                self.assertIn('data-external-link="instagram"', studio)
+                rendered_text = rendered.decode("utf-8").lower()
+                self.assertNotRegex(rendered_text, r"çok yakında|sipariş açılışından|very soon|when orders open"
+                                                   r"|sehr bald|besteller")
+                for attr in ('name="description"', 'property="og:description"', 'name="twitter:description"'):
+                    self.assertIn(f'<meta {attr} content="{html.escape(m["studio.meta"], quote=True)}">',
+                                  rendered.decode("utf-8"), attr)
                 # Görev 227: eski START/PLUS/PREMIUM ve "MP3 teslim (mümkünse WAV)" kalktı; form, ödeme sayfası,
                 # e-posta alanı veya iframe yok. Görev 228: sayfadaki Shopier adresleri yalnız dört ürün bağlantısı.
                 self.assertNotRegex(text, r"\bSTART\b|\bPREMIUM\b|mümkünse WAV|WAV where possible|acil tarife")
