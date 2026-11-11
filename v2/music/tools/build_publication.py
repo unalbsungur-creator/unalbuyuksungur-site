@@ -91,6 +91,8 @@ SITE_FILES = (
     "v2/music/work/work.js",
     "v2/studio/index.html",
     "v2/studio/studio.css",
+    # Görev 239: stüdyo yorumları — yalnız build girdisi (sayfaya işlenir, ayrı dosya olarak yayımlanmaz)
+    "v2/studio/reviews.json",
     "v2/perspective/index.html",
     "v2/perspective/style.css",
     "v2/perspective/script.js",
@@ -118,6 +120,12 @@ SITE_FILES = (
 RENDERED_SHELLS = ("v2/index.html", "v2/music/index.html", "v2/studio/index.html", "v2/privacy/index.html")
 # Görev 221: yalnız Türkçe sayfalar da kopyalanmaz; canonical/OG etiketleriyle üretilir.
 RENDERED_PAGES = RENDERED_SHELLS + tuple(render_site.TR_PAGES)
+# Görev 239: yalnız build girdisi olan dosyalar (sayfalara işlenir, pakete kopyalanmaz).
+BUILD_INPUTS = (render_site.REVIEWS,)
+# Görev 239: önbellek sürümleme — HTML'deki yerel .js/.css adreslerine içerik SHA-256'sının ilk 10 hanesi
+# (?v=...) eklenir; dosya değişmezse parametre de değişmez. Dış adresler (şema içeren) dokunulmaz.
+ASSET_REF = re.compile(r'\b(src|href)="([^"?#:]+\.(?:js|css))"')
+VERSION_LENGTH = 10
 # 404 sayfası her adresten sunulur; kök-mutlak bağlantıya yalnız bu sayfada izin verilir.
 NOT_FOUND = "v2/404.html"
 # V1 görselleri: v2/legacy/v1-images/ altındaki kopyalar, pakette images/ altına aynı adlarla yazılır.
@@ -267,7 +275,7 @@ def load_catalog(root):
 
 def plan(root, catalog):
     """Allowlist: {depo göreli yol: (beklenen SHA-256, bayt) ya da None}. Katalog yolları kalıplarla sınırlıdır."""
-    files = {rel: None for rel in SITE_FILES if rel not in RENDERED_PAGES}
+    files = {rel: None for rel in SITE_FILES if rel not in RENDERED_PAGES and rel not in BUILD_INPUTS}
     files[CATALOG] = None
     legacy = root / LEGACY_IMAGES
     if not legacy.is_dir():
@@ -393,6 +401,17 @@ def check_references(files, read):
     return count
 
 
+def version_assets(rel, data, digests):
+    """Görev 239: HTML'deki yerel .js/.css src/href değerlerine ?v=<içerik hash'i> ekler (digests: depo yolu -> SHA-256)."""
+    def versioned(m):
+        target = resolve_ref(rel, m.group(2))
+        if target not in digests:
+            raise BuildError(f"[ASSET-VERSION] {rel}: {m.group(2)} -> {target} pakette yok")
+        return f'{m.group(1)}="{m.group(2)}?v={digests[target][:VERSION_LENGTH]}"'
+
+    return ASSET_REF.sub(versioned, data.decode("utf-8")).encode("utf-8")
+
+
 def safe_out(root, out):
     if out.is_absolute() or ".." in out.parts or not out.parts:
         raise BuildError(f"[OUT-PATH] --out depo kökü altında göreli bir klasör olmalı: {out}")
@@ -430,6 +449,8 @@ def build(root, out, expect_count=None, manifest_path=None, log=print, profile="
     catalog = load_catalog(root)
     files = plan(root, catalog)
     pages, template_digest = render(root, catalog, files, profile)
+    digests = {rel: sha256(checked_source(root, rel)) for rel in files if rel.endswith((".js", ".css"))}
+    pages = {rel: version_assets(rel, data, digests) for rel, data in pages.items()}
     extra_files = generated(profile, pages)
     if profile == "production":
         for path, hits in placeholders(pages).items():
@@ -450,6 +471,9 @@ def build(root, out, expect_count=None, manifest_path=None, log=print, profile="
             expected = files[rel]
             if expected and (expected[0] != digest or expected[1] not in (None, len(data))):
                 raise BuildError(f"[HASH-EXPECTED] {rel}: onaylı SHA-256/bayt değeriyle uyuşmuyor")
+            if rel.endswith(".html"):  # Görev 239: kopyalanan HTML'de de JS/CSS adresleri sürümlenir
+                data = version_assets(rel, data, digests)
+                digest = sha256(data)
             if FORBIDDEN_OUTPUT.search(rel):
                 raise BuildError(f"[OUT-FORBIDDEN] yasak dosya allowlist'te: {rel}")
             path = published_path(rel)

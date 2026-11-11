@@ -68,7 +68,9 @@ class ExternalLinksTests(unittest.TestCase):
             self.assertRegex(catalog, rf'<a class="platform-link" data-external-link="{key}"')
         self.assertRegex(home, r'id="yazilar"[\s\S]*?data-external-link="blog"')
         self.assertRegex(home, r'id="magaza"[\s\S]*?data-external-link="shopier"[\s\S]*?data-external-link="etsy"')
-        self.assertNotRegex(home.lower(), r"mailto:|tel:|iletişim formu")
+        self.assertNotRegex(home.lower(), r"tel:|iletişim formu")
+        # Görev 239: e-posta yalnız footer'da (site geneli iletişim satırı).
+        self.assertEqual(re.findall(r"mailto:[^\"]*", home.split("<footer", 1)[0]), [])
 
     def test_runtime_applies_external_link_security_and_accessible_names(self):
         self.assertIn('anchor.target = "_blank"', SOURCE)

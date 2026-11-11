@@ -46,12 +46,18 @@ HEADERS_BEFORE = ("# build_publication.py tarafından üretildi; elle düzenleme
 
 def expected_web_files():
     """Allowlist, oluşturucudan bağımsız olarak yeniden hesaplanır."""
-    files = (set(bp.SITE_FILES) - set(bp.RENDERED_PAGES)) | {bp.CATALOG, bp.MUSIC + "data/schema.json"}
+    files = (set(bp.SITE_FILES) - set(bp.RENDERED_PAGES) - set(bp.BUILD_INPUTS)) | {bp.CATALOG,
+                                                                                   bp.MUSIC + "data/schema.json"}
     files |= {bp.LEGACY_IMAGES + name for name in bp.LEGACY_V1_IMAGES}
     for work in CATALOG["works"]:
         files |= {bp.MUSIC + work[k]["file"] for k in ("lyrics", "story") if work[k]["status"] == "published"}
     files |= {bp.MUSIC + i["path"] for c in CATALOG["covers"] for i in c["webImages"]}
     return files
+
+
+def unversioned(data):
+    """Görev 239: kopyalanan HTML'de yalnız yerel .js/.css adreslerine ?v= eklenir; geri kalan baytlar aynıdır."""
+    return re.sub(rb'(\.(?:js|css))\?v=[0-9a-f]{10}"', rb'\1"', data)
 
 
 def published(paths):
@@ -167,14 +173,36 @@ class BuildPublicationTests(unittest.TestCase):
         for entry in manifest["files"]:
             source = (REPO / entry["source"]).read_bytes()
             self.assertEqual(entry["path"], bp.published_path(entry["source"]))
-            self.assertEqual(tree[entry["path"]], source, entry["path"])
-            self.assertEqual(bp.sha256(source), entry["sha256"])
-        self.assertEqual(tree["music/work/index.html"], (REPO / "v2/music/work/index.html").read_bytes())
+            output = unversioned(tree[entry["path"]]) if entry["path"].endswith(".html") else tree[entry["path"]]
+            self.assertEqual(output, source, entry["path"])
+            self.assertEqual(bp.sha256(tree[entry["path"]]), entry["sha256"])
+        self.assertEqual(unversioned(tree["music/work/index.html"]), (REPO / "v2/music/work/index.html").read_bytes())
         # V1 görselleri ve Perspective aynı adlarla, bayt bayt (kök images/ ile aynı).
         for name in bp.LEGACY_V1_IMAGES:
             self.assertEqual(tree["images/" + name], (REPO / "images" / name).read_bytes(), name)
         for name in ("index.html", "style.css", "script.js"):
-            self.assertEqual(tree["perspective/" + name], (REPO / "v2/perspective" / name).read_bytes())
+            output = tree["perspective/" + name]
+            self.assertEqual(unversioned(output) if name.endswith(".html") else output,
+                             (REPO / "v2/perspective" / name).read_bytes())
+
+    def test_local_js_css_references_are_versioned(self):
+        """Görev 239: üretilen ve kopyalanan her HTML'de yerel .js/.css adresinde ?v=<içerik SHA-256'sının ilk 10 hanesi>."""
+        self.build()
+        tree = self.tree()
+        checked = 0
+        for path, data in tree.items():
+            if not path.endswith(".html"):
+                continue
+            for ref in re.findall(r'\b(?:src|href)="([^"]*\.(?:js|css)(?:\?[^"]*)?)"', data.decode("utf-8")):
+                if re.match(r"^[a-z]+:", ref):
+                    continue
+                match = re.fullmatch(r"(.+)\?v=([0-9a-f]{10})", ref)
+                self.assertIsNotNone(match, f"{path}: {ref}")
+                target = bp.resolve_ref("v2/" + path, match[1])
+                self.assertEqual(match[2], bp.sha256(tree[bp.published_path(target)])[:10], f"{path}: {ref}")
+                checked += 1
+        self.assertGreater(checked, 1000)
+        self.assertNotIn("studio/reviews.json", tree)  # yalnız build girdisi
 
     def test_rendered_pages_in_manifest(self):
         manifest = self.build()

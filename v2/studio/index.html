@@ -72,6 +72,17 @@
                 <li>Seçtiğin nihai şarkı paketine uygun formatta teslim edilir.</li>
             </ol>
         </section>
+        <section class="studio-section studio-samples" aria-labelledby="studio-samples">
+            <h2 id="studio-samples">Örnek dinle</h2>
+            <p>Önceki çalışmalarımdan birkaçı.</p>
+            <ul class="sample-grid">
+                <!-- STUDIO_SAMPLES -->
+            </ul>
+            <ul class="sample-more">
+                <li><a href="../music/?koleksiyon=burc-serisi">12 Burç koleksiyonunun tamamı →</a></li>
+                <li><a href="../music/?koleksiyon=ozel-gun-sarkilari">Özel Gün Şarkıları →</a></li>
+            </ul>
+        </section>
         <section class="studio-section" aria-labelledby="studio-packages">
             <h2 id="studio-packages">Paketler</h2>
             <div class="studio-grid">
@@ -145,6 +156,7 @@
             <a class="studio-notify-link" data-external-link="instagram"
                 data-external-label="Instagram'dan yaz">Instagram'dan yaz</a>
         </section>
+        <!-- STUDIO_REVIEWS -->
         <section class="studio-section studio-faq" aria-labelledby="studio-faq">
             <h2 id="studio-faq">Sık Sorulanlar</h2>
             <div class="faq-list">
@@ -261,7 +273,7 @@
     </main>
     <footer class="site-footer">
         <div class="footer-inner"><span>© Ünal Büyüksungur · Digital World · <a class="footer-privacy"
-                    href="../privacy/">Gizlilik</a> · <a class="footer-privacy"
+                    href="../privacy/">Gizlilik</a> · <a class="footer-privacy" href="mailto:destek@unalbuyuksungur.com">destek@unalbuyuksungur.com</a> · <a class="footer-privacy" data-external-link="instagram" data-external-label="Instagram profilini aç">Instagram</a> · <a class="footer-privacy"
                     href="../yasal/hizmet-kosullari/">Yasal metinler</a></span></div>
     </footer>
     <script src="../external-links.js"></script>
@@ -283,6 +295,24 @@
             window.addEventListener("scroll", onScroll, { passive: true });
             onScroll();
         })();
+    </script>
+    <script>
+        // Görev 239: "Örnek dinle" kartları — sayfa açılışında YouTube'a istek gitmez; oynatıcı tıklayınca yüklenir.
+        document.querySelectorAll(".sample-play[data-video-id]").forEach(function (button) {
+            button.addEventListener("click", function () {
+                var id = button.getAttribute("data-video-id");
+                if (!/^[A-Za-z0-9_-]{11}$/.test(id)) return;
+                var frame = document.createElement("iframe");
+                frame.src = "https://www.youtube-nocookie.com/embed/" + id + "?autoplay=1&rel=0&playsinline=1";
+                frame.title = button.getAttribute("data-video-title");
+                frame.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share";
+                frame.referrerPolicy = "strict-origin-when-cross-origin";
+                frame.allowFullscreen = true;
+                button.parentNode.classList.add("is-playing");
+                button.parentNode.replaceChild(frame, button);
+                frame.focus();
+            });
+        });
     </script>
     <script src="../site-nav.js"></script>
 </body>

@@ -28,6 +28,16 @@ BLOG_POSTS = {
 }
 # Görev 224: ana sayfa Müzik vitrininde öne çıkan eserler (eser kimliğiyle; sıra korunur).
 FEATURED_WORKS = ("w-0023", "w-0013", "w-0014", "w-0016")  # Çat Çat Çat, Benimle Yaşlanacaktın, Biliyorum, Bir Kedim Var
+# Görev 239: stüdyo "Örnek dinle" eserleri — başlık ve koleksiyon slug'ıyla bulunur (sıra korunur). Bulunamazsa build durur.
+STUDIO_SAMPLES = (("Bugün Benim Doğum Günüm", "ozel-gun-sarkilari"), ("Mutlu Yıllar", "ozel-gun-sarkilari"),
+                  ("Koç", "burc-serisi"), ("Boğa", "burc-serisi"))
+SAMPLE_LINKS = (("spotify", "music.spotifyListen"), ("appleMusic", "music.appleListen"),
+                ("youtubeMusic", "music.youtubeMusicListen"), ("youtube", "music.youtubeListen"))
+YOUTUBE_ID = re.compile(r"^[A-Za-z0-9_-]{11}$")
+# Görev 239: stüdyo "Yorumlar" — kaynak v2/studio/reviews.json (dizi). Boşsa bölüm hiç üretilmez.
+REVIEWS = "v2/studio/reviews.json"
+REVIEW_NAME = re.compile(r"^[^\s<>&\d][^<>&\d]{0,40}\s[A-ZÇĞİÖŞÜ]\.$")  # ad + soyadın baş harfi: "Ayşe K."
+REVIEW_DATE = re.compile(r"^(\d{4})-(\d{2})-(\d{2})$")
 TR_PAGES = {"v2/blog/index.html": ("blog/", None)}
 TR_PAGES.update({f"v2/blog/{slug}/index.html": (f"blog/{slug}/", url) for slug, url in BLOG_POSTS.items()})
 # Görev 226: taslak yasal metinler — yalnız TR, kaynakta noindex, sitemap'e girmez (yalnız önizleme).
@@ -211,6 +221,105 @@ def music_showcase(text, catalog, locale, messages):
     return text.replace(marker, "\n".join(cards))
 
 
+def studio_samples(text, catalog, locale, messages):
+    """Görev 239: stüdyo "Örnek dinle" kartları (statik HTML): kapak, başlık, katalogdaki dinleme bağlantıları,
+    YouTube videosu varsa tıkla-yükle oynatıcı ve eser sayfası bağlantısı."""
+    def t(key):
+        return lookup(messages, locale, key)
+
+    def esc(value):
+        return html.escape(value, quote=True)
+
+    collections = {c["slug"]: {m["workId"] for m in c["members"]} for c in catalog["collections"]}
+    covers = {c["id"]: c for c in catalog["covers"]}
+    cards = []
+    for title, slug in STUDIO_SAMPLES:
+        found = [w for w in catalog["works"] if w["title"] == title and w["id"] in collections.get(slug, ())]
+        if len(found) != 1:
+            raise LocaleError(f"[STUDIO-SAMPLES] {title!r} ({slug}) katalogda bulunamadı")
+        work = found[0]
+        recording = render_pages.primary_recording([r for r in catalog["recordings"] if r["workId"] == work["id"]])
+        images = {i["width"]: i["path"] for i in covers[recording["coverId"]]["webImages"]}
+        href = f"../music/work/{work['id']}.html"
+        image = (f'<img src="../music/{images[400]}" srcset="../music/{images[400]} 400w, ../music/{images[800]} 800w" '
+                 f'sizes="(max-width: 640px) 90vw, 300px" width="400" height="400" loading="lazy" decoding="async" '
+                 f'alt="{esc(work["title"] + " " + t("music.cover"))}">')
+        video = next((v for v in recording.get("videos") or [] if v.get("provider") == "youtube"
+                      and YOUTUBE_ID.fullmatch(v.get("videoId") or "")), None)
+        links = []
+        for key, label in SAMPLE_LINKS:
+            url = (recording.get("links") or {}).get(key)
+            if isinstance(url, str) and url.startswith("https://"):
+                links.append((url, t(label)))
+        if video:
+            name = work["title"] + " — " + t("music.video")
+            media = (f'<button class="sample-play" type="button" data-video-id="{video["videoId"]}" '
+                     f'data-video-title="{esc(name + " (YouTube)")}" '
+                     f'aria-label="{esc(t("music.play") + ": " + name + " (YouTube" + t("music.playerLoads") + ")")}">'
+                     f'{image}<span class="sample-play-icon" aria-hidden="true"></span></button>')
+            links.append(("https://www.youtube.com/watch?v=" + video["videoId"], t("music.youtubeWatch")))
+        else:
+            media = f'<a href="{href}" tabindex="-1" aria-hidden="true">{image}</a>'
+        listen = "".join(f'<li><a href="{esc(url)}" target="_blank" rel="noopener noreferrer">'
+                         f'{html.escape(label, quote=False)}'
+                         f'<span class="visually-hidden">{html.escape(t("music.newTab"), quote=False)}</span></a></li>'
+                         for url, label in links)
+        cards.append(f'                <li class="sample-card"><div class="sample-media">{media}</div>'
+                     f'<h3 class="sample-title"><a href="{href}">{html.escape(work["title"], quote=False)}</a></h3>'
+                     f'<ul class="sample-links">{listen}'
+                     f'<li><a href="{href}">{html.escape(t("studio.samplesWork"), quote=False)}</a></li></ul></li>')
+    newline = "\r\n" if "\r\n" in text else "\n"
+    return replace_once(text, "                <!-- STUDIO_SAMPLES -->", newline.join(cards))
+
+
+def load_reviews(data):
+    """Görev 239: reviews.json'u doğrular. Alanlar: name, text, package, date (YYYY-MM-DD), promo (bool), lang."""
+    try:
+        reviews = json.loads(data.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise LocaleError(f"[STUDIO-REVIEWS] reviews.json okunamadı: {exc}") from None
+    if not isinstance(reviews, list):
+        raise LocaleError("[STUDIO-REVIEWS] reviews.json bir dizi olmalı")
+    fields = {"name", "text", "package", "date", "promo", "lang"}
+    for i, review in enumerate(reviews):
+        if not isinstance(review, dict) or set(review) != fields:
+            raise LocaleError(f"[STUDIO-REVIEWS] #{i}: alanlar tam olarak {sorted(fields)} olmalı")
+        if not isinstance(review["name"], str) or not REVIEW_NAME.fullmatch(review["name"]):
+            raise LocaleError(f"[STUDIO-REVIEWS] #{i}: name 'Ad S.' biçiminde olmalı (ad + soyadın baş harfi)")
+        for key in ("text", "package"):
+            if not isinstance(review[key], str) or not review[key].strip():
+                raise LocaleError(f"[STUDIO-REVIEWS] #{i}: {key} boş olamaz")
+        if not isinstance(review["date"], str) or not REVIEW_DATE.fullmatch(review["date"]):
+            raise LocaleError(f"[STUDIO-REVIEWS] #{i}: date YYYY-MM-DD olmalı")
+        if not isinstance(review["promo"], bool) or review["lang"] not in ("tr", "en", "de"):
+            raise LocaleError(f"[STUDIO-REVIEWS] #{i}: promo true/false, lang tr/en/de olmalı")
+    return reviews
+
+
+def studio_reviews(text, reviews, locale, messages):
+    """Görev 239: "Yorumlar" bölümü SSS'den hemen önce; yorum yoksa bölüm (ve işaretçi) hiç yer almaz."""
+    marker = "        <!-- STUDIO_REVIEWS -->"
+    newline = "\r\n" if "\r\n" in text else "\n"
+    if not reviews:
+        return replace_once(text, marker + newline, "")
+    items = []
+    for review in reviews:
+        year, month, day = REVIEW_DATE.fullmatch(review["date"]).groups()
+        badge = (' <span class="review-badge">' + html.escape(lookup(messages, locale, "studio.reviewPromo"), quote=False)
+                 + "</span>") if review["promo"] else ""
+        items.append(f'                <li class="review"><blockquote lang="{review["lang"]}"><p>'
+                     f'{html.escape(review["text"].strip(), quote=False)}</p></blockquote>'
+                     f'<p class="review-meta"><span class="review-name">{html.escape(review["name"], quote=False)}</span>'
+                     f' · {html.escape(review["package"], quote=False)} · '
+                     f'<time datetime="{review["date"]}">{day}.{month}.{year}</time>{badge}</p></li>')
+    section = newline.join([
+        '        <section class="studio-section studio-reviews" aria-labelledby="studio-reviews">',
+        '            <h2 id="studio-reviews">' + html.escape(lookup(messages, locale, "studio.reviews"), quote=False)
+        + "</h2>",
+        '            <ul class="review-list">', *items, "            </ul>", "        </section>"])
+    return replace_once(text, marker, section)
+
+
 def studio_orders_closed(text):
     """Görev 232: kaynak (TR) stüdyo sayfasında satın alma bağlantılarını pasifleştirir ve not ekler."""
     text, count = BUY_LINK.subn(lambda m: f'<span class="{m["cls"]} is-soon" role="link" aria-disabled="true" '
@@ -247,12 +356,16 @@ def relative_route(source, locale, route):
 
 
 def render_page(text, locale, surface, messages, config, work=None, profile="preview", catalog=None,
-                orders_open=None):
+                orders_open=None, reviews=None):
     """Localize a source HTML document while keeping stable catalog facts and shared assets."""
     original, route = SURFACES[surface]
     orders_open = STUDIO_ORDERS_OPEN if orders_open is None else orders_open
     if surface == "studio" and not orders_open:
         text = studio_orders_closed(text)
+    if surface == "studio":
+        if catalog is None:
+            raise LocaleError("[STUDIO-SAMPLES] the studio page needs the catalog")
+        text = studio_samples(text, catalog, locale, messages)
     if surface == "home":
         if catalog is None:
             raise LocaleError("[HOME-FEATURED] the home page needs the catalog")
@@ -338,6 +451,7 @@ def render_page(text, locale, surface, messages, config, work=None, profile="pre
                       "../../site-nav.": "../../../site-nav."},
             "studio": {"../music/catalog.css": "../../music/catalog.css",
                        "studio.css": "../../studio/studio.css", "../images/": "../../images/",
+                       "../music/images/": "../../music/images/",
                        "../i18n/": "../../i18n/", "../site-nav.": "../../site-nav.",
                        "../external-links.js": "../../external-links.js", "../yasal/": "../../yasal/"},
             "privacy": {"../music/catalog.css": "../../music/catalog.css", "../blog/": "../../blog/",
@@ -396,6 +510,9 @@ def render_page(text, locale, surface, messages, config, work=None, profile="pre
                             f'<link rel="canonical" href="{canonical}">\n' + alternates(seo_route, profile))
     if surface == "studio" and not orders_open:
         text = hide_legal_links(text)  # yerelleştirmeden sonra: SSS cümlesinin çevirisi parçalarla eşleşir
+    if surface == "studio":
+        # yerelleştirmeden sonra: yorum metinleri sözlükle çevrilmez, olduğu gibi kalır
+        text = studio_reviews(text, reviews or [], locale, messages)
     if surface in SHELL_ROUTES:
         text = shell_seo(text, locale, surface, profile, config)
     return text.encode("utf-8")
@@ -405,6 +522,7 @@ def render(catalog, sources, profile="preview", studio_orders_open=None):
     if profile not in render_pages.PROFILES:
         raise LocaleError(f"[I18N-PROFILE] unknown profile: {profile!r}")
     config, messages = load_messages(lambda rel: sources[rel])
+    reviews = load_reviews(sources[REVIEWS])
     tr_pages = render_pages.render_work_pages(catalog, sources[SURFACES["work"][0]], profile)
     works = {w["id"]: w for w in catalog["works"]}
     pages = {}
@@ -418,12 +536,13 @@ def render(catalog, sources, profile="preview", studio_orders_open=None):
     for surface in SHELL_ROUTES:
         source = SURFACES[surface][0]
         pages[source] = render_page(sources[source].decode("utf-8"), "tr", surface, messages, config,
-                                    profile=profile, catalog=catalog, orders_open=studio_orders_open)
+                                    profile=profile, catalog=catalog, orders_open=studio_orders_open,
+                                    reviews=reviews)
     for locale in ("en", "de"):
         for surface, (source, route) in SURFACES.items():
             pages["v2/" + locale + "/" + route] = render_page(
                 sources[source].decode("utf-8"), locale, surface, messages, config, profile=profile,
-                catalog=catalog, orders_open=studio_orders_open)
+                catalog=catalog, orders_open=studio_orders_open, reviews=reviews)
     for rel in TR_PAGES:
         pages[rel] = tr_page_seo(sources[rel].decode("utf-8"), rel, profile).encode("utf-8")
     return pages

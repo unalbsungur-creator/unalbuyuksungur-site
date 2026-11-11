@@ -15,7 +15,8 @@ ROOT = Path(__file__).resolve().parents[3]
 CATALOG = json.loads((ROOT / "v2/music/data/catalog.json").read_text(encoding="utf-8"))
 SOURCES = {p: (ROOT / p).read_bytes() for p in (
     "v2/index.html", "v2/music/index.html", "v2/music/work/index.html", "v2/studio/index.html",
-    "v2/privacy/index.html", "v2/i18n/config.json", "v2/i18n/tr.json", "v2/i18n/en.json", "v2/i18n/de.json", *render_site.TR_PAGES)}
+    "v2/privacy/index.html", "v2/i18n/config.json", "v2/i18n/tr.json", "v2/i18n/en.json", "v2/i18n/de.json",
+    render_site.REVIEWS, *render_site.TR_PAGES)}
 # Görev 228: stüdyo Shopier ürünleri (external-links.js ile birebir; test_external_links denetler).
 SHOPIER = {key: "https://www.shopier.com/unalbuyuksungur/" + num for key, num in (
     ("shopierOzelSarki", "52596551"), ("shopierOzelSarkiHaftaSonu", "52596592"),
@@ -293,6 +294,86 @@ class MultilingualTests(unittest.TestCase):
         for rel in ("v2/music/catalog.js", "v2/music/work/work.js"):
             self.assertIn('tr("music.collection." + collection.slug + ".title", collection.title)',
                           (ROOT / rel).read_text(encoding="utf-8"), rel)
+
+    def test_every_collection_has_translations(self):
+        """Görev 239: üç koleksiyonun adı ve açıklaması EN/DE'de çevrili; TR anahtarı katalogla aynı."""
+        _, messages = render_site.load_messages(SOURCES.__getitem__)
+        expected = {"burc-serisi": ("12 Zodiac Signs", "12 Sternzeichen"),
+                    "ozel-gun-sarkilari": ("Special Occasion Songs", "Lieder für besondere Anlässe"),
+                    "almanca-sarkilar": ("German & English Songs", "Deutsche & englische Songs")}
+        self.assertEqual({c["slug"] for c in CATALOG["collections"]}, set(expected))
+        for collection in CATALOG["collections"]:
+            key = "music.collection." + collection["slug"] + "."
+            self.assertEqual((messages["tr"][key + "title"], messages["tr"][key + "description"]),
+                             (collection["title"], collection["description"]))
+            self.assertEqual((messages["en"][key + "title"], messages["de"][key + "title"]), expected[collection["slug"]])
+            self.assertNotEqual(messages["en"][key + "description"], collection["description"])
+
+    def test_studio_samples(self):
+        """Görev 239: "Örnek dinle" Nasıl çalışır ile Paketler arasında; 4 eser, tıkla-yükle video, eser ve koleksiyon bağlantıları."""
+        _, messages = render_site.load_messages(SOURCES.__getitem__)
+        ids = ["w-0021", "w-0046", "w-0044", "w-0018"]  # Bugün Benim Doğum Günüm, Mutlu Yıllar, Koç, Boğa
+        for locale in ("tr", "en", "de"):
+            page = self.pages["v2/" + ("" if locale == "tr" else locale + "/") + "studio/index.html"].decode("utf-8")
+            with self.subTest(locale=locale):
+                self.assertLess(page.index('id="studio-process"'), page.index('id="studio-samples"'))
+                self.assertLess(page.index('id="studio-samples"'), page.index('id="studio-packages"'))
+                section = page.split('aria-labelledby="studio-samples">', 1)[1].split("</section>", 1)[0]
+                self.assertIn(f'<h2 id="studio-samples">{messages[locale]["studio.samples"]}</h2>', section)
+                self.assertEqual(re.findall(r'<h3 class="sample-title"><a href="\.\./music/work/(w-\d{4})\.html">', section), ids)
+                self.assertEqual(len(re.findall(r'<button class="sample-play" type="button" data-video-id="[\w-]{11}"', section)), 4)
+                self.assertEqual(section.count("https://www.youtube.com/watch?v="), 4)
+                self.assertNotIn("youtube-nocookie", section)  # oynatıcı yalnız tıklayınca (sayfa betiği)
+                self.assertIn('href="../music/?koleksiyon=burc-serisi"', section)
+                self.assertIn('href="../music/?koleksiyon=ozel-gun-sarkilari"', section)
+                self.assertEqual(len(re.findall(r'<img src="(\.\./)+music/images/c-\d{4}-400\.webp"[^>]* alt="[^"]+"', section)), 4)
+        with self.assertRaises(render_site.LocaleError):
+            render_site.studio_samples("<!-- STUDIO_SAMPLES -->", {**CATALOG, "collections": []}, "tr",
+                                       render_site.load_messages(SOURCES.__getitem__)[1])
+
+    def test_studio_reviews_only_when_present(self):
+        """Görev 239: reviews.json boşken "Yorumlar" bölümü hiç yok; örnek veriyle bölüm ve tanıtım rozeti var."""
+        self.assertEqual(json.loads(SOURCES[render_site.REVIEWS]), [])
+        for locale in ("tr", "en", "de"):
+            page = self.pages["v2/" + ("" if locale == "tr" else locale + "/") + "studio/index.html"].decode("utf-8")
+            self.assertNotIn("studio-reviews", page)
+            self.assertNotIn("STUDIO_REVIEWS", page)
+        sample = [{"name": "Ayşe K.", "text": "Çok güzel <oldu>!", "package": "Özel Şarkı", "date": "2026-11-01",
+                   "promo": True, "lang": "tr"},
+                  {"name": "John D.", "text": "Lovely song.", "package": "Özel Şarkı Plus", "date": "2026-11-02",
+                   "promo": False, "lang": "en"}]
+        pages = render_site.render(CATALOG, {**SOURCES, render_site.REVIEWS: json.dumps(sample).encode("utf-8")})
+        badges = {"tr": "Tanıtım siparişi", "en": "Promotional order", "de": "Werbebestellung"}
+        for locale, badge in badges.items():
+            page = pages["v2/" + ("" if locale == "tr" else locale + "/") + "studio/index.html"].decode("utf-8")
+            with self.subTest(locale=locale):
+                section = page.split('<section class="studio-section studio-reviews"', 1)[1].split("</section>", 1)[0]
+                self.assertLess(page.index("studio-reviews"), page.index('id="studio-faq"'))
+                self.assertEqual(section.count('<li class="review">'), 2)
+                self.assertEqual(section.count(f'<span class="review-badge">{badge}</span>'), 1)
+                self.assertIn("Çok güzel &lt;oldu&gt;!", section)
+                self.assertIn('<time datetime="2026-11-01">01.11.2026</time>', section)
+        for bad in ({**sample[0], "name": "Ayşe Kaya"}, {**sample[0], "promo": "yes"}, {**sample[0], "lang": "fr"}):
+            with self.assertRaises(render_site.LocaleError):
+                render_site.load_reviews(json.dumps([bad]).encode("utf-8"))
+
+    def test_site_footer_contact_and_alt_texts(self):
+        """Görev 239: 14 kaynak sayfanın footer'ında destek e-postası ve Instagram; içerik görsellerinde alt metin."""
+        sources = [rel for rel in subprocess.run(["git", "ls-files", "v2/*.html"], cwd=ROOT, capture_output=True,
+                                                 text=True).stdout.split() if "site-footer" in (ROOT / rel).read_text(encoding="utf-8")]
+        self.assertEqual(len(sources), 14)
+        for rel in sources:
+            footer = (ROOT / rel).read_text(encoding="utf-8").split('<footer class="site-footer">', 1)[1].split("</footer>", 1)[0]
+            self.assertIn('href="mailto:destek@unalbuyuksungur.com">destek@unalbuyuksungur.com</a>', footer, rel)
+            self.assertIn('data-external-link="instagram" data-external-label="Instagram profilini aç">Instagram</a>', footer, rel)
+            self.assertIn(">Gizlilik</a>", footer, rel)
+            self.assertNotRegex((ROOT / rel).read_text(encoding="utf-8"), r'<img\b[^>]*\balt=""', rel)
+        _, messages = render_site.load_messages(SOURCES.__getitem__)
+        for locale in ("en", "de"):
+            home = self.pages[f"v2/{locale}/index.html"].decode("utf-8")
+            for key in ("home.hero.alt", "blog.alt.ai", "blog.alt.tourism", "blog.alt.neYapayim"):
+                self.assertIn(f'alt="{html.escape(messages[locale][key], quote=True)}"', home)
+            self.assertIn(f'data-external-label="{messages[locale]["common.instagram"]}">Instagram</a>', home)
 
     def test_home_music_showcase(self):
         """Görev 224: Müzik vitrini statik HTML; sayılar katalogdan, kartlar FEATURED_WORKS listesinden (eser kimliği)."""
