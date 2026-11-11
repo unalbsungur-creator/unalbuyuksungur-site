@@ -37,7 +37,7 @@ TR_PAGES.update({f"v2/yasal/{slug}/index.html": (f"yasal/{slug}/", None) for slu
 # bağlantısını "Çok yakında" etiketli pasif butonlara çevirir (üretilen HTML'de shopier.com geçmez), paket kartlarının
 # üstüne "Siparişler çok yakında açılıyor" notunu ekler ve sayfadaki yasal metin bağlantılarını gizler (/yasal/...
 # sayfaları noindex olarak doğrudan adresle erişilebilir kalır). True iken kaynak sayfa olduğu gibi yayınlanır.
-STUDIO_ORDERS_OPEN = False
+STUDIO_ORDERS_OPEN = True
 BUY_LINK = re.compile(r'<a class="(?P<cls>studio-buy-button|studio-buy-weekend)" href="https://www\.shopier\.com/[^"]*"'
                       r'\s+target="_blank"\s+rel="noopener noreferrer"\s+(?P<desc>aria-describedby="[^"]*")'
                       r'\s+data-purchase-link="\w+">[^<]*</a>')
@@ -227,7 +227,7 @@ def hide_legal_links(text):
     """Görev 232: siparişler kapalıyken stüdyo sayfasındaki yasal metin bağlantıları gösterilmez (metin kalır)."""
     text, footer = LEGAL_FOOTER_LINK.subn("", text)
     text, inline = LEGAL_LINK.subn(r"\1", text)
-    if footer != 1 or inline != 2 or "yasal/" in text:
+    if footer != 1 or inline != 3 or "yasal/" in text:
         raise LocaleError("[STUDIO-ORDERS] unexpected legal links on the studio page")
     return text
 

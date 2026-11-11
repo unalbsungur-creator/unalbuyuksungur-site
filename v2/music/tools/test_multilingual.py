@@ -151,13 +151,18 @@ class MultilingualTests(unittest.TestCase):
                 # Görev 226: SSS en altta, footer'dan hemen önce; Görev 221 kısıtları SSS dışındaki tanıtım içindir.
                 faq = studio.split('<section class="studio-section studio-faq"', 1)[1].split("</section>", 1)[0]
                 self.assertRegex(studio.split(faq, 1)[1], r"^</section>\s*</main>\s*<footer")
-                self.assertEqual(faq.count('<details class="faq-item">'), 17)
+                self.assertEqual(faq.count('<details class="faq-item">'), 18)
                 self.assertIn(f'<h2 id="studio-faq">{messages[locale]["studio.faq"]}</h2>', faq)
                 legal = "../yasal/" if locale == "tr" else "../../yasal/"
                 self.assertIn(f'href="{legal}hizmet-kosullari/">{messages[locale]["footer.legal"]}</a>', studio)
                 self.assertIn(f'href="{legal}iade/">{messages[locale]["studio.faq.a14b"]}</a>'
                               f'{html.escape(messages[locale]["studio.faq.a14c"], quote=False)}', faq)
                 self.assertIn('href="../music/">', faq)
+                # Görev 235: isim/açık rıza sorusu "İsimler doğru okunacak mı?" sorusundan hemen önce; KVKK #acik-riza.
+                summaries = re.findall(r"<summary>(.*?)</summary>", faq)
+                names = summaries.index(html.escape(messages[locale]["studio.faq.q07n"], quote=False))
+                self.assertEqual(summaries[names + 1], html.escape(messages[locale]["studio.faq.q08"], quote=False))
+                self.assertIn(f'href="{legal}kvkk/#acik-riza">{messages[locale]["studio.faq.a07nb"]}</a>', faq)
                 if locale != "tr":
                     for key, value in messages["tr"].items():
                         if key.startswith("studio.faq") and value != messages[locale][key]:
@@ -165,7 +170,7 @@ class MultilingualTests(unittest.TestCase):
                 rendered = self.open_pages["v2/" + ("" if locale == "tr" else locale + "/") + "studio/index.html"]
                 self.assertEqual(rendered.count(b'"@type":"FAQPage"'), 1 if locale == "tr" else 0)  # yalnız TR
                 if locale == "tr":
-                    self.assertEqual(rendered.count(b'"@type":"Question"'), 17)
+                    self.assertEqual(rendered.count(b'"@type":"Question"'), 18)
                 studio = studio.replace(faq, "")
                 text = " ".join(html.unescape(studio).split())
                 for key in ("studio.status", "studio.service.song", "studio.service.video", "studio.priceNote",
@@ -205,7 +210,7 @@ class MultilingualTests(unittest.TestCase):
 
     def test_studio_orders_switch(self):
         """Görev 232: anahtar kapalıyken "Çok yakında" var, shopier.com ve yasal bağlantı yok; açıkken tersi."""
-        self.assertIs(render_site.STUDIO_ORDERS_OPEN, False)  # canlıya "Çok yakında" ile çıkış
+        self.assertIs(render_site.STUDIO_ORDERS_OPEN, True)  # Görev 235: satış açıldı
         closed = render_site.render(CATALOG, SOURCES, studio_orders_open=False)
         soon = {"tr": ("Çok yakında", "Siparişler çok yakında açılıyor. Sorularınız için"),
                 "en": ("Coming soon", "Orders are opening soon. For questions, write to"),
@@ -214,7 +219,7 @@ class MultilingualTests(unittest.TestCase):
             rel = "v2/" + ("" if locale == "tr" else locale + "/") + "studio/index.html"
             with self.subTest(locale=locale):
                 page, opened = closed[rel].decode("utf-8"), self.open_pages[rel].decode("utf-8")
-                self.assertEqual(page, self.pages[rel].decode("utf-8"))  # varsayılan build = kapalı
+                self.assertEqual(opened, self.pages[rel].decode("utf-8"))  # varsayılan build = açık (Görev 235)
                 # Kapalı: dört pasif buton, not, shopier.com ve yasal bağlantı yok; fiyat/SSS/iletişim kutusu yerinde.
                 self.assertNotIn("shopier.com", page)
                 self.assertNotIn("data-purchase-link", page)
@@ -230,13 +235,25 @@ class MultilingualTests(unittest.TestCase):
                 for fixed in ('<p class="studio-price">690 TL</p>', '<p class="studio-price">990 TL</p>',
                               '<ol class="studio-steps">', '<section class="studio-notify"', 'class="faq-item"'):
                     self.assertIn(fixed, page)
-                self.assertEqual(page.count('<details class="faq-item">'), 17)
+                self.assertEqual(page.count('<details class="faq-item">'), 18)
                 # Açık: bugünkü davranış — Shopier ve yasal bağlantılar var, "Çok yakında" ve not yok.
                 self.assertEqual(len(re.findall(r'href="https://www\.shopier\.com/', opened)), 4)
-                self.assertEqual(len(re.findall(r'href="[^"]*yasal/', opened)), 3)
+                self.assertEqual(len(re.findall(r'href="[^"]*yasal/', opened)), 4)
                 self.assertNotIn(label, opened)
                 self.assertNotIn("studio-soon-note", opened)
                 self.assertNotIn("is-soon", opened)
+
+    def test_legal_pages_final(self):
+        """Görev 235: yasal metinler yürürlükte — taslak notu/yer tutucu yok, yürürlük tarihi var, noindex sürer."""
+        for slug in render_site.LEGAL_PAGES:
+            page = self.pages[f"v2/yasal/{slug}/index.html"].decode("utf-8")
+            with self.subTest(slug=slug):
+                self.assertNotRegex(page, r"(?i)taslak|\[[A-ZÇĞİÖŞÜ ]{3,}|hukukçu|önemli notlar|onay kutuları")
+                self.assertRegex(page, r'<p class="legal-effective">Yürürlük tarihi: \d{1,2} \w+ 20\d\d</p>')
+                self.assertIn('<meta name="robots" content="noindex, follow">', page)
+        kvkk = self.pages["v2/yasal/kvkk/index.html"].decode("utf-8")
+        self.assertEqual(kvkk.count('<h2 id="acik-riza">Yurt Dışına Aktarım Açık Rıza Metni</h2>'), 1)
+        self.assertLess(kvkk.index('id="acik-riza"'), kvkk.index('<nav class="legal-links"'))
 
     def test_home_music_showcase(self):
         """Görev 224: Müzik vitrini statik HTML; sayılar katalogdan, kartlar FEATURED_WORKS listesinden (eser kimliği)."""

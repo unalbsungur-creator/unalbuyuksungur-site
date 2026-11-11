@@ -101,16 +101,17 @@
     color: var(--gold);
 }
 
-/* Görev 226: taslak yasal metin sayfaları (/yasal/...) — aynı dar sütun; tablolar mobilde yatay kayar */
-.legal-draft {
-    display: inline-block;
-    margin: 0 0 8px;
-    padding: 6px 14px;
-    border: 1px solid var(--gold);
-    border-radius: 4px;
-    color: var(--gold);
+/* Görev 226: yasal metin sayfaları (/yasal/...) — aynı dar sütun; tablolar mobilde yatay kayar.
+   Görev 235: taslak etiketi kalktı; başlık altında yürürlük tarihi. */
+.legal-effective {
+    margin: 0 0 24px;
+    color: var(--muted);
     font-size: 14px;
-    line-height: 1.5;
+}
+
+.post.legal .legal-choices {
+    list-style: none;
+    padding-left: 0;
 }
 
 .post.legal p {
