@@ -278,6 +278,22 @@ class MultilingualTests(unittest.TestCase):
         self.assertIn("Bu Oda ist ein türkisches Werk von Ünal Büyüksungur. Bald verfügbar.",
                       self.pages["v2/de/music/work/w-0072.html"].decode("utf-8"))
 
+    def test_german_english_collection(self):
+        """Görev 238: "Almanca ve İngilizce Şarkılar" (slug aynı), 4 eser; EN/DE adları i18n'den, TR katalogdan."""
+        _, messages = render_site.load_messages(SOURCES.__getitem__)
+        collection = next(c for c in CATALOG["collections"] if c["slug"] == "almanca-sarkilar")
+        self.assertEqual([m["workId"] for m in collection["members"]], ["w-0026", "w-0058", "w-0037", "w-0076"])
+        self.assertEqual((collection["title"], collection["description"]),
+                         ("Almanca ve İngilizce Şarkılar", "Almanca ve İngilizce seslendirilen eserler."))
+        key = "music.collection.almanca-sarkilar."
+        self.assertEqual({loc: (messages[loc][key + "title"], messages[loc][key + "description"]) for loc in messages},
+                         {"tr": (collection["title"], collection["description"]),
+                          "en": ("German & English Songs", "Works performed in German and English."),
+                          "de": ("Deutsche & englische Songs", "Auf Deutsch und Englisch gesungene Werke.")})
+        for rel in ("v2/music/catalog.js", "v2/music/work/work.js"):
+            self.assertIn('tr("music.collection." + collection.slug + ".title", collection.title)',
+                          (ROOT / rel).read_text(encoding="utf-8"), rel)
+
     def test_home_music_showcase(self):
         """Görev 224: Müzik vitrini statik HTML; sayılar katalogdan, kartlar FEATURED_WORKS listesinden (eser kimliği)."""
         self.assertEqual(render_site.FEATURED_WORKS, ("w-0023", "w-0013", "w-0014", "w-0016"))

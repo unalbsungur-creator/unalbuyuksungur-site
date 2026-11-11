@@ -6052,8 +6052,8 @@
     {
       "id": "col-0002",
       "slug": "almanca-sarkilar",
-      "title": "Almanca Şarkılar",
-      "description": "Almanca seslendirilen eserler.",
+      "title": "Almanca ve İngilizce Şarkılar",
+      "description": "Almanca ve İngilizce seslendirilen eserler.",
       "order": 2,
       "members": [
         {
@@ -6064,6 +6064,9 @@
         },
         {
           "workId": "w-0037"
+        },
+        {
+          "workId": "w-0076"
         }
       ]
     },

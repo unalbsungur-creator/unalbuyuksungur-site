@@ -159,6 +159,8 @@ COMING_SOON = {
     "w-0078": ("Sonunda Gidiyorum", "sonunda-gidiyorum", "tr"),
 }
 COMING_SOON_UPDATED_AT = "2026-11-11"
+GERMAN_ENGLISH_COLLECTION = {"title": "Almanca ve İngilizce Şarkılar",
+                             "description": "Almanca ve İngilizce seslendirilen eserler."}
 EMPTY_LINKS = {"spotify": None, "youtube": None, "youtubeMusic": None, "appleMusic": None, "other": []}
 # Görev 25 kullanıcı onaylı site hikâyesi düzeltmesi (Ağlama, w-0001; Word belgesi değişmedi).
 AGLAMA_CORRECTION = ("content/stories/w-0001.txt",
@@ -382,6 +384,11 @@ def add_coming_soon(data, catalog):
         if "c-" + number in covers:
             data["covers"].append(covers["c-" + number])
     data["updatedAt"] = COMING_SOON_UPDATED_AT
+    # Görev 238: almanca-sarkilar koleksiyonu "Almanca ve İngilizce Şarkılar" oldu; Rise and Shine (w-0076) eklendi.
+    for collection in data["collections"]:
+        if collection["slug"] == "almanca-sarkilar":
+            collection.update(GERMAN_ENGLISH_COLLECTION)
+            collection["members"].append({"workId": "w-0076"})
     return data
 
 

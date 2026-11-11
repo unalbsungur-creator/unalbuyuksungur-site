@@ -98,6 +98,11 @@
             ["works", "recordings", "covers", "collections", "relations"].forEach(function (key) {
                 if (!Array.isArray(catalog[key])) throw new Error("Eksik alan: " + key);
             });
+            // Görev 238: koleksiyon adı/açıklaması sayfa dilinde (i18n anahtarı yoksa katalogdaki Türkçe metin).
+            catalog.collections.forEach(function (collection) {
+                collection.title = tr("music.collection." + collection.slug + ".title", collection.title);
+                collection.description = tr("music.collection." + collection.slug + ".description", collection.description);
+            });
             return catalog;
         });
     }

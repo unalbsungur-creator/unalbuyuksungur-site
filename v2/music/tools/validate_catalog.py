@@ -60,6 +60,8 @@ ZODIAC_TITLES = ["Koç", "Boğa", "İkizler", "Yengeç", "Aslan", "Başak",
                  "Terazi", "Akrep", "Yay", "Oğlak", "Kova", "Balık"]
 BEN_BOGAYIM_FILE = "Ben Boğa'yım.jpg"
 GERMAN_FILES = ["Du bist der Grund.jpg", "Wegen Dir.jpg", "Ich meld' mich....jpg"]
+# Görev 238: koleksiyon "Almanca ve İngilizce Şarkılar" oldu (slug aynı: almanca-sarkilar); Rise and Shine eklendi.
+ENGLISH_FILES = ["Rise and Shine.jpg"]
 SPECIAL_DAY_FILES = ["Anneler Günü.jpg", "Babalar Günü.jpg",
                      "Bugün Benim Doğum Günüm.jpg", "Mutlu Yıllar.jpg"]
 # Aynı bestenin versiyonları: dosya adı -> isOriginal beklentisi. Görev 25 kullanıcı kararıyla her kayıt
@@ -509,15 +511,15 @@ def run(catalog, schema, archive, music_root):
     # 11. Almanca koleksiyon
     problems = []
     german = member_ids("almanca-sarkilar")
-    for name in GERMAN_FILES:
+    for name, language in [(n, "de") for n in GERMAN_FILES] + [(n, "en") for n in ENGLISH_FILES]:
         work = work_for_file(name)
         if not work or work["id"] not in german:
-            problems.append(f"{name} Almanca koleksiyonunda değil")
-        elif work["language"] != "de":
-            problems.append(f"{name}: language 'de' olmalı")
-    if len(german) != len(GERMAN_FILES):
-        problems.append(f"Almanca koleksiyonunda {len(german)} eser var")
-    report.check(11, "Üç Almanca eser Almanca koleksiyonunda", problems)
+            problems.append(f"{name} Almanca ve İngilizce koleksiyonunda değil")
+        elif work["language"] != language:
+            problems.append(f"{name}: language '{language}' olmalı")
+    if len(german) != len(GERMAN_FILES) + len(ENGLISH_FILES):
+        problems.append(f"Almanca ve İngilizce koleksiyonunda {len(german)} eser var")
+    report.check(11, "Üç Almanca ve bir İngilizce eser 'Almanca ve İngilizce Şarkılar' koleksiyonunda", problems)
 
     # 12. Özel gün koleksiyonu
     problems = []
