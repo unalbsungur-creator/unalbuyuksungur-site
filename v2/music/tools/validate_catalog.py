@@ -120,6 +120,8 @@ ID_BASELINE = (
     "0061:0058 0062:0059 0063:0060 0064:0061 0065:0068 0066:0062 0067:0063 0068:0064"
 )
 BASELINE_WORK_COUNT = 68
+# Görev 236: arşive 10 yeni kapak eklendi (w/r/c-0069 … 0078, "Yakında" durumunda); arşivdeki toplam kapak sayısı.
+ARCHIVE_COVER_COUNT = 78
 
 
 # --- Dosya yardımcıları ------------------------------------------------------
@@ -378,13 +380,13 @@ def run(catalog, schema, archive, music_root):
     # 1-2. Kaynak arşiv kapsamı
     archive_files = list_archive_covers(archive)
     problems = []
-    if len(archive_files) != 68:
-        problems.append(f"arşivde {len(archive_files)} kapak var, 68 bekleniyordu")
+    if len(archive_files) != ARCHIVE_COVER_COUNT:
+        problems.append(f"arşivde {len(archive_files)} kapak var, {ARCHIVE_COVER_COUNT} bekleniyordu")
     for name in archive_files:
         count = len(cover_by_file.get(name, []))
         if count != 1:
             problems.append(f"{name!r} katalogda {count} kez temsil ediliyor")
-    report.check(1, "68 kapağın her biri katalogda tam bir kez temsil ediliyor", problems)
+    report.check(1, f"{ARCHIVE_COVER_COUNT} kapağın her biri katalogda tam bir kez temsil ediliyor", problems)
 
     archive_set = set(archive_files)
     report.check(2, "Kaynakta bulunmayan kapak referansı yok",

@@ -1,7 +1,7 @@
 {
   "$schema": "./schema.json",
   "catalogVersion": 1,
-  "updatedAt": "2026-10-21",
+  "updatedAt": "2026-11-11",
   "artist": "Ünal Büyüksungur",
   "source": {
     "coversDir": "UNAL_MUSIC_ARCHIVE/covers",
@@ -1163,6 +1163,176 @@
       "story": {
         "status": "published",
         "file": "content/stories/w-0061.txt"
+      }
+    },
+    {
+      "id": "w-0069",
+      "title": "Alışamadım",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "alisamadim",
+      "language": "tr",
+      "releaseStatus": "unreleased",
+      "lyrics": {
+        "status": "missing",
+        "file": null
+      },
+      "story": {
+        "status": "missing",
+        "file": null
+      }
+    },
+    {
+      "id": "w-0070",
+      "title": "Anlat",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "anlat",
+      "language": "tr",
+      "releaseStatus": "unreleased",
+      "lyrics": {
+        "status": "missing",
+        "file": null
+      },
+      "story": {
+        "status": "missing",
+        "file": null
+      }
+    },
+    {
+      "id": "w-0071",
+      "title": "Benden Sonra",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "benden-sonra",
+      "language": "tr",
+      "releaseStatus": "unreleased",
+      "lyrics": {
+        "status": "missing",
+        "file": null
+      },
+      "story": {
+        "status": "missing",
+        "file": null
+      }
+    },
+    {
+      "id": "w-0072",
+      "title": "Bu Oda",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "bu-oda",
+      "language": "tr",
+      "releaseStatus": "unreleased",
+      "lyrics": {
+        "status": "missing",
+        "file": null
+      },
+      "story": {
+        "status": "missing",
+        "file": null
+      }
+    },
+    {
+      "id": "w-0073",
+      "title": "Gel Sevgilim",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "gel-sevgilim",
+      "language": "tr",
+      "releaseStatus": "unreleased",
+      "lyrics": {
+        "status": "missing",
+        "file": null
+      },
+      "story": {
+        "status": "missing",
+        "file": null
+      }
+    },
+    {
+      "id": "w-0074",
+      "title": "Hacı",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "haci",
+      "language": "tr",
+      "releaseStatus": "unreleased",
+      "lyrics": {
+        "status": "missing",
+        "file": null
+      },
+      "story": {
+        "status": "missing",
+        "file": null
+      }
+    },
+    {
+      "id": "w-0075",
+      "title": "Next Point TR",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "next-point-tr",
+      "language": "tr",
+      "releaseStatus": "unreleased",
+      "lyrics": {
+        "status": "missing",
+        "file": null
+      },
+      "story": {
+        "status": "missing",
+        "file": null
+      }
+    },
+    {
+      "id": "w-0076",
+      "title": "Rise and Shine",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "rise-and-shine",
+      "language": "en",
+      "releaseStatus": "unreleased",
+      "lyrics": {
+        "status": "missing",
+        "file": null
+      },
+      "story": {
+        "status": "missing",
+        "file": null
+      }
+    },
+    {
+      "id": "w-0077",
+      "title": "Rüyama Bile Girmedin",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "ruyama-bile-girmedin",
+      "language": "tr",
+      "releaseStatus": "unreleased",
+      "lyrics": {
+        "status": "missing",
+        "file": null
+      },
+      "story": {
+        "status": "missing",
+        "file": null
+      }
+    },
+    {
+      "id": "w-0078",
+      "title": "Sonunda Gidiyorum",
+      "titleStatus": "confirmed",
+      "workingTitle": null,
+      "slug": "sonunda-gidiyorum",
+      "language": "tr",
+      "releaseStatus": "unreleased",
+      "lyrics": {
+        "status": "missing",
+        "file": null
+      },
+      "story": {
+        "status": "missing",
+        "file": null
       }
     }
   ],
@@ -2810,6 +2980,176 @@
           "videoType": "official-music-video"
         }
       ]
+    },
+    {
+      "id": "r-0069",
+      "workId": "w-0069",
+      "title": "Alışamadım",
+      "versionLabel": null,
+      "genres": [],
+      "isOriginal": null,
+      "coverId": "c-0069",
+      "releaseDate": null,
+      "links": {
+        "spotify": null,
+        "youtube": null,
+        "youtubeMusic": null,
+        "appleMusic": null,
+        "other": []
+      }
+    },
+    {
+      "id": "r-0070",
+      "workId": "w-0070",
+      "title": "Anlat",
+      "versionLabel": null,
+      "genres": [],
+      "isOriginal": null,
+      "coverId": "c-0070",
+      "releaseDate": null,
+      "links": {
+        "spotify": null,
+        "youtube": null,
+        "youtubeMusic": null,
+        "appleMusic": null,
+        "other": []
+      }
+    },
+    {
+      "id": "r-0071",
+      "workId": "w-0071",
+      "title": "Benden Sonra",
+      "versionLabel": null,
+      "genres": [],
+      "isOriginal": null,
+      "coverId": "c-0071",
+      "releaseDate": null,
+      "links": {
+        "spotify": null,
+        "youtube": null,
+        "youtubeMusic": null,
+        "appleMusic": null,
+        "other": []
+      }
+    },
+    {
+      "id": "r-0072",
+      "workId": "w-0072",
+      "title": "Bu Oda",
+      "versionLabel": null,
+      "genres": [],
+      "isOriginal": null,
+      "coverId": "c-0072",
+      "releaseDate": null,
+      "links": {
+        "spotify": null,
+        "youtube": null,
+        "youtubeMusic": null,
+        "appleMusic": null,
+        "other": []
+      }
+    },
+    {
+      "id": "r-0073",
+      "workId": "w-0073",
+      "title": "Gel Sevgilim",
+      "versionLabel": null,
+      "genres": [],
+      "isOriginal": null,
+      "coverId": "c-0073",
+      "releaseDate": null,
+      "links": {
+        "spotify": null,
+        "youtube": null,
+        "youtubeMusic": null,
+        "appleMusic": null,
+        "other": []
+      }
+    },
+    {
+      "id": "r-0074",
+      "workId": "w-0074",
+      "title": "Hacı",
+      "versionLabel": null,
+      "genres": [],
+      "isOriginal": null,
+      "coverId": "c-0074",
+      "releaseDate": null,
+      "links": {
+        "spotify": null,
+        "youtube": null,
+        "youtubeMusic": null,
+        "appleMusic": null,
+        "other": []
+      }
+    },
+    {
+      "id": "r-0075",
+      "workId": "w-0075",
+      "title": "Next Point TR",
+      "versionLabel": null,
+      "genres": [],
+      "isOriginal": null,
+      "coverId": "c-0075",
+      "releaseDate": null,
+      "links": {
+        "spotify": null,
+        "youtube": null,
+        "youtubeMusic": null,
+        "appleMusic": null,
+        "other": []
+      }
+    },
+    {
+      "id": "r-0076",
+      "workId": "w-0076",
+      "title": "Rise and Shine",
+      "versionLabel": null,
+      "genres": [],
+      "isOriginal": null,
+      "coverId": "c-0076",
+      "releaseDate": null,
+      "links": {
+        "spotify": null,
+        "youtube": null,
+        "youtubeMusic": null,
+        "appleMusic": null,
+        "other": []
+      }
+    },
+    {
+      "id": "r-0077",
+      "workId": "w-0077",
+      "title": "Rüyama Bile Girmedin",
+      "versionLabel": null,
+      "genres": [],
+      "isOriginal": null,
+      "coverId": "c-0077",
+      "releaseDate": null,
+      "links": {
+        "spotify": null,
+        "youtube": null,
+        "youtubeMusic": null,
+        "appleMusic": null,
+        "other": []
+      }
+    },
+    {
+      "id": "r-0078",
+      "workId": "w-0078",
+      "title": "Sonunda Gidiyorum",
+      "versionLabel": null,
+      "genres": [],
+      "isOriginal": null,
+      "coverId": "c-0078",
+      "releaseDate": null,
+      "links": {
+        "spotify": null,
+        "youtube": null,
+        "youtubeMusic": null,
+        "appleMusic": null,
+        "other": []
+      }
     }
   ],
   "covers": [
@@ -5190,6 +5530,356 @@
           "height": 1200,
           "bytes": 54952,
           "sha256": "2327858cf4de6fdc27fe92dfe66c5203f658015bd4b1597177fa36ea38dc8c5a"
+        }
+      ]
+    },
+    {
+      "id": "c-0069",
+      "sourceFileName": "Alışamadım.jpg",
+      "format": "jpeg",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 1392525,
+      "sha256": "1878b7f52a1a075ea7f1a6d9066b58f7c607bd89bfe96e1eae1dc59b116d4e4b",
+      "webImages": [
+        {
+          "path": "images/c-0069-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 25930,
+          "sha256": "448d6b84fc64867ef62aecbf5ea74e2b20553fde94ef4f8c2d532780b38b532b"
+        },
+        {
+          "path": "images/c-0069-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 80488,
+          "sha256": "5ef0567acde642383133b1bd172c842c8072e84889b58418076034c910758bfe"
+        },
+        {
+          "path": "images/c-0069-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 143870,
+          "sha256": "3b8349df6d2cf22575ba3c74f0b53435d76c6ec62a96c310dba425210cdba0c3"
+        }
+      ]
+    },
+    {
+      "id": "c-0070",
+      "sourceFileName": "Anlat.jpg",
+      "format": "jpeg",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 1461993,
+      "sha256": "b80863fae1ee42437d9a8a04d6fb6703d71dc4102978de40c896da596ea4232f",
+      "webImages": [
+        {
+          "path": "images/c-0070-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 39118,
+          "sha256": "0018b34405b5c5c1e90bf173c3937ec0255686672f94b046d95b839465cdcd10"
+        },
+        {
+          "path": "images/c-0070-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 110656,
+          "sha256": "a24c829c7cd05814f640777dbf27ac524f1b9c94fc3bbdf9829ece92d5828517"
+        },
+        {
+          "path": "images/c-0070-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 187854,
+          "sha256": "11a3c4ec5ba0855967e66337acd0708307bfee85e1c0b57eecf4c52c37f1bb1b"
+        }
+      ]
+    },
+    {
+      "id": "c-0071",
+      "sourceFileName": "Benden Sonra.jpg",
+      "format": "jpeg",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 1744666,
+      "sha256": "ea21c0dc507aa089b909daba7b38d78771e0eba54dd02f885a719904b3e73716",
+      "webImages": [
+        {
+          "path": "images/c-0071-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 45904,
+          "sha256": "a724b34027180dff1bc18dd5e92d9aa17f0f21ccc777a1859c3056279a628a3f"
+        },
+        {
+          "path": "images/c-0071-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 139784,
+          "sha256": "55fbfcfcaac593b62fec638be54e1fd805618e18962b136908a4bfea4f023240"
+        },
+        {
+          "path": "images/c-0071-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 244196,
+          "sha256": "dc10efefade2c1f7154e21208ade4bc8839e2bd37159805c93bd7b348a5d9299"
+        }
+      ]
+    },
+    {
+      "id": "c-0072",
+      "sourceFileName": "Bu Oda.jpg",
+      "format": "jpeg",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 1192657,
+      "sha256": "9d40917ac14b5837f68f772a8fd8b3f585cab200a35b4416972b041b4303e85a",
+      "webImages": [
+        {
+          "path": "images/c-0072-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 25414,
+          "sha256": "91fc9022fcda3bf8c283d350df2d4248ea9c219ae6278591f9269ae19a1086c7"
+        },
+        {
+          "path": "images/c-0072-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 73296,
+          "sha256": "ba4e74a0a63aec725b2b6ba64bc304efab0e5ac242238b6ba8480f85a21ef761"
+        },
+        {
+          "path": "images/c-0072-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 126988,
+          "sha256": "590152893906a22301e8fbd29bbd0125f74eed060e4ee2e7823078e7c3885ce3"
+        }
+      ]
+    },
+    {
+      "id": "c-0073",
+      "sourceFileName": "Gel Sevgilim.jpg",
+      "format": "jpeg",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 1260238,
+      "sha256": "ef6a091ff410692357973243f7d43ed1874b9e46b84b9f5137dacdf14867808a",
+      "webImages": [
+        {
+          "path": "images/c-0073-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 28600,
+          "sha256": "e501f22240d665bd24676facd8c8ddae9c324e633d86ca72857759fbde346fa2"
+        },
+        {
+          "path": "images/c-0073-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 75916,
+          "sha256": "47cdc1bf3ebb0e35b2bc38dc8573aa92524d06cfcdc029d6f2f59e55645a65df"
+        },
+        {
+          "path": "images/c-0073-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 128968,
+          "sha256": "0acfae064be57043ed574d08d72b519cd967b69015ef0c3312bfef37ba589708"
+        }
+      ]
+    },
+    {
+      "id": "c-0074",
+      "sourceFileName": "Hacı.jpg",
+      "format": "jpeg",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 1580322,
+      "sha256": "7e30033eb2c632aec92e5c9d068c383cdca1440e6d336eaab02591d137d9e984",
+      "webImages": [
+        {
+          "path": "images/c-0074-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 39132,
+          "sha256": "0648988b7fb0d6a3f199fe14115c4e69b1585aa8be584036e0a74294f7b47e9c"
+        },
+        {
+          "path": "images/c-0074-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 114834,
+          "sha256": "e7edba05c72c04f6a77d7b1dc5b816b5d93a1fc909d144299c6e7adca4292d08"
+        },
+        {
+          "path": "images/c-0074-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 202952,
+          "sha256": "9458c688aef3bbf6b3c0081f61af70473034895a337120fe36e734613ce553db"
+        }
+      ]
+    },
+    {
+      "id": "c-0075",
+      "sourceFileName": "Next Point TR.jpg",
+      "format": "jpeg",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 2036610,
+      "sha256": "5a577055f4919de016ac0e28137177aeb7e3fa7810469d2af849b0b398333d85",
+      "webImages": [
+        {
+          "path": "images/c-0075-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 48056,
+          "sha256": "928abddf5782f3419272a26125d41d3fa0d2b790e6ffa054dd3260350a4af378"
+        },
+        {
+          "path": "images/c-0075-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 164602,
+          "sha256": "1e1c8a514b5296b371db87a7941308722c12dc600990098424a44c261bb1b6af"
+        },
+        {
+          "path": "images/c-0075-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 312466,
+          "sha256": "1354197d3f4e52a957719c4f71d2dc4fc063ca4944ea22220c5e67c0add72d44"
+        }
+      ]
+    },
+    {
+      "id": "c-0076",
+      "sourceFileName": "Rise and Shine.jpg",
+      "format": "jpeg",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 1868266,
+      "sha256": "ea8a3739069ca1b57809625b1c3a948fa75a3542717a74a98aaf30e4fd0e5da0",
+      "webImages": [
+        {
+          "path": "images/c-0076-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 50812,
+          "sha256": "03fdaf293216e7f5cd95b9c8c74b77fb4b346e0b888d5c62419cef6408e20589"
+        },
+        {
+          "path": "images/c-0076-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 153616,
+          "sha256": "b70dc67bed4955ac671cdd9a1736acdd7e2c86973706548d9a934bde1bd8f2f9"
+        },
+        {
+          "path": "images/c-0076-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 266298,
+          "sha256": "239d8bd9d9ee478d1badc3001ef5d6abd83dee2e0d8b3e3aa0c08c580bf2e666"
+        }
+      ]
+    },
+    {
+      "id": "c-0077",
+      "sourceFileName": "Rüyama Bile Girmedin.jpg",
+      "format": "jpeg",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 1244065,
+      "sha256": "20f637acf806891b9f37387d3da6700da9136f2f013c3c9253909691f13b3906",
+      "webImages": [
+        {
+          "path": "images/c-0077-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 32930,
+          "sha256": "98f69cbba7626ef4960a23118edfae681372a2480e304b9feca296c4138b56f0"
+        },
+        {
+          "path": "images/c-0077-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 89010,
+          "sha256": "81385287113d6c56f02e4245ac4c21b55671f93970cd5f5da792fdc98697cc02"
+        },
+        {
+          "path": "images/c-0077-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 148702,
+          "sha256": "5033c74edd1c82481a7dfcfddd86b37f36742af38722471c76a2dd41ebe4ef71"
+        }
+      ]
+    },
+    {
+      "id": "c-0078",
+      "sourceFileName": "Sonunda Gidiyorum.jpg",
+      "format": "jpeg",
+      "width": 3000,
+      "height": 3000,
+      "bytes": 1785912,
+      "sha256": "455f202e3bccfa598e890320de54b331dde7157e9ab1506aef72ac111886959f",
+      "webImages": [
+        {
+          "path": "images/c-0078-400.webp",
+          "format": "webp",
+          "width": 400,
+          "height": 400,
+          "bytes": 42866,
+          "sha256": "6221dd74ffd34531d546d3f37a6f98eebe562e283e237ca6a8f3161dd5bcf70f"
+        },
+        {
+          "path": "images/c-0078-800.webp",
+          "format": "webp",
+          "width": 800,
+          "height": 800,
+          "bytes": 144116,
+          "sha256": "fdbde5a7da5bd1273c972ebf01b006e3a335c6ad69da94019541464e6f75d3b6"
+        },
+        {
+          "path": "images/c-0078-1200.webp",
+          "format": "webp",
+          "width": 1200,
+          "height": 1200,
+          "bytes": 262054,
+          "sha256": "0c74fc94b2edb665ec57a26e01555a3d3bdb1e70e9aacae8238720024b7c8338"
         }
       ]
     }

@@ -9,7 +9,7 @@
     var ASSET_ROOT = window.UNAL_UI && window.UNAL_UI.locale !== "tr" ? window.UNAL_UI.musicRoot : "";
     if (ASSET_ROOT) CATALOG_URL = ASSET_ROOT + "data/catalog.json";
     function tr(key, fallback) { return (window.UNAL_MESSAGES && window.UNAL_MESSAGES[key]) || fallback; }
-    var LANGUAGE_NAMES = { tr: "Türkçe", de: "Almanca" };
+    var LANGUAGE_NAMES = { tr: "Türkçe", de: "Almanca", en: "İngilizce" };
     // Galeri sütunlarıyla (4 / 3 / 2 / 1) uyumlu görüntü genişlikleri
     var CARD_SIZES = "(min-width: 1500px) 310px, (min-width: 1200px) 22vw, (min-width: 900px) 29vw, (min-width: 360px) 45vw, 90vw";
     var EAGER_CARDS = 4;
@@ -316,6 +316,15 @@
         });
     }
 
+    // Görev 236: "Yakında yayında" — kaydın doğrulanmış dinleme bağlantısı ve videosu yoksa. Tek kaynak catalog.json:
+    // kaydın links/videos alanına bağlantı eklenince rozet kendiliğinden kalkar ve butonlar görünür.
+    function isComingSoon(recording) {
+        var links = recording.links || {};
+        var linked = ["spotify", "youtube", "youtubeMusic", "appleMusic"].some(function (key) { return Boolean(links[key]); })
+            || (Array.isArray(links.other) && links.other.length > 0);
+        return !linked && !(Array.isArray(recording.videos) && recording.videos.length > 0);
+    }
+
     function workCard(work, position) {
         var versions = work.recordings.length;
         var meta = [el("span", { text: languageName(work.language) })];
@@ -328,7 +337,8 @@
                 alt: work.title + " " + tr("music.cover", "kapak görseli"),
                 lazy: position >= EAGER_CARDS
             }),
-            versions > 1 ? el("span", { className: "version-badge", text: versions + " " + tr("music.versions", "Versiyon") }) : null
+            versions > 1 ? el("span", { className: "version-badge", text: versions + " " + tr("music.versions", "Versiyon") }) : null,
+            work.recordings.every(isComingSoon) ? el("span", { className: "soon-badge", text: tr("music.comingSoon", "Yakında yayında") }) : null
         ]);
 
         var card = el("article", { className: "work-card" }, [

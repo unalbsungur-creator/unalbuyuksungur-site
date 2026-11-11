@@ -405,7 +405,7 @@ class SongArchiveTest(unittest.TestCase):
 
     def test_webp_unchanged(self):
         now = {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in (MUSIC_ROOT / "images").glob("*.webp")}
-        self.assertEqual((len(now), now), (204, self.webp))
+        self.assertEqual((len(now), now), (234, self.webp))  # Görev 236: 78 kapak × 3
 
 
 if __name__ == "__main__":

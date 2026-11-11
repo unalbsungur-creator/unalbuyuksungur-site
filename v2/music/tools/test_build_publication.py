@@ -106,17 +106,17 @@ class BuildPublicationTests(unittest.TestCase):
     def test_output_is_exactly_the_allowlist(self):
         manifest = self.build()
         web = expected_web_files()
-        self.assertEqual(len(web), 384)  # V1 favicon, V2 favicon ile aynı paket yoluna düşer (alias)
-        self.assertEqual(len(PAGES), 68)
+        self.assertEqual(len(web), 414)  # Görev 236: +30 WebP. V1 favicon, V2 favicon ile aynı paket yoluna düşer (alias)
+        self.assertEqual(len(PAGES), 78)  # Görev 236: +10 "Yakında" eser
         generated = {"_headers", "_redirects", "robots.txt"}
         self.assertEqual(set(self.tree()), published(web) | published(ALL_PAGES) | generated)
-        self.assertEqual(len(self.tree()), 613)
+        self.assertEqual(len(self.tree()), 673)
         self.assertEqual([n for n in self.tree() if n.startswith(("v2/", "legacy/"))], [])
-        self.assertEqual((manifest["webFiles"], manifest["copiedFiles"], manifest["renderedPages"]), (610, 383, 227))
-        self.assertEqual(manifest["totalOutputFiles"], 613)
+        self.assertEqual((manifest["webFiles"], manifest["copiedFiles"], manifest["renderedPages"]), (670, 413, 257))
+        self.assertEqual(manifest["totalOutputFiles"], 673)
         self.assertEqual(manifest["profile"], "preview")
-        self.assertEqual(manifest["groups"], {"site": 37, "data": 2, "lyrics": 64, "stories": 64, "webp": 204,
-                                               "legacyImages": 12, "pages": 227})
+        self.assertEqual(manifest["groups"], {"site": 37, "data": 2, "lyrics": 64, "stories": 64, "webp": 234,
+                                               "legacyImages": 12, "pages": 257})
         self.assertEqual([(a["path"], a["source"], a["sameAs"]) for a in manifest["aliases"]],
                          [("images/favicon.jpg.jpeg", "v2/legacy/v1-images/favicon.jpg.jpeg",
                            "v2/images/favicon.jpg.jpeg")])
@@ -162,7 +162,7 @@ class BuildPublicationTests(unittest.TestCase):
     def test_output_bytes_identical_to_source(self):
         manifest = self.build()
         tree = self.tree()
-        self.assertEqual(len(manifest["files"]), 383)
+        self.assertEqual(len(manifest["files"]), 413)
         self.assertEqual(tree["images/favicon.jpg.jpeg"], (REPO / "images/favicon.jpg.jpeg").read_bytes())
         for entry in manifest["files"]:
             source = (REPO / entry["source"]).read_bytes()
@@ -208,11 +208,13 @@ class BuildPublicationTests(unittest.TestCase):
     def test_catalog_and_page_references_resolve(self):
         self.build()
         names = set(self.tree())
-        self.assertEqual(len(CATALOG["works"]), 68)
-        self.assertEqual(len(CATALOG["recordings"]), 68)
-        self.assertEqual(len(CATALOG["covers"]), 68)
+        self.assertEqual(len(CATALOG["works"]), 78)  # Görev 236: +10 "Yakında" (söz/hikâye yok)
+        self.assertEqual(len(CATALOG["recordings"]), 78)
+        self.assertEqual(len(CATALOG["covers"]), 78)
         for work in CATALOG["works"]:
             for key in ("lyrics", "story"):
+                if work[key]["status"] != "published":
+                    continue
                 self.assertIn(bp.published_path(bp.MUSIC + work[key]["file"]), names)
         for cover in CATALOG["covers"]:
             for image in cover["webImages"]:
@@ -249,7 +251,7 @@ class BuildPublicationTests(unittest.TestCase):
         """Görev 220: ana alan adında noindex yok (yalnız pages.dev), robots/sitemap üretilir, URL'ler köktedir."""
         manifest = self.build(profile="production")
         tree = self.tree()
-        self.assertEqual((manifest["profile"], manifest["totalOutputFiles"]), ("production", 614))
+        self.assertEqual((manifest["profile"], manifest["totalOutputFiles"]), ("production", 674))  # Görev 236: +30 WebP, +30 eser sayfası
         headers = tree["_headers"].decode("utf-8")
         self.assertTrue(headers.startswith(bp.MARKER + "\n"))
         self.assertIn("https://unalbuyuksungur-v2.pages.dev/*\n  X-Robots-Tag: noindex\n", headers)
@@ -428,12 +430,12 @@ class BuildPublicationTests(unittest.TestCase):
 
     def test_cli_exit_codes(self):
         run = [sys.executable, "-I", str(SCRIPT), "--root", str(self.root), "--out", "_site"]
-        ok = subprocess.run(run + ["--expect-count", "610"], capture_output=True, text=True, encoding="utf-8")
+        ok = subprocess.run(run + ["--expect-count", "670"], capture_output=True, text=True, encoding="utf-8")
         self.assertEqual(ok.returncode, 0, ok.stderr)
-        self.assertIn("383/383", ok.stdout)
-        self.assertIn("üretilen sayfa 227 (preview)", ok.stdout)
+        self.assertIn("413/413", ok.stdout)
+        self.assertIn("üretilen sayfa 257 (preview)", ok.stdout)
         manifest = json.loads((self.root / "_site-manifest.json").read_text(encoding="utf-8"))
-        self.assertEqual(manifest["totalOutputFiles"], 613)
+        self.assertEqual(manifest["totalOutputFiles"], 673)
         bad = subprocess.run(run + ["--profile", "staging"], capture_output=True, text=True, encoding="utf-8")
         self.assertEqual(bad.returncode, 2)  # argparse: geçersiz profil seçimi
         (self.root / "v2/music/catalog.css").unlink()

@@ -53,7 +53,7 @@
         "titleStatus": { "enum": ["confirmed", "unconfirmed"] },
         "workingTitle": { "type": ["string", "null"] },
         "slug": { "type": ["string", "null"], "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" },
-        "language": { "enum": ["tr", "de"] },
+        "language": { "enum": ["tr", "de", "en"] },
         "releaseStatus": { "enum": ["unknown", "unreleased", "released"] },
         "lyrics": { "$ref": "#/$defs/textAsset" },
         "story": { "$ref": "#/$defs/textAsset" }

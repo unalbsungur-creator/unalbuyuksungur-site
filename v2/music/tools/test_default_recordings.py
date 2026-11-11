@@ -53,7 +53,7 @@ def old_link_target(work_id, recording_id):
 
 class WorkRecordingTests(unittest.TestCase):
     def test_every_work_has_exactly_one_recording(self):
-        self.assertEqual((len(WORKS), len(RECORDINGS)), (68, 68))
+        self.assertEqual((len(WORKS), len(RECORDINGS)), (78, 78))  # Görev 236: +10 "Yakında"
         for work_id in WORKS:
             self.assertEqual(len(recordings_of(work_id)), 1, work_id)
         for recording in RECORDINGS.values():

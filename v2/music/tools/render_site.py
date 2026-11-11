@@ -294,11 +294,17 @@ def render_page(text, locale, surface, messages, config, work=None, profile="pre
             name = "My Music" if locale == "en" else "Meine Musik"
             text = replace_once(text, f"{title} | Müzik Dünyam | Ünal Büyüksungur",
                                 f"{title} | {name} | Ünal Büyüksungur")
-            language = {"tr": ("Turkish", "türkisches"), "de": ("German", "deutsches")}[work["language"]]
+            language = {"tr": ("Turkish", "türkisches"), "de": ("German", "deutsches"),
+                        "en": ("English", "englisches")}[work["language"]]
+            # Görev 236: söz/hikâyesi henüz yayımlanmamış ("Yakında") eserde içerik vaadi yazılmaz.
+            released = work["lyrics"]["status"] == "published"
             if locale == "en":
-                description = f"{work['title']} is a {language[0]} work by Ünal Büyüksungur. Explore its original lyrics, story and music video."
+                article = "an" if language[0][0] in "AEIOU" else "a"
+                description = (f"{work['title']} is {article} {language[0]} work by Ünal Büyüksungur. "
+                               + ("Explore its original lyrics, story and music video." if released else "Coming soon."))
             else:
-                description = f"{work['title']} ist ein {language[1]} Werk von Ünal Büyüksungur. Originaltext, Geschichte und Musikvideo entdecken."
+                description = (f"{work['title']} ist ein {language[1]} Werk von Ünal Büyüksungur. "
+                               + ("Originaltext, Geschichte und Musikvideo entdecken." if released else "Bald verfügbar."))
             for attr in ('name="description"', 'property="og:description"', 'name="twitter:description"'):
                 pattern = r'(<meta ' + attr + r' content=")[^"]*(")'
                 text, n = re.subn(pattern, lambda m: m[1] + html.escape(description, quote=True) + m[2], text)

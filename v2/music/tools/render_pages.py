@@ -29,7 +29,7 @@ PROFILES = {
     "production": {"origin": "https://unalbuyuksungur.com", "prefix": "/"},
 }
 
-LANGUAGE_NAMES = {"tr": "Türkçe", "de": "Almanca"}  # work.js ile aynı
+LANGUAGE_NAMES = {"tr": "Türkçe", "de": "Almanca", "en": "İngilizce"}  # work.js ile aynı
 IMAGE_TYPES = {"webp": "image/webp", "jpeg": "image/jpeg", "png": "image/png"}
 WORK_ID = re.compile(r"^w-\d{4}$")
 COVER_ID = re.compile(r"^c-\d{4}$")

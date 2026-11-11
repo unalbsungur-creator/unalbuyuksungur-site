@@ -542,7 +542,7 @@ class ImportFormsTest(unittest.TestCase):
 
     def test_webp_unchanged(self):
         now = {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in (MUSIC_ROOT / "images").glob("*.webp")}
-        self.assertEqual(len(now), 204)
+        self.assertEqual(len(now), 234)  # Görev 236: 78 kapak × 3
         self.assertEqual(now, self.webp_before)
 
 

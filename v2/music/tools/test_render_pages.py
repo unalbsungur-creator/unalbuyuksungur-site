@@ -25,7 +25,7 @@ REPO = Path(__file__).resolve().parents[3]
 CATALOG = json.loads((REPO / "v2/music/data/catalog.json").read_text(encoding="utf-8"))
 TEMPLATE = (REPO / rp.TEMPLATE).read_bytes()
 BASE = "https://unalbuyuksungur-v2.pages.dev/"  # Görev 220: paket köke yazılır
-LANG = {"tr": "Türkçe", "de": "Almanca"}
+LANG = {"tr": "Türkçe", "de": "Almanca", "en": "İngilizce"}  # Görev 236: "en"
 
 
 class Head(HTMLParser):
@@ -78,7 +78,10 @@ def expected(work):
     text = f"Ünal Büyüksungur'un {LANG[work['language']]} eseri “{work['title']}”."
     if cols:
         text += " " + ", ".join(cols) + " koleksiyonunda."
-    if recs[0].get("videos"):
+    if work["lyrics"]["status"] != "published":  # Görev 236: "Yakında" eserlerde söz/hikâye/video yok
+        self_check = (work["story"]["status"], recs[0].get("videos"))
+        assert self_check == ("missing", None), work["id"]
+    elif recs[0].get("videos"):
         text += " Şarkı sözleri, hikâyesi ve video klibi bu sayfada."
     else:
         text += " Şarkı sözleri ve hikâyesi bu sayfada."
@@ -120,15 +123,16 @@ class RenderPagesTests(unittest.TestCase):
     # --- Gerçek katalog ---
 
     def test_inventory(self):
-        self.assertEqual(len(CATALOG["works"]), 68)
-        self.assertEqual(len(CATALOG["recordings"]), 68)
-        self.assertEqual(len(CATALOG["covers"]), 68)
+        # Görev 236: 68 eser + 10 "Yakında" eser (videosuz).
+        self.assertEqual(len(CATALOG["works"]), 78)
+        self.assertEqual(len(CATALOG["recordings"]), 78)
+        self.assertEqual(len(CATALOG["covers"]), 78)
         with_video = sum(1 for r in CATALOG["recordings"] if r.get("videos"))
-        self.assertEqual((with_video, 68 - with_video), (68, 0))
+        self.assertEqual((with_video, 78 - with_video), (68, 10))
 
     def test_68_pages_with_expected_paths(self):
         ids = sorted(w["id"] for w in CATALOG["works"])
-        self.assertEqual(len(set(ids)), 68)
+        self.assertEqual(len(set(ids)), 78)
         self.assertEqual(list(self.pages), [f"v2/music/work/{i}.html" for i in ids])
 
     def test_metadata_matches_catalog_for_every_work(self):
@@ -142,7 +146,7 @@ class RenderPagesTests(unittest.TestCase):
         heads = [parse(p).tags for p in self.pages.values()]
         for key in ("title", "description", "canonical", "og:title", "og:url", "og:image", "twitter:title"):
             values = [h[key][0] for h in heads]
-            self.assertEqual(len(set(values)), 68, key)
+            self.assertEqual(len(set(values)), 78, key)
 
     def test_no_invented_facts(self):
         for page in self.pages.values():
@@ -212,7 +216,7 @@ class RenderPagesTests(unittest.TestCase):
                            lambda c: c["works"][0].update(title="A\nB"),
                            lambda c: c["works"][0].update(title=" Boşluk"),
                            lambda c: c["works"][0].update(title="x" * 201),
-                           lambda c: c["works"][0].update(language="en"),
+                           lambda c: c["works"][0].update(language="fr"),
                            lambda c: c["recordings"].pop(0),
                            lambda c: c["covers"].pop(0),
                            lambda c: c["covers"][0].update(webImages=[]),

@@ -158,10 +158,12 @@ class CatalogVideoTests(unittest.TestCase):
                 self.assertEqual(RECORDINGS[rid]["workId"], wid)
                 self.assertEqual(RECORDINGS[rid]["coverId"], covers[rid])
                 self.assertEqual(RECORDINGS[rid]["videos"], VIDEO(vid))
-        self.assertFalse([rid for rid, r in RECORDINGS.items() if "videos" not in r])
+        # Görev 236: yalnız 10 yeni "Yakında" kaydı videosuz.
+        self.assertEqual([rid for rid, r in RECORDINGS.items() if "videos" not in r],
+                         [f"r-{n:04d}" for n in range(69, 79)])
 
     def test_counts_preserved(self):
-        self.assertEqual((len(WORKS), len(RECORDINGS), len(CATALOG["covers"])), (68, 68, 68))
+        self.assertEqual((len(WORKS), len(RECORDINGS), len(CATALOG["covers"])), (78, 78, 78))  # Görev 236
 
     def test_galatasaray_marsi_goes_to_sonsuza_kadar(self):
         _, vid, wid, rid = by_order(7)
@@ -203,7 +205,7 @@ class ContentIntegrityTests(unittest.TestCase):
 
     def test_cover_webp_hashes(self):
         images = [image for cover in CATALOG["covers"] for image in cover["webImages"]]
-        self.assertEqual(len(images), 204)
+        self.assertEqual(len(images), 234)  # Görev 236
         for image in images:
             self.assertEqual(hashlib.sha256((MUSIC_ROOT / image["path"]).read_bytes()).hexdigest(), image["sha256"], image["path"])
 

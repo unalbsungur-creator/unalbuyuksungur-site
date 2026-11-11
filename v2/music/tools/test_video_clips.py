@@ -53,7 +53,7 @@ def codes(problems):
 
 class CatalogVideoTests(unittest.TestCase):
     def test_counts_preserved(self):
-        self.assertEqual((len(WORKS), len(RECORDINGS), len(CATALOG["covers"])), (68, 68, 68))
+        self.assertEqual((len(WORKS), len(RECORDINGS), len(CATALOG["covers"])), (78, 78, 78))  # Görev 236
 
     def test_first_video_on_cok_sevince_insani_recording(self):
         work = WORKS["w-0025"]

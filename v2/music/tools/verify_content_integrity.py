@@ -143,6 +143,23 @@ COVER_DECISIONS = {
         "images/c-0015-1200.webp": (176938, "5dbac967756792065b01874305d4a7bcc353f24b663c709007492d206c3c2c31"),
     },
 }
+# Görev 236: arşive eklenen 10 yeni şarkı ("Yakında" durumunda). Kapaktan başka bilgi yok: söz/hikâye missing,
+# tür/tarih/bağlantı/video yok, releaseStatus unreleased. Dil sahibin kararı (Rise and Shine EN, diğerleri TR).
+# eser -> (başlık, slug, dil); kayıt ve kapak aynı numaradadır (w-0069 -> r-0069, c-0069).
+COMING_SOON = {
+    "w-0069": ("Alışamadım", "alisamadim", "tr"),
+    "w-0070": ("Anlat", "anlat", "tr"),
+    "w-0071": ("Benden Sonra", "benden-sonra", "tr"),
+    "w-0072": ("Bu Oda", "bu-oda", "tr"),
+    "w-0073": ("Gel Sevgilim", "gel-sevgilim", "tr"),
+    "w-0074": ("Hacı", "haci", "tr"),
+    "w-0075": ("Next Point TR", "next-point-tr", "tr"),
+    "w-0076": ("Rise and Shine", "rise-and-shine", "en"),
+    "w-0077": ("Rüyama Bile Girmedin", "ruyama-bile-girmedin", "tr"),
+    "w-0078": ("Sonunda Gidiyorum", "sonunda-gidiyorum", "tr"),
+}
+COMING_SOON_UPDATED_AT = "2026-11-11"
+EMPTY_LINKS = {"spotify": None, "youtube": None, "youtubeMusic": None, "appleMusic": None, "other": []}
 # Görev 25 kullanıcı onaylı site hikâyesi düzeltmesi (Ağlama, w-0001; Word belgesi değişmedi).
 AGLAMA_CORRECTION = ("content/stories/w-0001.txt",
                      "1998/ Flört bitince gözler kapaklarını açtığı ve damlalar gelmeye başladı",
@@ -349,13 +366,32 @@ def apply_later_decisions(data):
     return data
 
 
+def add_coming_soon(data, catalog):
+    """Görev 236: 10 yeni "Yakında" eserini ve kaydını kararlardan üretir. Kapak kayıtları (kaynak SHA-256, WebP)
+    validate_catalog'da arşiv dosyasıyla doğrulanır (16, 19, 24, 26); burada yalnız güncel katalogdan alınır."""
+    data = json.loads(json.dumps(data))
+    covers = {c["id"]: c for c in catalog["covers"]}
+    for wid, (title, slug, language) in COMING_SOON.items():
+        number = wid[2:]
+        data["works"].append({"id": wid, "title": title, "titleStatus": "confirmed", "workingTitle": None,
+                              "slug": slug, "language": language, "releaseStatus": "unreleased",
+                              "lyrics": {"status": "missing", "file": None}, "story": {"status": "missing", "file": None}})
+        data["recordings"].append({"id": "r-" + number, "workId": wid, "title": title, "versionLabel": None,
+                                   "genres": [], "isOriginal": None, "coverId": "c-" + number, "releaseDate": None,
+                                   "links": dict(EMPTY_LINKS, other=[])})
+        if "c-" + number in covers:
+            data["covers"].append(covers["c-" + number])
+    data["updatedAt"] = COMING_SOON_UPDATED_AT
+    return data
+
+
 def repo_checks(report, catalog):
     works = {w["id"]: w for w in catalog["works"]}
     recordings = {r["id"]: r for r in catalog["recordings"]}
     covers = {c["id"]: c for c in catalog["covers"]}
 
-    counts = {"Work": (len(works), 68), "Recording": (len(recordings), 68), "CoverAsset": (len(covers), 68)}
-    report.check("Katalog: 68 Work, 68 Recording, 68 CoverAsset",
+    counts = {"Work": (len(works), 78), "Recording": (len(recordings), 78), "CoverAsset": (len(covers), 78)}
+    report.check("Katalog: 78 Work, 78 Recording, 78 CoverAsset (68 + Görev 236'da 10 yeni)",
                  [f"{k}: {got} (beklenen {want})" for k, (got, want) in counts.items() if got != want])
 
     problems = []
@@ -377,10 +413,12 @@ def repo_checks(report, catalog):
     for js in (MUSIC_ROOT / "work" / "work.js", MUSIC_ROOT / "catalog.js"):
         if "DEFAULT_RECORDINGS" in js.read_text(encoding="utf-8"):
             problems.append(f"{js.name}: tek kayıtlı eserlerde DEFAULT_RECORDINGS gereksiz")
-    report.check("Eser–kayıt: 68 eserin her birinde tam 1 kayıt; ayrılan 8 eser doğru kayıt, başlık ve slug'da", problems)
+    report.check("Eser–kayıt: 78 eserin her birinde tam 1 kayıt; ayrılan 8 eser doğru kayıt, başlık ve slug'da", problems)
 
     problems = []
     for wid, work in works.items():
+        if wid in COMING_SOON:
+            continue
         for field, folder in (("lyrics", "lyrics"), ("story", "stories")):
             owner = SHARED_CONTENT.get(wid, wid)
             if work[field] != {"status": "published", "file": f"content/{folder}/{owner}.txt"}:
@@ -391,7 +429,28 @@ def repo_checks(report, catalog):
     report.check("68 eserin sözü ve hikâyesi yayımlanmış; kendi dosyasına ya da onaylı ortak dosyaya bağlı; "
                  "kayda özel söz yok", problems)
 
-    referenced = {w[f]["file"] for w in works.values() for f in ("lyrics", "story")}
+    problems = []
+    empty = {"status": "missing", "file": None}
+    for wid, (title, slug, language) in COMING_SOON.items():
+        rid, cid = "r-" + wid[2:], "c-" + wid[2:]
+        work, recording = works.get(wid), recordings.get(rid)
+        if work is None or recording is None or cid not in covers:
+            problems.append(f"{wid}/{rid}/{cid} katalogda yok")
+            continue
+        if (work["title"], work["slug"], work["language"], work["titleStatus"], work["releaseStatus"]) !=                 (title, slug, language, "confirmed", "unreleased"):
+            problems.append(f"{wid}: başlık/slug/dil/durum beklenenden farklı")
+        if work["lyrics"] != empty or work["story"] != empty:
+            problems.append(f"{wid}: söz/hikâye uydurulmamalı (missing, file null)")
+        if (recording["workId"], recording["coverId"], recording["title"], recording["genres"], recording["isOriginal"],
+                recording["releaseDate"], recording["versionLabel"]) != (wid, cid, title, [], None, None, None):
+            problems.append(f"{rid}: tür/tarih/orijinallik uydurulmamalı")
+        if recording["links"] != EMPTY_LINKS or "videos" in recording or "lyrics" in recording:
+            problems.append(f"{rid}: bağlantı/video henüz yok olmalı ('Yakında')")
+        if covers[cid]["sourceFileName"] != f"{title}.jpg":
+            problems.append(f"{cid}: kaynak kapak {covers[cid]['sourceFileName']!r}")
+    report.check("Görev 236: 10 yeni eser 'Yakında' — yalnız kapak; söz/hikâye/tür/tarih/bağlantı/video boş", problems)
+
+    referenced = {w[f]["file"] for w in works.values() for f in ("lyrics", "story") if w[f]["file"]}
     on_disk = {p.relative_to(MUSIC_ROOT).as_posix() for p in (MUSIC_ROOT / "content").rglob("*") if p.is_file()}
     lyrics = sorted(f for f in on_disk if f.startswith("content/lyrics/"))
     stories = sorted(f for f in on_disk if f.startswith("content/stories/"))
@@ -454,9 +513,9 @@ def repo_checks(report, catalog):
         head = (MUSIC_ROOT / p).read_bytes()[:12]
         if head[:4] != b"RIFF" or head[8:12] != b"WEBP":
             problems.append(f"{p}: WebP başlığı yok")
-    if len(images) != 204:
-        problems.append(f"{len(images)} WebP (beklenen 204)")
-    report.check("204 WebP geçerli ve kapaklarda referanslı; her kaydın kendi kapağı var", problems)
+    if len(images) != 234:
+        problems.append(f"{len(images)} WebP (beklenen 234)")
+    report.check("234 WebP geçerli ve kapaklarda referanslı; her kaydın kendi kapağı var", problems)
 
     ids = [o["id"] for o in catalog["openIssues"]]
     problems = [] if ids == EXPECTED_OPEN_ISSUES else [f"açık konular: {ids}"]
@@ -558,9 +617,10 @@ def archive_checks(report, catalog, archive):
     if sha256(before_path) != TASK25_BACKUP_CATALOG_SHA256:
         problems.append("Görev 25 yedek kataloğu beklenen sürüm değil")
     expected = apply_later_decisions(expected_split_catalog(json.loads(before_path.read_text(encoding="utf-8"))))
+    expected = add_coming_soon(expected, catalog)
     problems += [key for key in sorted(set(expected) | set(catalog)) if expected.get(key) != catalog.get(key)]
     report.check("Katalog = Görev 25 öncesi yedek + ayırma kararı + onaylı 49 eski ve 16 yeni video "
-                 "+ 6 onaylı Spotify bağlantısı + yenilenen Biliyorum kapağı (başka fark yok)",
+                 "+ 6 onaylı Spotify bağlantısı + yenilenen Biliyorum kapağı + Görev 236'da 10 'Yakında' eser (başka fark yok)",
                  problems)
 
     backup = {}

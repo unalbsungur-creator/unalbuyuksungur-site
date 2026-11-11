@@ -100,8 +100,9 @@ class ExternalLinksTests(unittest.TestCase):
 
     def test_preserved_catalog_invariants(self):
         catalog = (ROOT / "v2/music/data/catalog.json").read_text(encoding="utf-8")
-        self.assertEqual(len(re.findall(r'"id": "w-\d{4}"', catalog)), 68)
-        self.assertEqual(len(re.findall(r'"id": "r-\d{4}"', catalog)), 68)
+        # Görev 236: 10 yeni "Yakında" eseri (videosuz); video sayısı değişmez.
+        self.assertEqual(len(re.findall(r'"id": "w-\d{4}"', catalog)), 78)
+        self.assertEqual(len(re.findall(r'"id": "r-\d{4}"', catalog)), 78)
         self.assertEqual(len(re.findall(r'"videoId": "[A-Za-z0-9_-]{11}"', catalog)), 68)
 
 

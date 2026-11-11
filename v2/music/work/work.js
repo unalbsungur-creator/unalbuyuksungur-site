@@ -14,7 +14,7 @@
     var WORK_ID = /^w-\d{4}$/;
     var MAX_QUERY_LENGTH = 100;
     var SITE_NAME = "Ünal Büyüksungur";
-    var LANGUAGE_NAMES = { tr: "Türkçe", de: "Almanca" };
+    var LANGUAGE_NAMES = { tr: "Türkçe", de: "Almanca", en: "İngilizce" };
     var GENRE_NAMES = { pop: "Pop", "rock-ballad": "Rock Ballad", "thrash-metal": "Thrash Metal" };
     var DATE_RANGE_NOTES = {
         "cover-verified": tr("music.dateUnverified", "Kapak üzerindeki tarih; henüz doğrulanmadı."),
@@ -583,11 +583,21 @@
 
     /* ---------- Versiyon seçimi ---------- */
 
+    // Görev 236: "Yakında yayında" — kaydın doğrulanmış dinleme bağlantısı ve videosu yoksa. Tek kaynak catalog.json:
+    // kaydın links/videos alanına bağlantı eklenince rozet kendiliğinden kalkar ve butonlar görünür.
+    function isComingSoon(recording) {
+        var links = recording.links || {};
+        var linked = ["spotify", "youtube", "youtubeMusic", "appleMusic"].some(function (key) { return Boolean(links[key]); })
+            || (Array.isArray(links.other) && links.other.length > 0);
+        return !linked && !(Array.isArray(recording.videos) && recording.videos.length > 0);
+    }
+
     function selectRecording(work, recordingId, updateUrl) {
         var recording = work.recordings.filter(function (r) { return r.id === recordingId; })[0] || work.recordings[0];
         renderCover(work, recording);
         renderVideo(work, recording);
         renderListen(work, recording);
+        dom.soon.hidden = !isComingSoon(recording);
         var lyrics = lyricsFor(work, recording);
         if (lyrics !== dom.lyrics.__asset) {
             dom.lyrics.__asset = lyrics;
@@ -661,6 +671,7 @@
         applySeo(work);
         var version = versionLabel(work);
         dom.title.textContent = version ? version.title : work.title;
+        dom.soon.textContent = tr("music.comingSoon", "Yakında yayında");
         dom.title.setAttribute("lang", work.data.language);
         dom.lyrics.setAttribute("lang", work.data.language);
         // Story translations are not part of this task. The existing story asset is the Turkish fallback.
@@ -753,6 +764,7 @@
             title: document.getElementById("work-title"),
             titleNote: document.getElementById("work-title-note"),
             version: document.getElementById("work-version"),
+            soon: document.getElementById("work-soon"),
             crumbTitle: document.getElementById("crumb-title"),
             crumbCatalog: document.getElementById("crumb-catalog"),
             facts: document.getElementById("work-facts"),

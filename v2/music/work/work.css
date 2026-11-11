@@ -196,6 +196,23 @@
     color: var(--gold);
 }
 
+/* Görev 236: "Yakında yayında" rozeti (bağlantısı/videosu olmayan kayıt) */
+.work-soon {
+    display: inline-block;
+    margin: 16px 0 0;
+    padding: 4px 12px;
+    border: 1px solid var(--gold);
+    border-radius: 999px;
+    color: var(--gold);
+    font-size: 12px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.work-soon[hidden] {
+    display: none;
+}
+
 .work-note {
     margin: 16px 0 0;
     padding-left: 14px;

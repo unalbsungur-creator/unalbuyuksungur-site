@@ -51,10 +51,10 @@ class MultilingualTests(unittest.TestCase):
 
     def test_static_locales_and_metadata(self):
         ids = {w["id"] for w in CATALOG["works"]}
-        self.assertEqual(len(ids), 68)
-        # Turkish: 68 works + 4 rendered shells (Görev 220; privacy since Görev 231) + 4 Turkish-only pages
-        # (Görev 221: blog, posts) + 5 draft legal pages (Görev 226); EN/DE: 68 works + 5 shells each.
-        self.assertEqual(len(self.pages), 227)
+        self.assertEqual(len(ids), 78)  # Görev 236: 68 + 10 "Yakında"
+        # Turkish: 78 works + 4 rendered shells (Görev 220; privacy since Görev 231) + 4 Turkish-only pages
+        # (Görev 221: blog, posts) + 5 draft legal pages (Görev 226); EN/DE: 78 works + 5 shells each.
+        self.assertEqual(len(self.pages), 257)
         for locale in ("en", "de"):
             home = self.pages[f"v2/{locale}/index.html"].decode("utf-8")
             catalog = self.pages[f"v2/{locale}/music/index.html"].decode("utf-8")
@@ -255,6 +255,29 @@ class MultilingualTests(unittest.TestCase):
         self.assertEqual(kvkk.count('<h2 id="acik-riza">Yurt Dışına Aktarım Açık Rıza Metni</h2>'), 1)
         self.assertLess(kvkk.index('id="acik-riza"'), kvkk.index('<nav class="legal-links"'))
 
+    def test_coming_soon_songs(self):
+        """Görev 236: bağlantısı ve videosu olmayan 10 yeni kayıt "Yakında yayında" rozetiyle; kural catalog.json'dan."""
+        _, messages = render_site.load_messages(SOURCES.__getitem__)
+        self.assertEqual({loc: messages[loc]["music.comingSoon"] for loc in ("tr", "en", "de")},
+                         {"tr": "Yakında yayında", "en": "Coming soon", "de": "Bald verfügbar"})
+        self.assertEqual({loc: messages[loc]["music.lang.en"] for loc in ("tr", "en", "de")},
+                         {"tr": "İngilizce", "en": "English", "de": "Englisch"})
+        soon = [r["id"] for r in CATALOG["recordings"] if "videos" not in r
+                and not any(v for k, v in r["links"].items() if k != "other") and not r["links"]["other"]]
+        self.assertEqual(soon, [f"r-{n:04d}" for n in range(69, 79)])
+        self.assertEqual([w["language"] for w in CATALOG["works"] if w["language"] == "en"], ["en"])  # Rise and Shine
+        for rel in ("v2/music/catalog.js", "v2/music/work/work.js"):
+            js = (ROOT / rel).read_text(encoding="utf-8")
+            self.assertIn("function isComingSoon(recording)", js, rel)
+            self.assertIn('tr("music.comingSoon", "Yakında yayında")', js, rel)
+            self.assertIn('en: "İngilizce"', js, rel)
+        self.assertIn('<p class="work-soon" id="work-soon" hidden></p>',
+                      (ROOT / "v2/music/work/index.html").read_text(encoding="utf-8"))
+        page = self.pages["v2/en/music/work/w-0076.html"].decode("utf-8")
+        self.assertIn("Rise and Shine is an English work by Ünal Büyüksungur. Coming soon.", page)
+        self.assertIn("Bu Oda ist ein türkisches Werk von Ünal Büyüksungur. Bald verfügbar.",
+                      self.pages["v2/de/music/work/w-0072.html"].decode("utf-8"))
+
     def test_home_music_showcase(self):
         """Görev 224: Müzik vitrini statik HTML; sayılar katalogdan, kartlar FEATURED_WORKS listesinden (eser kimliği)."""
         self.assertEqual(render_site.FEATURED_WORKS, ("w-0023", "w-0013", "w-0014", "w-0016"))
@@ -415,8 +438,8 @@ class MultilingualTests(unittest.TestCase):
 
     def test_work_creative_content_unchanged(self):
         ids = {w["id"]: w for w in CATALOG["works"]}
-        videos = [r["videos"][0]["videoId"] for r in CATALOG["recordings"]]
-        self.assertEqual((len(ids), len(videos), len(set(videos))), (68, 68, 68))
+        videos = [r["videos"][0]["videoId"] for r in CATALOG["recordings"] if "videos" in r]
+        self.assertEqual((len(ids), len(videos), len(set(videos))), (78, 68, 68))  # Görev 236: 10 videosuz
         for work_id, work in ids.items():
             for locale in ("tr", "en", "de"):
                 prefix = "" if locale == "tr" else locale + "/"
@@ -424,7 +447,8 @@ class MultilingualTests(unittest.TestCase):
                 self.assertIn(work["title"], html.unescape(page))
                 self.assertIn('data-work-id="' + work_id + '"', page)
             for asset in ("lyrics", "story"):
-                self.assertTrue((ROOT / "v2/music" / work[asset]["file"]).is_file())
+                if work[asset]["status"] == "published":
+                    self.assertTrue((ROOT / "v2/music" / work[asset]["file"]).is_file())
 
     def test_music_eyebrows_and_favicon_for_every_locale(self):
         _, messages = render_site.load_messages(SOURCES.__getitem__)
