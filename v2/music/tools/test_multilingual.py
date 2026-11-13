@@ -73,7 +73,7 @@ class MultilingualTests(unittest.TestCase):
                     self.assertEqual(page.count('class="language-switcher"'), 1)
                     self.assertEqual(page.count('aria-current="true"'), 1)
             self.assertIn("Digital Projects" if locale == "en" else "Digitale Projekte", home)
-            self.assertEqual(home.count('<article class="project-card">'), 6)
+            self.assertEqual(home.count('<article class="project-card">'), 7)  # Görev 242: + Next Point Monitor
             self.assertIn("A wall for ideas" if locale == "en" else "Pinnwand für Gedanken", home)
             self.assertIn('href="music/"', home)
             self.assertIn('href="../../music/catalog.css"', catalog)

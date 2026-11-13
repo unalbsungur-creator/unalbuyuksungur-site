@@ -77,12 +77,14 @@ SITE_FILES = (
     "v2/images/unal-digital-world-hero-1280.webp",
     "v2/images/unal-digital-world-hero-1672.webp",
     "v2/images/og/unal-digital-world-og-1200x630.jpg",
-    "v2/images/projects/dilek-kutum-placeholder-1200.webp",
-    "v2/images/projects/istec-placeholder-1200.webp",
+    # Görev 242: yer tutucular yerine gerçek proje görselleri (ekran görüntüsü veya marka kapağı; 1200×675 WebP).
+    "v2/images/projects/dilek-kutum-brand-1200.webp",
+    "v2/images/projects/faos-brand-1200.webp",
+    "v2/images/projects/istec-homepage-1200.webp",
     "v2/images/projects/mindot-homepage-1200.webp",
+    "v2/images/projects/next-point-monitor-brand-1200.webp",
     "v2/images/projects/next-point-tr-homepage-1200.webp",
-    "v2/images/projects/openfaos-placeholder-1200.webp",
-    "v2/images/projects/tralvid-placeholder-1200.webp",
+    "v2/images/projects/tralvid-brand-1200.webp",
     "v2/music/index.html",
     "v2/music/catalog.css",
     "v2/music/catalog.js",
@@ -127,7 +129,8 @@ RENDERED_PAGES = RENDERED_SHELLS + tuple(render_site.TR_PAGES)
 BUILD_INPUTS = (render_site.REVIEWS,)
 # Görev 239: önbellek sürümleme — HTML'deki yerel .js/.css adreslerine içerik SHA-256'sının ilk 10 hanesi
 # (?v=...) eklenir; dosya değişmezse parametre de değişmez. Dış adresler (şema içeren) dokunulmaz.
-ASSET_REF = re.compile(r'\b(src|href)="([^"?#:]+\.(?:js|css))"')
+# Görev 242: proje kartı görselleri (images/projects/*.webp) de aynı içerik sürümünü alır.
+ASSET_REF = re.compile(r'\b(src|href)="([^"?#:]+\.(?:js|css)|[^"?#:]*images/projects/[^"?#:/]+\.webp)"')
 VERSION_LENGTH = 10
 # 404 sayfası her adresten sunulur; kök-mutlak bağlantıya yalnız bu sayfada izin verilir.
 NOT_FOUND = "v2/404.html"
@@ -452,7 +455,8 @@ def build(root, out, expect_count=None, manifest_path=None, log=print, profile="
     catalog = load_catalog(root)
     files = plan(root, catalog)
     pages, template_digest = render(root, catalog, files, profile)
-    digests = {rel: sha256(checked_source(root, rel)) for rel in files if rel.endswith((".js", ".css"))}
+    digests = {rel: sha256(checked_source(root, rel)) for rel in files
+               if rel.endswith((".js", ".css")) or rel.startswith("v2/images/projects/")}
     pages = {rel: version_assets(rel, data, digests) for rel, data in pages.items()}
     extra_files = generated(profile, pages)
     if profile == "production":

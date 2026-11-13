@@ -20,6 +20,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from PIL import Image
+
 sys.dont_write_bytecode = True  # v2/ altında __pycache__ oluşmasın (herkese açık klasör)
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import build_publication as bp  # noqa: E402
@@ -112,16 +114,16 @@ class BuildPublicationTests(unittest.TestCase):
     def test_output_is_exactly_the_allowlist(self):
         manifest = self.build()
         web = expected_web_files()
-        self.assertEqual(len(web), 414)  # Görev 236: +30 WebP. V1 favicon, V2 favicon ile aynı paket yoluna düşer (alias)
+        self.assertEqual(len(web), 415)  # Görev 242: proje görselleri 6 -> 7;  # Görev 236: +30 WebP. V1 favicon, V2 favicon ile aynı paket yoluna düşer (alias)
         self.assertEqual(len(PAGES), 78)  # Görev 236: +10 "Yakında" eser
         generated = {"_headers", "_redirects", "robots.txt"}
         self.assertEqual(set(self.tree()), published(web) | published(ALL_PAGES) | generated)
-        self.assertEqual(len(self.tree()), 676)  # Görev 240: + video sayfası (TR/EN/DE)
+        self.assertEqual(len(self.tree()), 677)  # Görev 242: +1 proje görseli; Görev 240: + video sayfası (TR/EN/DE)
         self.assertEqual([n for n in self.tree() if n.startswith(("v2/", "legacy/"))], [])
-        self.assertEqual((manifest["webFiles"], manifest["copiedFiles"], manifest["renderedPages"]), (673, 413, 260))
-        self.assertEqual(manifest["totalOutputFiles"], 676)
+        self.assertEqual((manifest["webFiles"], manifest["copiedFiles"], manifest["renderedPages"]), (674, 414, 260))
+        self.assertEqual(manifest["totalOutputFiles"], 677)
         self.assertEqual(manifest["profile"], "preview")
-        self.assertEqual(manifest["groups"], {"site": 37, "data": 2, "lyrics": 64, "stories": 64, "webp": 234,
+        self.assertEqual(manifest["groups"], {"site": 38, "data": 2, "lyrics": 64, "stories": 64, "webp": 234,
                                                "legacyImages": 12, "pages": 260})
         self.assertEqual([(a["path"], a["source"], a["sameAs"]) for a in manifest["aliases"]],
                          [("images/favicon.jpg.jpeg", "v2/legacy/v1-images/favicon.jpg.jpeg",
@@ -130,30 +132,58 @@ class BuildPublicationTests(unittest.TestCase):
     def test_project_portfolio_policy(self):
         source = (REPO / "v2/index.html").read_text(encoding="utf-8")
         section = source.split('<section class="projects"', 1)[1].split('</section>', 1)[0]
-        projects = ("MINDOT", "Next Point TR", "OpenFAOS", "TRALVID", "İŞTEÇ", "Dilek Kutum")
+        # Görev 242: Next Point Monitor, Next Point TR'nin hemen arkasında; OpenFAOS'un görünen adı FAOS.
+        projects = ("MINDOT", "Next Point TR", "Next Point Monitor", "FAOS", "TRALVID", "İŞTEÇ", "Dilek Kutum")
         positions = [section.index(f"<h3>{name}</h3>") for name in projects]
         self.assertEqual(positions, sorted(positions))
-        self.assertEqual(section.count('<article class="project-card">'), 6)
+        self.assertEqual(section.count('<article class="project-card">'), 7)
         self.assertEqual(section.count('class="project-media" href='), 2)
         self.assertEqual(section.count('class="project-link" href='), 2)
         self.assertEqual(section.count('target="_blank"'), 4)
         self.assertEqual(section.count('rel="noopener noreferrer"'), 4)
-        self.assertEqual(section.count('loading="lazy" decoding="async"'), 6)
-        self.assertEqual(section.count('width="1200" height="675"'), 6)
-        self.assertEqual(section.count('class="project-status"'), 6)
-        self.assertEqual(section.count('alt="'), 6)
-        self.assertEqual(section.count('<figure class="project-media">'), 4)
-        self.assertEqual(section.count('konsept kapak'), 4)
+        self.assertEqual(section.count('loading="lazy" decoding="async"'), 7)
+        self.assertEqual(section.count('width="1200" height="675"'), 7)
+        self.assertEqual(section.count('class="project-status"'), 7)
+        self.assertEqual(section.count('alt="'), 7)
+        self.assertEqual(section.count('<figure class="project-media">'), 5)
         self.assertEqual(section.count("https://mind-ot.com/"), 2)
         self.assertEqual(section.count("https://nextpointtr.com/"), 2)
-        for forbidden in ('href="#"', "isbuyutec.com", "localhost", "tralvid.com",
+        self.assertIn("Football Academy Operating System — ", section)
+        # Görev 242: nextpointmonitor.com ve fa-os.com DNS'te çözülmüyor → bağlantısız; İŞTEÇ bağlantısız kalır.
+        for forbidden in ('href="#"', "isbuyutec.com", "localhost", "tralvid.com", "nextpointmonitor.com",
+                          "fa-os.com", "OpenFAOS", "placeholder", "konsept kapak",
                           'project-no-link', 'project-placeholder', 'Doğrulanmış public bağlantı'):
             self.assertNotIn(forbidden, section)
         for asset in (
-                "dilek-kutum-placeholder-1200.webp", "istec-placeholder-1200.webp",
-                "mindot-homepage-1200.webp", "next-point-tr-homepage-1200.webp",
-                "openfaos-placeholder-1200.webp", "tralvid-placeholder-1200.webp"):
+                "dilek-kutum-brand-1200.webp", "istec-homepage-1200.webp", "mindot-homepage-1200.webp",
+                "next-point-tr-homepage-1200.webp", "next-point-monitor-brand-1200.webp",
+                "faos-brand-1200.webp", "tralvid-brand-1200.webp"):
             self.assertIn(f'images/projects/{asset}', section)
+            self.assertEqual(Image.open(REPO / "v2/images/projects" / asset).size, (1200, 675))
+        self.assertEqual(sorted(p.name for p in (REPO / "v2/images/projects").iterdir()), sorted(
+            ("dilek-kutum-brand-1200.webp", "istec-homepage-1200.webp", "mindot-homepage-1200.webp",
+             "next-point-tr-homepage-1200.webp", "next-point-monitor-brand-1200.webp",
+             "faos-brand-1200.webp", "tralvid-brand-1200.webp")))
+
+    def test_project_images_are_versioned(self):
+        """Görev 242: üretilen ana sayfalarda (TR/EN/DE) proje görselleri ?v=<içerik SHA-256[:10]> taşır."""
+        self.build()
+        tree = self.tree()
+        for page in ("index.html", "en/index.html", "de/index.html"):
+            html = tree[page].decode("utf-8")
+            refs = re.findall(r'src="([^"]*images/projects/([\w-]+\.webp))(\?v=[0-9a-f]+)?"', html)
+            self.assertEqual(len(refs), 7, page)
+            for _, name, version in refs:
+                digest = bp.sha256((REPO / "v2/images/projects" / name).read_bytes())
+                self.assertEqual(version, "?v=" + digest[:bp.VERSION_LENGTH], (page, name))
+        en = tree["en/index.html"].decode("utf-8")
+        self.assertIn("<h3>Next Point Monitor</h3>", en)
+        self.assertIn("A tourism intelligence and incident monitoring platform", en)
+        self.assertIn("<h3>FAOS</h3>", en)
+        self.assertIn("Football Academy Operating System — Bringing", en)
+        de = tree["de/index.html"].decode("utf-8")
+        self.assertIn("Eine Plattform für Tourismus-Intelligence", de)
+        self.assertIn("FAOS-Logo und Markengrafik", de)
 
     def test_excluded_files_absent(self):
         self.build()
@@ -168,7 +198,7 @@ class BuildPublicationTests(unittest.TestCase):
     def test_output_bytes_identical_to_source(self):
         manifest = self.build()
         tree = self.tree()
-        self.assertEqual(len(manifest["files"]), 413)
+        self.assertEqual(len(manifest["files"]), 414)
         self.assertEqual(tree["images/favicon.jpg.jpeg"], (REPO / "images/favicon.jpg.jpeg").read_bytes())
         for entry in manifest["files"]:
             source = (REPO / entry["source"]).read_bytes()
@@ -282,7 +312,7 @@ class BuildPublicationTests(unittest.TestCase):
         """Görev 220: ana alan adında noindex yok (yalnız pages.dev), robots/sitemap üretilir, URL'ler köktedir."""
         manifest = self.build(profile="production")
         tree = self.tree()
-        self.assertEqual((manifest["profile"], manifest["totalOutputFiles"]), ("production", 677))  # Görev 236: +30 WebP, +30 eser sayfası
+        self.assertEqual((manifest["profile"], manifest["totalOutputFiles"]), ("production", 678))  # Görev 236: +30 WebP, +30 eser sayfası
         headers = tree["_headers"].decode("utf-8")
         self.assertTrue(headers.startswith(bp.MARKER + "\n"))
         self.assertIn("https://unalbuyuksungur-v2.pages.dev/*\n  X-Robots-Tag: noindex\n", headers)
@@ -463,12 +493,12 @@ class BuildPublicationTests(unittest.TestCase):
 
     def test_cli_exit_codes(self):
         run = [sys.executable, "-I", str(SCRIPT), "--root", str(self.root), "--out", "_site"]
-        ok = subprocess.run(run + ["--expect-count", "673"], capture_output=True, text=True, encoding="utf-8")
+        ok = subprocess.run(run + ["--expect-count", "674"], capture_output=True, text=True, encoding="utf-8")
         self.assertEqual(ok.returncode, 0, ok.stderr)
-        self.assertIn("413/413", ok.stdout)
+        self.assertIn("414/414", ok.stdout)
         self.assertIn("üretilen sayfa 260 (preview)", ok.stdout)
         manifest = json.loads((self.root / "_site-manifest.json").read_text(encoding="utf-8"))
-        self.assertEqual(manifest["totalOutputFiles"], 676)
+        self.assertEqual(manifest["totalOutputFiles"], 677)
         bad = subprocess.run(run + ["--profile", "staging"], capture_output=True, text=True, encoding="utf-8")
         self.assertEqual(bad.returncode, 2)  # argparse: geçersiz profil seçimi
         (self.root / "v2/music/catalog.css").unlink()
