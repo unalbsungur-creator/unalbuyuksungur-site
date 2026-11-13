@@ -270,7 +270,7 @@ class MultilingualTests(unittest.TestCase):
                 self.assertEqual(len(re.findall(r'<button class="sample-play" type="button" data-video-id="[\w-]{11}"',
                                                 samples)), 4)
                 self.assertIn('href="../../music/?koleksiyon=burc-serisi"', samples)
-                self.assertEqual(len(re.findall(r'<img src="(\.\./)+music/images/c-\d{4}-400\.webp"', samples)), 4)
+                self.assertEqual(len(re.findall(r'<img src="(\.\./)+music/images/c-\d{4}-400\.webp\?v=[0-9a-f]{12}"', samples)), 4)
                 self.assertEqual(re.findall(r'href="(https://www\.shopier\.com/[^"]+)"', page),
                                  ["https://www.shopier.com/unalbuyuksungur/" + n for n in ("52905449", "52905472", "52905482")])
                 self.assertEqual(re.findall(r'<p class="studio-price">([^<]+)</p>', page), ["1.590 TL", "1.890 TL", "1.290 TL"])
@@ -312,6 +312,33 @@ class MultilingualTests(unittest.TestCase):
             page = self.pages[f"v2/{'' if locale == 'tr' else locale + '/'}privacy/index.html"].decode("utf-8")
             self.assertIn(note, " ".join(html.unescape(page).split()), locale)
             self.assertIn("youtube-nocookie.com", page)
+
+    def test_cover_urls_are_content_versioned(self):
+        """Görev 241: build'in ürettiği bütün HTML'deki kapak adresleri ?v=<sha256[:12]> taşır (catalog.js, work.js
+        imageUrl() ve og:image ile aynı kural); sürüm görsel içeriğine bağlıdır."""
+        digests = {i["path"]: i["sha256"] for c in CATALOG["covers"] for i in c["webImages"]}
+        found = 0
+        for rel, data in self.pages.items():
+            for path, version in re.findall(r'music/(images/c-\d{4}-\d+\.webp)(\?v=[0-9a-f]+)?', data.decode("utf-8")):
+                with self.subTest(rel=rel, path=path):
+                    self.assertEqual(version, "?v=" + digests[path][:12])
+                found += 1
+        self.assertGreater(found, 0)
+        for script in ("v2/music/catalog.js", "v2/music/work/work.js"):
+            self.assertIn('return ASSET_ROOT + image.path + "?v=" + image.sha256.slice(0, 12);',
+                          (ROOT / script).read_text(encoding="utf-8"), script)
+        # Görev 241: yenilenen Anneler Günü kapağı (c-0004) yeni sürümüyle görünür; değişmeyen kapaklar aynı kalır.
+        cover = next(c for c in CATALOG["covers"] if c["id"] == "c-0004")
+        self.assertEqual(cover["sha256"], "84dfd9a47b7e929d77d75aaeb8834b530f68a15e22802364538e6d8bf62cec85")
+        self.assertEqual(render_site.cover_url("../", cover["webImages"][0]),
+                         "../music/images/c-0004-400.webp?v=" + cover["webImages"][0]["sha256"][:12])
+        changed = json.loads(json.dumps(CATALOG))
+        changed["covers"][0]["webImages"][0]["sha256"] = "0" * 64
+        self.assertEqual(render_site.cover_url("", changed["covers"][0]["webImages"][0])[-15:], "?v=000000000000")
+        self.assertEqual(render_site.cover_url("", CATALOG["covers"][1]["webImages"][0]),
+                         render_site.cover_url("", changed["covers"][1]["webImages"][0]))  # değişmeyen aynı
+        with self.assertRaisesRegex(render_site.LocaleError, "COVER-VERSION"):
+            render_site.cover_url("", {"path": "images/c-0001-400.webp", "sha256": None})
 
     def test_legal_pages_final(self):
         """Görev 235: yasal metinler yürürlükte — taslak notu/yer tutucu yok, yürürlük tarihi var, noindex sürer."""
@@ -404,7 +431,7 @@ class MultilingualTests(unittest.TestCase):
                 self.assertNotIn("youtube-nocookie", section)  # oynatıcı yalnız tıklayınca (sayfa betiği)
                 self.assertIn('href="../music/?koleksiyon=burc-serisi"', section)
                 self.assertIn('href="../music/?koleksiyon=ozel-gun-sarkilari"', section)
-                self.assertEqual(len(re.findall(r'<img src="(\.\./)+music/images/c-\d{4}-400\.webp"[^>]* alt="[^"]+"', section)), 4)
+                self.assertEqual(len(re.findall(r'<img src="(\.\./)+music/images/c-\d{4}-400\.webp\?v=[0-9a-f]{12}"[^>]* alt="[^"]+"', section)), 4)
         with self.assertRaises(render_site.LocaleError):
             render_site.studio_samples("<!-- STUDIO_SAMPLES -->", {**CATALOG, "collections": []}, "tr",
                                        render_site.load_messages(SOURCES.__getitem__)[1])
@@ -436,10 +463,10 @@ class MultilingualTests(unittest.TestCase):
                 render_site.load_reviews(json.dumps([bad]).encode("utf-8"))
 
     def test_site_footer_contact_and_alt_texts(self):
-        """Görev 239: 14 kaynak sayfanın footer'ında destek e-postası ve Instagram; içerik görsellerinde alt metin."""
+        """Görev 239: kaynak sayfaların (Görev 240: + video, 15) footer'ında destek e-postası ve Instagram; içerik görsellerinde alt metin."""
         sources = [rel for rel in subprocess.run(["git", "ls-files", "v2/*.html"], cwd=ROOT, capture_output=True,
                                                  text=True).stdout.split() if "site-footer" in (ROOT / rel).read_text(encoding="utf-8")]
-        self.assertEqual(len(sources), 14)
+        self.assertEqual(len(sources), 15)
         for rel in sources:
             footer = (ROOT / rel).read_text(encoding="utf-8").split('<footer class="site-footer">', 1)[1].split("</footer>", 1)[0]
             self.assertIn('href="mailto:destek@unalbuyuksungur.com">destek@unalbuyuksungur.com</a>', footer, rel)
@@ -470,8 +497,8 @@ class MultilingualTests(unittest.TestCase):
                 self.assertEqual([c[0] for c in cards], list(render_site.FEATURED_WORKS))
                 for work_id, src, srcset, title in cards:
                     self.assertEqual(html.unescape(title), titles[work_id])
-                    self.assertTrue(src.startswith(prefix + "music/images/c-") and src.endswith("-400.webp"), src)
-                    self.assertIn("-800.webp 800w", srcset)
+                    self.assertRegex(src, "^" + re.escape(prefix) + r"music/images/c-\d{4}-400\.webp\?v=[0-9a-f]{12}$")
+                    self.assertRegex(srcset, r"-800\.webp\?v=[0-9a-f]{12} 800w")
                 self.assertEqual(len(re.findall(r'class="platform-link" data-external-link="(spotify|youtubeMusic|'
                                                 r'appleMusic|youtube)"', section)), 4)
                 self.assertIn('class="button button-primary music-cta" href="music/">', section)

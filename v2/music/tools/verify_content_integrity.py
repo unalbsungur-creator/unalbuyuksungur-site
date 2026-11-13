@@ -142,6 +142,15 @@ COVER_DECISIONS = {
         "images/c-0015-800.webp": (98490, "674af8098e00d042b719d5059dec48c4c702e9da4198d6d37cfafc8b2e6e00c5"),
         "images/c-0015-1200.webp": (176938, "5dbac967756792065b01874305d4a7bcc353f24b663c709007492d206c3c2c31"),
     },
+    # Görev 241: sahip arşivdeki "Anneler Günü.jpg" dosyasını yeni kare (3000×3000) görselle değiştirdi; web
+    # görselleri aynı kuralla (Pillow, RGB, Lanczos, WebP quality=80, method=6) yeniden üretildi.
+    "c-0004": {
+        "source": {"sourceFileName": "Anneler Günü.jpg", "width": 3000, "height": 3000, "bytes": 1898382,
+                   "sha256": "84dfd9a47b7e929d77d75aaeb8834b530f68a15e22802364538e6d8bf62cec85"},
+        "images/c-0004-400.webp": (29836, "9ab4d447dd270f0133af9765b327b8a4cee19e12d944c103f032bc101e6dc474"),
+        "images/c-0004-800.webp": (82404, "0d786236a52e6087c37e53a7d78e9724324315a48b10999b6de480c308954141"),
+        "images/c-0004-1200.webp": (137594, "c31b88496381078ca126539b73151c1d08195c8160ff1c2b8bab1da731b5d0c9"),
+    },
 }
 # Görev 236: arşive eklenen 10 yeni şarkı ("Yakında" durumunda). Kapaktan başka bilgi yok: söz/hikâye missing,
 # tür/tarih/bağlantı/video yok, releaseStatus unreleased. Dil sahibin kararı (Rise and Shine EN, diğerleri TR).
@@ -627,7 +636,7 @@ def archive_checks(report, catalog, archive):
     expected = add_coming_soon(expected, catalog)
     problems += [key for key in sorted(set(expected) | set(catalog)) if expected.get(key) != catalog.get(key)]
     report.check("Katalog = Görev 25 öncesi yedek + ayırma kararı + onaylı 49 eski ve 16 yeni video "
-                 "+ 6 onaylı Spotify bağlantısı + yenilenen Biliyorum kapağı + Görev 236'da 10 'Yakında' eser (başka fark yok)",
+                 "+ 6 onaylı Spotify bağlantısı + yenilenen Biliyorum ve Anneler Günü kapakları + Görev 236'da 10 'Yakında' eser (başka fark yok)",
                  problems)
 
     backup = {}

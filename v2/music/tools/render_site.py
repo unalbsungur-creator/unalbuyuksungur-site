@@ -37,6 +37,18 @@ VIDEO_SAMPLES = (("Koç", "burc-serisi"), ("Boğa", "burc-serisi"), ("İkizler",
 SAMPLE_LINKS = (("spotify", "music.spotifyListen"), ("appleMusic", "music.appleListen"),
                 ("youtubeMusic", "music.youtubeMusicListen"), ("youtube", "music.youtubeListen"))
 YOUTUBE_ID = re.compile(r"^[A-Za-z0-9_-]{11}$")
+# Görev 241: kapak görseli adresleri içerik sürümlüdür: ?v=<webImages.sha256'nın ilk 12 hanesi>. catalog.js/work.js
+# imageUrl() ve eser sayfası og:image (render_pages) ile aynı kural; görsel değişmezse parametre de değişmez.
+COVER_VERSION_LENGTH = 12
+SHA256_HEX = re.compile(r"^[0-9a-f]{64}$")
+
+
+def cover_url(prefix, item):
+    """Görev 241: <prefix>music/images/c-NNNN-W.webp?v=<sha12> — eksik/bozuk SHA build'i durdurur."""
+    digest = item.get("sha256")
+    if not isinstance(digest, str) or not SHA256_HEX.fullmatch(digest):
+        raise LocaleError(f"[COVER-VERSION] {item.get('path')!r}: geçerli sha256 yok")
+    return f"{prefix}music/{item['path']}?v={digest[:COVER_VERSION_LENGTH]}"
 # Görev 239: stüdyo "Yorumlar" — kaynak v2/studio/reviews.json (dizi). Boşsa bölüm hiç üretilmez.
 REVIEWS = "v2/studio/reviews.json"
 REVIEW_NAME = re.compile(r"^[^\s<>&\d][^<>&\d]{0,40}\s[A-ZÇĞİÖŞÜ]\.$")  # ad + soyadın baş harfi: "Ayşe K."
@@ -213,14 +225,14 @@ def music_showcase(text, catalog, locale, messages):
         if work is None or not recordings or not WORK_ID.fullmatch(work_id):
             raise LocaleError(f"[HOME-FEATURED] unknown work or no recording: {work_id}")
         cover = covers.get(render_pages.primary_recording(recordings).get("coverId"))
-        images = {i["width"]: i["path"] for i in (cover or {}).get("webImages", [])}
+        images = {i["width"]: cover_url("", i) for i in (cover or {}).get("webImages", [])}
         if 400 not in images or 800 not in images:
             raise LocaleError(f"[HOME-FEATURED] {work_id}: 400/800 cover images missing")
         title = html.escape(work["title"], quote=False)
         alt = html.escape(work["title"] + " " + lookup(messages, locale, "music.cover"), quote=True)
         cards.append(
             f'                    <li><a class="featured-work" href="music/work/{work_id}.html">'
-            f'<img src="music/{images[400]}" srcset="music/{images[400]} 400w, music/{images[800]} 800w" '
+            f'<img src="{images[400]}" srcset="{images[400]} 400w, {images[800]} 800w" '
             f'sizes="(max-width: 1100px) 45vw, 22vw" width="400" height="400" loading="lazy" decoding="async" '
             f'alt="{alt}"><span>{title}</span></a></li>')
     marker = "                    <!-- FEATURED_WORKS -->"
@@ -249,10 +261,10 @@ def studio_samples(text, catalog, locale, messages, samples=STUDIO_SAMPLES, pref
             raise LocaleError(f"[STUDIO-SAMPLES] {title!r} ({slug}) katalogda bulunamadı")
         work = found[0]
         recording = render_pages.primary_recording([r for r in catalog["recordings"] if r["workId"] == work["id"]])
-        images = {i["width"]: i["path"] for i in covers[recording["coverId"]]["webImages"]}
+        images = {i["width"]: cover_url(prefix, i) for i in covers[recording["coverId"]]["webImages"]}
         href = f"{prefix}music/work/{work['id']}.html"
-        image = (f'<img src="{prefix}music/{images[400]}" srcset="{prefix}music/{images[400]} 400w, '
-                 f'{prefix}music/{images[800]} 800w" '
+        image = (f'<img src="{images[400]}" srcset="{images[400]} 400w, '
+                 f'{images[800]} 800w" '
                  f'sizes="(max-width: 640px) 90vw, 300px" width="400" height="400" loading="lazy" decoding="async" '
                  f'alt="{esc(work["title"] + " " + t("music.cover"))}">')
         video = next((v for v in recording.get("videos") or [] if v.get("provider") == "youtube"

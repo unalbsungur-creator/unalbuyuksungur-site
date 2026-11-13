@@ -3264,32 +3264,32 @@
       "format": "jpeg",
       "width": 3000,
       "height": 3000,
-      "bytes": 1341265,
-      "sha256": "da99d6969d972c3aea669cd2ef031b8cb9ba99e69820a98da9ba3b03e39e0920",
+      "bytes": 1898382,
+      "sha256": "84dfd9a47b7e929d77d75aaeb8834b530f68a15e22802364538e6d8bf62cec85",
       "webImages": [
         {
           "path": "images/c-0004-400.webp",
           "format": "webp",
           "width": 400,
           "height": 400,
-          "bytes": 18864,
-          "sha256": "c57a0c18bf5595ede76cb1f528aee261ecfa51ea57a9cc34be6914d655ea1950"
+          "bytes": 29836,
+          "sha256": "9ab4d447dd270f0133af9765b327b8a4cee19e12d944c103f032bc101e6dc474"
         },
         {
           "path": "images/c-0004-800.webp",
           "format": "webp",
           "width": 800,
           "height": 800,
-          "bytes": 53456,
-          "sha256": "fa6e0869f75da0572f1215f43fa0861f216eb3717e5c4dc52642d8c8dfdd25a1"
+          "bytes": 82404,
+          "sha256": "0d786236a52e6087c37e53a7d78e9724324315a48b10999b6de480c308954141"
         },
         {
           "path": "images/c-0004-1200.webp",
           "format": "webp",
           "width": 1200,
           "height": 1200,
-          "bytes": 92886,
-          "sha256": "f8cde7b66de41e25ede892e984ad76607f38560ae260971cef11f53b5c6f6a4f"
+          "bytes": 137594,
+          "sha256": "c31b88496381078ca126539b73151c1d08195c8160ff1c2b8bab1da731b5d0c9"
         }
       ]
     },
