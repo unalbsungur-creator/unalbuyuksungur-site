@@ -15,7 +15,8 @@ ROOT = "v2/"
 # Görev 220: TR/EN/DE kabuk sayfalarının canonical, hreflang, Open Graph ve Twitter etiketleri build sırasında
 # profile göre üretilir; kaynak sayfalar bu etiketleri taşımaz. og:image, hero görselinin 1200×630 türevidir.
 # Görev 231: gizlilik sayfası TR/EN/DE kabuk sayfasıdır (önceden yalnız TR + sabit EN/DE özet bölümleri).
-SHELL_ROUTES = {"home": "", "catalog": "music/", "studio": "studio/", "privacy": "privacy/"}
+# Görev 240: video klip sayfası (stüdyo alt sayfası) TR/EN/DE kabuk sayfasıdır.
+SHELL_ROUTES = {"home": "", "catalog": "music/", "studio": "studio/", "privacy": "privacy/", "video": "studio/video/"}
 OG_IMAGE = {"path": "images/og/unal-digital-world-og-1200x630.jpg", "type": "image/jpeg",
             "width": "1200", "height": "630"}
 SEO_TAG = re.compile(r'<link rel="(canonical|alternate)"|<meta (property="og:(?!locale")|name="twitter:)')
@@ -31,6 +32,8 @@ FEATURED_WORKS = ("w-0023", "w-0013", "w-0014", "w-0016")  # Çat Çat Çat, Ben
 # Görev 239: stüdyo "Örnek dinle" eserleri — başlık ve koleksiyon slug'ıyla bulunur (sıra korunur). Bulunamazsa build durur.
 STUDIO_SAMPLES = (("Bugün Benim Doğum Günüm", "ozel-gun-sarkilari"), ("Mutlu Yıllar", "ozel-gun-sarkilari"),
                   ("Koç", "burc-serisi"), ("Boğa", "burc-serisi"))
+# Görev 240: video sayfası "Örnek klipler" — 12 Burç koleksiyonundan YouTube videosu olan eserler (video zorunlu).
+VIDEO_SAMPLES = (("Koç", "burc-serisi"), ("Boğa", "burc-serisi"), ("İkizler", "burc-serisi"), ("Yengeç", "burc-serisi"))
 SAMPLE_LINKS = (("spotify", "music.spotifyListen"), ("appleMusic", "music.appleListen"),
                 ("youtubeMusic", "music.youtubeMusicListen"), ("youtube", "music.youtubeListen"))
 YOUTUBE_ID = re.compile(r"^[A-Za-z0-9_-]{11}$")
@@ -48,6 +51,9 @@ TR_PAGES.update({f"v2/yasal/{slug}/index.html": (f"yasal/{slug}/", None) for slu
 # üstüne "Siparişler çok yakında açılıyor" notunu ekler ve sayfadaki yasal metin bağlantılarını gizler (/yasal/...
 # sayfaları noindex olarak doğrudan adresle erişilebilir kalır). True iken kaynak sayfa olduğu gibi yayınlanır.
 STUDIO_ORDERS_OPEN = True
+# Görev 240: VİDEO SİPARİŞ ANAHTARI — video sayfası (studio/video/) için aynı mantık: False iken üç Shopier bağlantısı
+# "Çok yakında" etiketli pasif butona döner (shopier.com geçmez), not eklenir, yasal metin bağlantısı gizlenir.
+VIDEO_ORDERS_OPEN = True
 BUY_LINK = re.compile(r'<a class="(?P<cls>studio-buy-button|studio-buy-weekend)" href="https://www\.shopier\.com/[^"]*"'
                       r'\s+target="_blank"\s+rel="noopener noreferrer"\s+(?P<desc>aria-describedby="[^"]*")'
                       r'\s+data-purchase-link="\w+">[^<]*</a>')
@@ -64,6 +70,7 @@ SURFACES = {
     "work": ("v2/music/work/index.html", "music/work/index.html"),
     "studio": ("v2/studio/index.html", "studio/index.html"),
     "privacy": ("v2/privacy/index.html", "privacy/index.html"),
+    "video": ("v2/studio/video/index.html", "studio/video/index.html"),
 }
 TEXT_NODE = re.compile(r">([^<>]+)<")
 ATTRIBUTE = re.compile(r'\b(?P<name>aria-label|data-external-label|alt|placeholder)="(?P<value>[^"]*)"')
@@ -170,7 +177,8 @@ def seo_block(text, url, profile, alternate_links, og_type="website"):
 
 
 def faq_json_ld(text):
-    """Görev 226: TR stüdyo sayfasındaki SSS öğelerinden FAQPage JSON-LD (düz metin; sıra korunur)."""
+    """Görev 226: TR stüdyo sayfasındaki SSS öğelerinden FAQPage JSON-LD (düz metin; sıra korunur).
+    Görev 240: video sayfasında her dilde, yerelleştirilmiş SSS'den üretilir."""
     def plain(fragment):
         return " ".join(html.unescape(re.sub(r"<[^>]+>", "", fragment)).split())
 
@@ -221,9 +229,11 @@ def music_showcase(text, catalog, locale, messages):
     return text.replace(marker, "\n".join(cards))
 
 
-def studio_samples(text, catalog, locale, messages):
+def studio_samples(text, catalog, locale, messages, samples=STUDIO_SAMPLES, prefix="../", need_video=False):
     """Görev 239: stüdyo "Örnek dinle" kartları (statik HTML): kapak, başlık, katalogdaki dinleme bağlantıları,
-    YouTube videosu varsa tıkla-yükle oynatıcı ve eser sayfası bağlantısı."""
+    YouTube videosu varsa tıkla-yükle oynatıcı ve eser sayfası bağlantısı.
+    Görev 240: video sayfası aynı bileşeni kendi eser listesi ve göreli kökü (prefix) ile kullanır; videosuz eser
+    build'i durdurur (need_video)."""
     def t(key):
         return lookup(messages, locale, key)
 
@@ -233,19 +243,22 @@ def studio_samples(text, catalog, locale, messages):
     collections = {c["slug"]: {m["workId"] for m in c["members"]} for c in catalog["collections"]}
     covers = {c["id"]: c for c in catalog["covers"]}
     cards = []
-    for title, slug in STUDIO_SAMPLES:
+    for title, slug in samples:
         found = [w for w in catalog["works"] if w["title"] == title and w["id"] in collections.get(slug, ())]
         if len(found) != 1:
             raise LocaleError(f"[STUDIO-SAMPLES] {title!r} ({slug}) katalogda bulunamadı")
         work = found[0]
         recording = render_pages.primary_recording([r for r in catalog["recordings"] if r["workId"] == work["id"]])
         images = {i["width"]: i["path"] for i in covers[recording["coverId"]]["webImages"]}
-        href = f"../music/work/{work['id']}.html"
-        image = (f'<img src="../music/{images[400]}" srcset="../music/{images[400]} 400w, ../music/{images[800]} 800w" '
+        href = f"{prefix}music/work/{work['id']}.html"
+        image = (f'<img src="{prefix}music/{images[400]}" srcset="{prefix}music/{images[400]} 400w, '
+                 f'{prefix}music/{images[800]} 800w" '
                  f'sizes="(max-width: 640px) 90vw, 300px" width="400" height="400" loading="lazy" decoding="async" '
                  f'alt="{esc(work["title"] + " " + t("music.cover"))}">')
         video = next((v for v in recording.get("videos") or [] if v.get("provider") == "youtube"
                       and YOUTUBE_ID.fullmatch(v.get("videoId") or "")), None)
+        if need_video and video is None:
+            raise LocaleError(f"[STUDIO-SAMPLES] {title!r}: YouTube videosu yok")
         links = []
         for key, label in SAMPLE_LINKS:
             url = (recording.get("links") or {}).get(key)
@@ -320,23 +333,28 @@ def studio_reviews(text, reviews, locale, messages):
     return replace_once(text, marker, section)
 
 
-def studio_orders_closed(text):
-    """Görev 232: kaynak (TR) stüdyo sayfasında satın alma bağlantılarını pasifleştirir ve not ekler."""
+def studio_orders_closed(text, expected=4):
+    """Görev 232: kaynak (TR) stüdyo sayfasında satın alma bağlantılarını pasifleştirir ve not ekler.
+    Görev 240: video sayfasında üç bağlantı (expected=3)."""
     text, count = BUY_LINK.subn(lambda m: f'<span class="{m["cls"]} is-soon" role="link" aria-disabled="true" '
                                           f'{m["desc"]}>{BUY_SOON[m["cls"]]}</span>', text)
-    if count != 4 or "shopier.com" in text:
-        raise LocaleError(f"[STUDIO-ORDERS] expected four Shopier purchase links, found {count}")
+    if count != expected or "shopier.com" in text:
+        raise LocaleError(f"[STUDIO-ORDERS] expected {expected} Shopier purchase links, found {count}")
     newline = "\r\n" if "\r\n" in text else "\n"
     note = ('            <p class="studio-soon-note" role="note">Siparişler çok yakında açılıyor. Sorularınız için '
             '<a href="mailto:destek@unalbuyuksungur.com">destek@unalbuyuksungur.com</a></p>' + newline)
-    return replace_once(text, '            <div class="studio-grid">', note + '            <div class="studio-grid">')
+    grid = re.search(r'            <div class="studio-grid[^"]*">', text)
+    if grid is None:
+        raise LocaleError("[STUDIO-ORDERS] package grid not found")
+    return replace_once(text, grid[0], note + grid[0])
 
 
-def hide_legal_links(text):
-    """Görev 232: siparişler kapalıyken stüdyo sayfasındaki yasal metin bağlantıları gösterilmez (metin kalır)."""
+def hide_legal_links(text, inline_links=3):
+    """Görev 232: siparişler kapalıyken stüdyo sayfasındaki yasal metin bağlantıları gösterilmez (metin kalır).
+    Görev 240: video sayfasında yalnız footer bağlantısı vardır (inline_links=0)."""
     text, footer = LEGAL_FOOTER_LINK.subn("", text)
     text, inline = LEGAL_LINK.subn(r"\1", text)
-    if footer != 1 or inline != 3 or "yasal/" in text:
+    if footer != 1 or inline != inline_links or "yasal/" in text:
         raise LocaleError("[STUDIO-ORDERS] unexpected legal links on the studio page")
     return text
 
@@ -356,16 +374,23 @@ def relative_route(source, locale, route):
 
 
 def render_page(text, locale, surface, messages, config, work=None, profile="preview", catalog=None,
-                orders_open=None, reviews=None):
+                orders_open=None, reviews=None, video_orders_open=None):
     """Localize a source HTML document while keeping stable catalog facts and shared assets."""
     original, route = SURFACES[surface]
     orders_open = STUDIO_ORDERS_OPEN if orders_open is None else orders_open
+    video_orders_open = VIDEO_ORDERS_OPEN if video_orders_open is None else video_orders_open
     if surface == "studio" and not orders_open:
         text = studio_orders_closed(text)
+    if surface == "video" and not video_orders_open:
+        text = studio_orders_closed(text, expected=3)
     if surface == "studio":
         if catalog is None:
             raise LocaleError("[STUDIO-SAMPLES] the studio page needs the catalog")
         text = studio_samples(text, catalog, locale, messages)
+    if surface == "video":
+        if catalog is None:
+            raise LocaleError("[STUDIO-SAMPLES] the video page needs the catalog")
+        text = studio_samples(text, catalog, locale, messages, VIDEO_SAMPLES, "../../", need_video=True)
     if surface == "home":
         if catalog is None:
             raise LocaleError("[HOME-FEATURED] the home page needs the catalog")
@@ -373,7 +398,7 @@ def render_page(text, locale, surface, messages, config, work=None, profile="pre
     if surface == "studio" and locale == "tr":
         text = faq_json_ld(text)
     seo_route = {"home": "", "catalog": "music/", "work": "music/work/", "studio": "studio/",
-                 "privacy": "privacy/"}[surface]
+                 "privacy": "privacy/", "video": "studio/video/"}[surface]
     if work is not None:
         if not WORK_ID.fullmatch(work["id"]):
             raise LocaleError("[I18N-WORK] invalid work id")
@@ -384,9 +409,9 @@ def render_page(text, locale, surface, messages, config, work=None, profile="pre
     if locale != "tr":
         text = replace_once(text, '<html lang="tr"', f'<html lang="{locale}"')
         text = localize_text(text, locale, messages)
-        if surface in ("home", "catalog", "studio", "privacy"):
+        if surface in ("home", "catalog", "studio", "privacy", "video"):
             description_key = {"home": "home.meta", "catalog": "music.description",
-                               "studio": "studio.meta", "privacy": "privacy.meta"}[surface]
+                               "studio": "studio.meta", "privacy": "privacy.meta", "video": "video.meta"}[surface]
             # Görev 221: the attribute may be wrapped onto the next line (\s+), which previously left it untranslated.
             text = re.sub(r'(<meta name="description"\s+content=")[^"]*(")',
                           lambda m: m[1] + html.escape(lookup(messages, locale, description_key), quote=True) + m[2],
@@ -457,6 +482,12 @@ def render_page(text, locale, surface, messages, config, work=None, profile="pre
             "privacy": {"../music/catalog.css": "../../music/catalog.css", "../blog/": "../../blog/",
                         "../images/": "../../images/", "../i18n/": "../../i18n/", "../site-nav.": "../../site-nav.",
                         "../external-links.js": "../../external-links.js"},
+            # Görev 240: studio/video/ — paylaşılan dosyalar kökten; gezinme bağlantıları dil içinde kalır.
+            "video": {"../../music/catalog.css": "../../../music/catalog.css",
+                      "../studio.css": "../../../studio/studio.css", "../../images/": "../../../images/",
+                      "../../music/images/": "../../../music/images/", "../../i18n/": "../../../i18n/",
+                      "../../site-nav.": "../../../site-nav.", "../../external-links.js": "../../../external-links.js",
+                      "../../yasal/": "../../../yasal/"},
         }[surface]
 
         def asset(m):
@@ -510,6 +541,10 @@ def render_page(text, locale, surface, messages, config, work=None, profile="pre
                             f'<link rel="canonical" href="{canonical}">\n' + alternates(seo_route, profile))
     if surface == "studio" and not orders_open:
         text = hide_legal_links(text)  # yerelleştirmeden sonra: SSS cümlesinin çevirisi parçalarla eşleşir
+    if surface == "video" and not video_orders_open:
+        text = hide_legal_links(text, inline_links=0)
+    if surface == "video":
+        text = faq_json_ld(text)  # Görev 240: her dilde, yerelleştirilmiş SSS'den
     if surface == "studio":
         # yerelleştirmeden sonra: yorum metinleri sözlükle çevrilmez, olduğu gibi kalır
         text = studio_reviews(text, reviews or [], locale, messages)
@@ -518,7 +553,7 @@ def render_page(text, locale, surface, messages, config, work=None, profile="pre
     return text.encode("utf-8")
 
 
-def render(catalog, sources, profile="preview", studio_orders_open=None):
+def render(catalog, sources, profile="preview", studio_orders_open=None, video_orders_open=None):
     if profile not in render_pages.PROFILES:
         raise LocaleError(f"[I18N-PROFILE] unknown profile: {profile!r}")
     config, messages = load_messages(lambda rel: sources[rel])
@@ -537,12 +572,13 @@ def render(catalog, sources, profile="preview", studio_orders_open=None):
         source = SURFACES[surface][0]
         pages[source] = render_page(sources[source].decode("utf-8"), "tr", surface, messages, config,
                                     profile=profile, catalog=catalog, orders_open=studio_orders_open,
-                                    reviews=reviews)
+                                    reviews=reviews, video_orders_open=video_orders_open)
     for locale in ("en", "de"):
         for surface, (source, route) in SURFACES.items():
             pages["v2/" + locale + "/" + route] = render_page(
                 sources[source].decode("utf-8"), locale, surface, messages, config, profile=profile,
-                catalog=catalog, orders_open=studio_orders_open, reviews=reviews)
+                catalog=catalog, orders_open=studio_orders_open, reviews=reviews,
+                video_orders_open=video_orders_open)
     for rel in TR_PAGES:
         pages[rel] = tr_page_seo(sources[rel].decode("utf-8"), rel, profile).encode("utf-8")
     return pages

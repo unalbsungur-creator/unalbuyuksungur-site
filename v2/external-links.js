@@ -21,7 +21,11 @@
         shopierOzelSarki: Object.freeze({ platform: "Shopier", display: "Özel Şarkı", url: "https://www.shopier.com/unalbuyuksungur/52596551" }),
         shopierOzelSarkiHaftaSonu: Object.freeze({ platform: "Shopier", display: "Özel Şarkı — Hafta Sonu Teslim", url: "https://www.shopier.com/unalbuyuksungur/52596592" }),
         shopierOzelSarkiPlus: Object.freeze({ platform: "Shopier", display: "Özel Şarkı Plus", url: "https://www.shopier.com/unalbuyuksungur/52596612" }),
-        shopierOzelSarkiPlusHaftaSonu: Object.freeze({ platform: "Shopier", display: "Özel Şarkı Plus — Hafta Sonu Teslim", url: "https://www.shopier.com/unalbuyuksungur/52596627" })
+        shopierOzelSarkiPlusHaftaSonu: Object.freeze({ platform: "Shopier", display: "Özel Şarkı Plus — Hafta Sonu Teslim", url: "https://www.shopier.com/unalbuyuksungur/52596627" }),
+        // Görev 240: video sayfası (studio/video/) satın alma ürünleri; statik HTML'de de aynı adresler yazılıdır.
+        shopierSarkiVideo: Object.freeze({ platform: "Shopier", display: "Özel Şarkı + Video", url: "https://www.shopier.com/unalbuyuksungur/52905449" }),
+        shopierSarkiPlusVideo: Object.freeze({ platform: "Shopier", display: "Özel Şarkı Plus + Video", url: "https://www.shopier.com/unalbuyuksungur/52905472" }),
+        shopierVideoKlip: Object.freeze({ platform: "Shopier", display: "Video Klip", url: "https://www.shopier.com/unalbuyuksungur/52905482" })
     });
 
     function applyExternalLinks(root) {

@@ -157,14 +157,16 @@ input {
 
 .nav-list a:hover,
 .nav-list a:focus-visible,
-.nav-list a[aria-current="page"] {
+.nav-list a[aria-current="page"],
+.nav-list a.nav-sub-trigger[aria-current="true"] {
     opacity: 1;
     color: var(--gold);
 }
 
 .nav-list a:hover::after,
 .nav-list a:focus-visible::after,
-.nav-list a[aria-current="page"]::after {
+.nav-list a[aria-current="page"]::after,
+.nav-list a.nav-sub-trigger[aria-current="true"]::after {
     transform: scaleX(1);
 }
 

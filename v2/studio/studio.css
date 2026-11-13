@@ -253,6 +253,33 @@
     color: var(--muted);
 }
 
+/* Görev 240: video sayfası — üç paket kartı, #paketler çapası ve stüdyodan video paketlerine çağrı */
+.studio-section[id] {
+    scroll-margin-top: calc(var(--header-height) + 16px);
+}
+
+.studio-crosslink {
+    max-width: 960px;
+    margin: 28px 0 0;
+}
+
+.studio-crosslink a {
+    color: var(--gold);
+    text-underline-offset: 4px;
+}
+
+.studio-crosslink a:hover,
+.studio-crosslink a:focus-visible {
+    color: var(--text);
+}
+
+@media (min-width: 901px) {
+    .studio-grid.studio-grid--three {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        max-width: none;
+    }
+}
+
 /* Görev 226: Sık Sorulanlar — JS gerektirmeyen açılır-kapanır liste (details/summary) */
 .faq-list {
     max-width: 860px;

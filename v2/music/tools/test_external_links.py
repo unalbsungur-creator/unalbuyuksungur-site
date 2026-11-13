@@ -39,6 +39,12 @@ PURCHASE = {
     "shopierOzelSarkiPlus": "https://www.shopier.com/unalbuyuksungur/52596612",
     "shopierOzelSarkiPlusHaftaSonu": "https://www.shopier.com/unalbuyuksungur/52596627",
 }
+# Görev 240: video sayfası ürünleri (studio/video/).
+VIDEO_PURCHASE = {
+    "shopierSarkiVideo": "https://www.shopier.com/unalbuyuksungur/52905449",
+    "shopierSarkiPlusVideo": "https://www.shopier.com/unalbuyuksungur/52905472",
+    "shopierVideoKlip": "https://www.shopier.com/unalbuyuksungur/52905482",
+}
 
 
 def source_links():
@@ -47,7 +53,7 @@ def source_links():
 
 class ExternalLinksTests(unittest.TestCase):
     def test_canonical_source_is_exactly_the_approved_allowlist(self):
-        self.assertEqual(source_links(), {**EXPECTED, **PURCHASE})
+        self.assertEqual(source_links(), {**EXPECTED, **PURCHASE, **VIDEO_PURCHASE})
         self.assertNotRegex(SOURCE.lower(), r"mailto:|tel:")
 
     def test_pages_use_the_single_canonical_source(self):
@@ -99,6 +105,17 @@ class ExternalLinksTests(unittest.TestCase):
         main = studio.split("<main", 1)[1].split("</main>", 1)[0]  # Görev 231: header'daki pasif "Video" hariç
         self.assertNotRegex(main, r"\bdisabled\b|aria-disabled|data-purchase-off")  # pasif durum kalmadı
         self.assertNotRegex(SOURCE.lower() + studio.lower(), r"bookings|outlook\.(office|live)")
+
+    def test_video_purchase_links_match_the_source(self):
+        """Görev 240: video sayfasındaki üç Shopier bağlantısı external-links.js ile birebir aynı."""
+        self.assertEqual({k: v for k, v in source_links().items() if k in VIDEO_PURCHASE}, VIDEO_PURCHASE)
+        video = (ROOT / "v2/studio/video/index.html").read_text(encoding="utf-8")
+        anchors = re.findall(r"<a\b[^>]*data-purchase-link[^>]*>", video)
+        self.assertEqual([re.search(r'data-purchase-link="(\w+)"', a)[1] for a in anchors], list(VIDEO_PURCHASE))
+        for anchor in anchors:
+            key = re.search(r'data-purchase-link="(\w+)"', anchor)[1]
+            self.assertIn(f'href="{VIDEO_PURCHASE[key]}"', anchor)
+            self.assertIn('rel="noopener noreferrer"', anchor)
 
     def test_preserved_catalog_invariants(self):
         catalog = (ROOT / "v2/music/data/catalog.json").read_text(encoding="utf-8")

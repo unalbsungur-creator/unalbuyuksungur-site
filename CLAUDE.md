@@ -21,6 +21,12 @@
 - `False`: stüdyo sayfasında dört Shopier butonu "Çok yakında" (EN "Coming soon", DE "Demnächst") etiketli pasif butondur; üretilen HTML'de shopier.com geçmez, paket kartlarının üstünde "Siparişler çok yakında açılıyor" notu görünür, sayfadaki yasal metin bağlantıları gizlenir (`/yasal/...` sayfaları noindex olarak doğrudan adresle erişilebilir kalır).
 - Siparişleri açmak için: sabiti `STUDIO_ORDERS_OPEN = True` yapın, `test_multilingual.py` içindeki `assertIs(render_site.STUDIO_ORDERS_OPEN, False)` satırını `True` olarak güncelleyin, testleri ve production build'i çalıştırıp `develop/v2-digital-world`'e push edin. Kaynak `v2/studio/index.html` her zaman açık hâli (Shopier bağlantıları) taşır.
 
+## Video sipariş anahtarı
+- Video sayfası: `v2/studio/video/index.html` → `/studio/video/` (EN/DE `/en/studio/video/`, `/de/studio/video/`).
+- Tek yer: `v2/music/tools/render_site.py` içindeki `VIDEO_ORDERS_OPEN` sabiti (şu an `True`). `STUDIO_ORDERS_OPEN` ile aynı mantık, ondan bağımsızdır.
+- `False`: video sayfasındaki üç Shopier butonu (`shopierSarkiVideo`, `shopierSarkiPlusVideo`, `shopierVideoKlip`) "Çok yakında" etiketli pasif butondur; üretilen HTML'de shopier.com geçmez, "Siparişler çok yakında açılıyor" notu eklenir, footer'daki yasal metin bağlantısı gizlenir.
+- Değiştirirken `test_multilingual.py` içindeki `assertIs(render_site.VIDEO_ORDERS_OPEN, True)` satırını da güncelleyin; testler + production build çalıştırılıp `develop/v2-digital-world`'e push edilir. Kaynak sayfa her zaman açık hâli taşır.
+
 ## Stüdyo yorumları
 - Kaynak: `v2/studio/reviews.json` (JSON dizi). Boş dizi (`[]`) iken stüdyo sayfasında "Yorumlar" bölümü hiç üretilmez; ilk yorum eklenince build bölümü SSS'nin hemen önüne, üç dilde ekler. Dosya yalnız build girdisidir, ayrıca yayımlanmaz.
 - Her yorum tam olarak şu alanları taşır: `name` (ad + soyadın baş harfi, ör. `"Ayşe K."`), `text` (müşterinin kendi sözleri, çevrilmez), `package` (ör. `"Özel Şarkı"`, `"Özel Şarkı Plus"`), `date` (`"YYYY-MM-DD"`), `promo` (`true` = tanıtım amaçlı ücretsiz/indirimli sipariş; "Tanıtım siparişi" / "Promotional order" / "Werbebestellung" rozeti görünür), `lang` (`"tr"`, `"en"` veya `"de"`; yorum metninin dili).

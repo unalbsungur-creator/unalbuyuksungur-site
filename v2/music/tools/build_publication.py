@@ -91,6 +91,8 @@ SITE_FILES = (
     "v2/music/work/work.js",
     "v2/studio/index.html",
     "v2/studio/studio.css",
+    # Görev 240: video klip sayfası (TR/EN/DE kabuk; render_site.SHELL_ROUTES["video"])
+    "v2/studio/video/index.html",
     # Görev 239: stüdyo yorumları — yalnız build girdisi (sayfaya işlenir, ayrı dosya olarak yayımlanmaz)
     "v2/studio/reviews.json",
     "v2/perspective/index.html",
@@ -117,7 +119,8 @@ SITE_FILES = (
     "v2/images/blog/ne-yapayim-1200.webp",
 )
 # Görev 220: TR kabuk sayfaları kopyalanmaz, profile göre SEO etiketleriyle üretilir (render_site.SHELL_ROUTES).
-RENDERED_SHELLS = ("v2/index.html", "v2/music/index.html", "v2/studio/index.html", "v2/privacy/index.html")
+RENDERED_SHELLS = ("v2/index.html", "v2/music/index.html", "v2/studio/index.html", "v2/privacy/index.html",
+                   "v2/studio/video/index.html")
 # Görev 221: yalnız Türkçe sayfalar da kopyalanmaz; canonical/OG etiketleriyle üretilir.
 RENDERED_PAGES = RENDERED_SHELLS + tuple(render_site.TR_PAGES)
 # Görev 239: yalnız build girdisi olan dosyalar (sayfalara işlenir, pakete kopyalanmaz).
@@ -505,6 +508,7 @@ def build(root, out, expect_count=None, manifest_path=None, log=print, profile="
                       else "v2/index.html" if re.fullmatch(r"v2/((en|de)/)?index\.html", rel)
                       else "v2/music/index.html" if re.fullmatch(r"v2/((en|de)/)?music/index\.html", rel)
                       else "v2/studio/index.html" if re.fullmatch(r"v2/((en|de)/)?studio/index\.html", rel)
+                      else "v2/studio/video/index.html" if re.fullmatch(r"v2/((en|de)/)?studio/video/index\.html", rel)
                       else "v2/privacy/index.html" if re.fullmatch(r"v2/((en|de)/)?privacy/index\.html", rel)
                       else render_pages.TEMPLATE)
             page_entries.append({"path": path, "source": rel, "bytes": len(pages[rel]),

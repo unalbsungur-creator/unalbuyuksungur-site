@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[3]
 CATALOG = json.loads((ROOT / "v2/music/data/catalog.json").read_text(encoding="utf-8"))
 SOURCES = {p: (ROOT / p).read_bytes() for p in (
     "v2/index.html", "v2/music/index.html", "v2/music/work/index.html", "v2/studio/index.html",
-    "v2/privacy/index.html", "v2/i18n/config.json", "v2/i18n/tr.json", "v2/i18n/en.json", "v2/i18n/de.json",
+    "v2/studio/video/index.html", "v2/privacy/index.html", "v2/i18n/config.json", "v2/i18n/tr.json", "v2/i18n/en.json", "v2/i18n/de.json",
     render_site.REVIEWS, *render_site.TR_PAGES)}
 # Görev 228: stüdyo Shopier ürünleri (external-links.js ile birebir; test_external_links denetler).
 SHOPIER = {key: "https://www.shopier.com/unalbuyuksungur/" + num for key, num in (
@@ -55,7 +55,8 @@ class MultilingualTests(unittest.TestCase):
         self.assertEqual(len(ids), 78)  # Görev 236: 68 + 10 "Yakında"
         # Turkish: 78 works + 4 rendered shells (Görev 220; privacy since Görev 231) + 4 Turkish-only pages
         # (Görev 221: blog, posts) + 5 draft legal pages (Görev 226); EN/DE: 78 works + 5 shells each.
-        self.assertEqual(len(self.pages), 257)
+        # Görev 240: + video sayfası (TR/EN/DE).
+        self.assertEqual(len(self.pages), 260)
         for locale in ("en", "de"):
             home = self.pages[f"v2/{locale}/index.html"].decode("utf-8")
             catalog = self.pages[f"v2/{locale}/music/index.html"].decode("utf-8")
@@ -244,6 +245,74 @@ class MultilingualTests(unittest.TestCase):
                 self.assertNotIn("studio-soon-note", opened)
                 self.assertNotIn("is-soon", opened)
 
+    def test_video_page(self):
+        """Görev 240: studio/video/ 3 dilde; bölüm sırası, 4 örnek klip, 3 Shopier ürünü, SSS + FAQPage, SEO."""
+        _, messages = render_site.load_messages(SOURCES.__getitem__)
+        for locale in ("tr", "en", "de"):
+            prefix = "" if locale == "tr" else locale + "/"
+            page = self.pages[f"v2/{prefix}studio/video/index.html"].decode("utf-8")
+            m = messages[locale]
+            with self.subTest(locale=locale):
+                self.assertIn(f'<html lang="{locale}">', page)
+                self.assertIn(f'<link rel="canonical" href="{render_site.locale_url(locale, "studio/video/", "preview")}">', page)
+                self.assertEqual(page.count('rel="alternate" hreflang='), 4)
+                description = re.search(r'<meta name="description" content="([^"]*)">', page)[1]
+                self.assertEqual(html.unescape(description), m["video.meta"])
+                order = [page.index(f'id="{i}"') for i in ("video-title", "video-process", "video-samples",
+                                                          "paketler", "video-important", "video-faq", "video-notify")]
+                self.assertEqual(order, sorted(order))
+                self.assertIn(f'<h1 id="video-title">{html.escape(m["video.h1"], quote=False)}</h1>', page)
+                self.assertEqual(page.count("<li>", page.index('<ol class="studio-steps">'),
+                                            page.index("</ol>")), 5)
+                samples = page.split('aria-labelledby="video-samples">', 1)[1].split("</section>", 1)[0]
+                self.assertEqual(re.findall(r'<h3 class="sample-title"><a href="\.\./\.\./music/work/(w-\d{4})\.html">',
+                                            samples), ["w-0044", "w-0018", "w-0038", "w-0060"])
+                self.assertEqual(len(re.findall(r'<button class="sample-play" type="button" data-video-id="[\w-]{11}"',
+                                                samples)), 4)
+                self.assertIn('href="../../music/?koleksiyon=burc-serisi"', samples)
+                self.assertEqual(len(re.findall(r'<img src="(\.\./)+music/images/c-\d{4}-400\.webp"', samples)), 4)
+                self.assertEqual(re.findall(r'href="(https://www\.shopier\.com/[^"]+)"', page),
+                                 ["https://www.shopier.com/unalbuyuksungur/" + n for n in ("52905449", "52905472", "52905482")])
+                self.assertEqual(re.findall(r'<p class="studio-price">([^<]+)</p>', page), ["1.590 TL", "1.890 TL", "1.290 TL"])
+                self.assertEqual(page.count('<details class="faq-item">'), 8)
+                self.assertEqual(page.count('"@type":"FAQPage"'), 1)
+                self.assertEqual(page.count('"@type":"Question"'), 8)
+                self.assertIn(json.dumps(m["video.faq.q1"], ensure_ascii=False), page)
+                self.assertIn(html.escape(m["video.importantText"], quote=False), page)
+                self.assertEqual(len(re.findall(r'href="[^"]*yasal/hizmet-kosullari/"', page)), 1)
+                self.assertNotRegex(page, r"aria-disabled|is-soon|studio-soon-note")
+        studio = self.pages["v2/studio/index.html"].decode("utf-8")
+        self.assertIn('<a href="video/#paketler">Şarkınıza klip de ister misiniz? Şarkı + Video paketlerine göz atın →</a>',
+                      studio)
+        self.assertNotIn("(yakında)", studio)
+        self.assertIs(render_site.VIDEO_ORDERS_OPEN, True)
+
+    def test_video_orders_switch(self):
+        """Görev 240: VIDEO_ORDERS_OPEN=False iken video sayfasında shopier.com ve yasal bağlantı yok, "Çok yakında" var."""
+        closed = render_site.render(CATALOG, SOURCES, video_orders_open=False)
+        for locale, label in (("tr", "Çok yakında"), ("en", "Coming soon"), ("de", "Demnächst")):
+            prefix = "" if locale == "tr" else locale + "/"
+            page = closed[f"v2/{prefix}studio/video/index.html"].decode("utf-8")
+            with self.subTest(locale=locale):
+                self.assertNotIn("shopier.com", page)
+                self.assertNotIn("data-purchase-link", page)
+                self.assertNotIn("yasal/", page)
+                self.assertEqual(len(re.findall(r'<span class="studio-buy-button is-soon" role="link" aria-disabled="true" '
+                                                r'aria-describedby="video-[\w-]+">' + label + "</span>", page)), 3)
+                self.assertIn('class="studio-soon-note"', page)
+                # stüdyo (şarkı) sayfası bu anahtardan etkilenmez
+                self.assertEqual(closed[f"v2/{prefix}studio/index.html"], self.pages[f"v2/{prefix}studio/index.html"])
+
+    def test_privacy_youtube_note_covers_studio(self):
+        """Görev 240: gizlilikteki YouTube cümlesi stüdyo sayfalarını da kapsar."""
+        notes = {"tr": "Eser sayfalarında ve Müzik Stüdyosu sayfalarında YouTube videoları",
+                 "en": "On the work pages and the Music Studio pages, YouTube videos",
+                 "de": "Auf den Werkseiten und den Seiten des Musikstudios werden YouTube-Videos"}
+        for locale, note in notes.items():
+            page = self.pages[f"v2/{'' if locale == 'tr' else locale + '/'}privacy/index.html"].decode("utf-8")
+            self.assertIn(note, " ".join(html.unescape(page).split()), locale)
+            self.assertIn("youtube-nocookie.com", page)
+
     def test_legal_pages_final(self):
         """Görev 235: yasal metinler yürürlükte — taslak notu/yer tutucu yok, yürürlük tarihi var, noindex sürer."""
         for slug in render_site.LEGAL_PAGES:
@@ -252,6 +321,15 @@ class MultilingualTests(unittest.TestCase):
                 self.assertNotRegex(page, r"(?i)taslak|\[[A-ZÇĞİÖŞÜ ]{3,}|hukukçu|önemli notlar|onay kutuları")
                 self.assertRegex(page, r'<p class="legal-effective">Yürürlük tarihi: \d{1,2} \w+ 20\d\d</p>')
                 self.assertIn('<meta name="robots" content="noindex, follow">', page)
+                self.assertIn('<p class="legal-effective">Yürürlük tarihi: 13 Kasım 2026</p>', page)  # Görev 240
+        # Görev 240: video klip maddeleri (kaynak: yasal-metinler.md, 13 Kasım 2026 sürümü).
+        legal = {slug: self.pages[f"v2/yasal/{slug}/index.html"].decode("utf-8") for slug in render_site.LEGAL_PAGES}
+        self.assertIn("<h2>Madde 4/A – Video klip</h2>", legal["mesafeli-satis"])
+        self.assertIn("<p>9.7. Video klip", legal["mesafeli-satis"])
+        self.assertIn("<h2>Video klip paketleri</h2>", legal["on-bilgilendirme"])
+        self.assertIn("<td>Video klip teslim edildi, alıcı beğenmedi</td>", legal["iade"])
+        self.assertIn("<td>Klip tarifi</td>", legal["kvkk"])
+        self.assertIn("Google (Flow)", legal["kvkk"])
         kvkk = self.pages["v2/yasal/kvkk/index.html"].decode("utf-8")
         self.assertEqual(kvkk.count('<h2 id="acik-riza">Yurt Dışına Aktarım Açık Rıza Metni</h2>'), 1)
         self.assertLess(kvkk.index('id="acik-riza"'), kvkk.index('<nav class="legal-links"'))
@@ -475,8 +553,9 @@ class MultilingualTests(unittest.TestCase):
                 self.assertEqual(" ".join(last.split()), contact[locale])
 
     def test_studio_submenu_in_every_header(self):
-        """Görev 231: her header'da Müzik Stüdyosu alt paneli; Şarkı stüdyoya gider, Video pasif ("Yakında")."""
-        labels = {"tr": ("ŞARKI", "VİDEO", "YAKINDA"), "en": ("SONG", "VIDEO", "SOON"), "de": ("SONG", "VIDEO", "BALD")}
+        """Görev 231: her header'da Müzik Stüdyosu alt paneli; Şarkı stüdyoya gider.
+        Görev 240: Video etkin, kendi dilindeki studio/video/ sayfasına gider; aktif sayfada dolu altın."""
+        labels = {"tr": ("ŞARKI", "VİDEO"), "en": ("SONG", "VIDEO"), "de": ("SONG", "VIDEO")}
         pages = {rel: data.decode("utf-8") for rel, data in self.pages.items()}
         pages["v2/music/work/index.html"] = SOURCES["v2/music/work/index.html"].decode("utf-8")  # kopyalanan şablon
         for rel, page in pages.items():
@@ -487,18 +566,20 @@ class MultilingualTests(unittest.TestCase):
                 block, base = blocks[0], posixpath.dirname(rel)
                 trigger = re.search(r'<a class="nav-sub-trigger" aria-haspopup="true" aria-expanded="false" '
                                     r'aria-controls="studio-submenu"\s+href="([^"]*)"', block)
-                song = re.search(r'<a class="nav-sub-btn( is-active)?" href="([^"]*)"[^>]*><svg [^>]*>.*?</svg>'
-                                 r'<span>([^<]+)</span></a>', block, re.S)
-                video = re.search(r'<span class="nav-sub-btn is-disabled" role="link" aria-disabled="true"><svg [^>]*>'
-                                  r'.*?</svg><span>([^<]+)</span><small class="nav-sub-soon">([^<]+)</small></span>',
-                                  block, re.S)
-                self.assertTrue(trigger and song and video, block)
-                self.assertEqual(song[2], trigger[1])
-                self.assertEqual(posixpath.normpath(posixpath.join(base, song[2])),
-                                 "v2/studio" if locale == "tr" else f"v2/{locale}/studio")
-                self.assertEqual(bool(song[1]), "/studio/" in rel)  # stüdyo sayfasında dolu altın (aktif)
-                self.assertEqual((song[3], video[1], video[2]), labels[locale])
-                self.assertNotIn("href", video[0])
+                buttons = re.findall(r'<a class="nav-sub-btn( is-active)?" href="([^"]*)"( aria-current="page")?>'
+                                     r'<svg [^>]*>.*?</svg><span>([^<]+)</span></a>', block, re.S)
+                self.assertTrue(trigger and len(buttons) == 2, block)
+                song, video = buttons
+                self.assertEqual(song[1], trigger[1])
+                studio = "v2/studio" if locale == "tr" else f"v2/{locale}/studio"
+                self.assertEqual(posixpath.normpath(posixpath.join(base, song[1])), studio)
+                self.assertEqual(posixpath.normpath(posixpath.join(base, video[1])), studio + "/video")
+                on_video = rel.endswith("studio/video/index.html")
+                on_song = rel.endswith("studio/index.html")
+                self.assertEqual(bool(song[0]), on_song)  # stüdyo sayfasında ŞARKI dolu altın (aktif)
+                self.assertEqual((bool(video[0]), bool(video[2])), (on_video, on_video))  # video sayfasında VİDEO
+                self.assertEqual((song[3], video[3]), labels[locale])
+                self.assertNotRegex(block, r"aria-disabled|is-disabled|nav-sub-soon")
                 for pattern, target in ((r'<link rel="stylesheet" href="([^"]*site-nav\.css)">', "v2/site-nav.css"),
                                         (r'<script src="([^"]*site-nav\.js)"></script>', "v2/site-nav.js")):
                     asset = re.search(pattern, page)
