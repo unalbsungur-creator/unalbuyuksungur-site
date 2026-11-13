@@ -149,6 +149,18 @@ class BuildPublicationTests(unittest.TestCase):
         self.assertEqual(section.count("https://mind-ot.com/"), 2)
         self.assertEqual(section.count("https://nextpointtr.com/"), 2)
         self.assertIn("Football Academy Operating System — ", section)
+        # Görev 243: kısa Next Point Monitor metni; masaüstü 3 sütunda son satır ortalanır (yalnız proje ızgarası).
+        self.assertIn('<p class="project-description">Tur operatörleri ve acenteler için turizm istihbaratı ve olay '
+                      'izleme platformu.</p>', section)
+        style = source.split("<style>", 1)[1].split("</style>", 1)[0]
+        center = style.split("@media (min-width: 1101px) {", 1)[1].split("\n        }\n", 1)[0]
+        self.assertRegex(center, r"\.project-grid \{\s*grid-template-columns: repeat\(6, minmax\(0, 1fr\)\);")
+        self.assertRegex(center, r"\.project-grid > li \{\s*grid-column: span 2;")
+        for selector, column in ((":last-child:nth-child(3n + 1)", 3), (":nth-last-child(2):nth-child(3n + 1)", 2),
+                                 (":last-child:nth-child(3n + 2)", 4)):
+            self.assertRegex(center, re.escape(".project-grid > li" + selector) + r" \{\s*grid-column: "
+                             + str(column) + " / span 2;")
+        self.assertNotRegex(center, r"studio|stops|grid-template-columns: 1fr")
         # Görev 242: nextpointmonitor.com ve fa-os.com DNS'te çözülmüyor → bağlantısız; İŞTEÇ bağlantısız kalır.
         for forbidden in ('href="#"', "isbuyutec.com", "localhost", "tralvid.com", "nextpointmonitor.com",
                           "fa-os.com", "OpenFAOS", "placeholder", "konsept kapak",
@@ -178,11 +190,11 @@ class BuildPublicationTests(unittest.TestCase):
                 self.assertEqual(version, "?v=" + digest[:bp.VERSION_LENGTH], (page, name))
         en = tree["en/index.html"].decode("utf-8")
         self.assertIn("<h3>Next Point Monitor</h3>", en)
-        self.assertIn("A tourism intelligence and incident monitoring platform", en)
+        self.assertIn("Tourism intelligence and incident monitoring for tour operators and agencies.", en)  # Görev 243
         self.assertIn("<h3>FAOS</h3>", en)
         self.assertIn("Football Academy Operating System — Bringing", en)
         de = tree["de/index.html"].decode("utf-8")
-        self.assertIn("Eine Plattform für Tourismus-Intelligence", de)
+        self.assertIn("Tourismus-Intelligence und Vorfallmonitoring für Reiseveranstalter und Reisebüros.", de)
         self.assertIn("FAOS-Logo und Markengrafik", de)
 
     def test_excluded_files_absent(self):

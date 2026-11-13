@@ -535,6 +535,30 @@
             list-style: none;
         }
 
+        /* Görev 243: masaüstü 3 sütunda son satırdaki tek/eksik kart(lar) ortalanır. 6 izli ızgarada her kart
+           2 iz kaplar; kart genişliği 3 sütunla aynıdır ((genişlik - 2 boşluk) / 3). */
+        @media (min-width: 1101px) {
+            .project-grid {
+                grid-template-columns: repeat(6, minmax(0, 1fr));
+            }
+
+            .project-grid > li {
+                grid-column: span 2;
+            }
+
+            .project-grid > li:last-child:nth-child(3n + 1) {
+                grid-column: 3 / span 2;
+            }
+
+            .project-grid > li:nth-last-child(2):nth-child(3n + 1) {
+                grid-column: 2 / span 2;
+            }
+
+            .project-grid > li:last-child:nth-child(3n + 2) {
+                grid-column: 4 / span 2;
+            }
+        }
+
         .project-card {
             display: flex;
             height: 100%;
@@ -1829,7 +1853,7 @@
                             <div class="project-body">
                                 <h3>Next Point Monitor</h3>
                                 <p class="project-category">Turizm istihbaratı</p>
-                                <p class="project-description">Tur operatörleri ve seyahat acenteleri için turizm istihbaratı ve olay izleme platformu. Destinasyondaki olayları, riskleri ve otel gelişmelerini tek ekranda izleyin.</p>
+                                <p class="project-description">Tur operatörleri ve acenteler için turizm istihbaratı ve olay izleme platformu.</p>
                                 <div class="project-footer"><span class="project-status">Geliştiriliyor</span></div>
                             </div>
                         </article>
