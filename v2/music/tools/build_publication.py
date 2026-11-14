@@ -100,6 +100,7 @@ SITE_FILES = (
     "v2/perspective/index.html",
     "v2/perspective/style.css",
     "v2/perspective/script.js",
+    "v2/farkindalikmetre/index.html",
     # Görev 221: yalnız Türkçe blog sayfaları (render_site.TR_PAGES) ve blog görselleri;
     # gizlilik sayfası Görev 231'den beri TR/EN/DE kabuk sayfasıdır (render_site.SHELL_ROUTES).
     "v2/blog/index.html",

@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Farkındalıkmetre — 20 soruda duygusal, bedensel, düşünsel ve çevresel farkındalık seviyeni keşfet.">
+<meta name="theme-color" content="#05060a">
+<meta property="og:title" content="Farkındalıkmetre — Ne kadar farkındasın?">
+<meta property="og:description" content="20 kısa soru, 3 dakika. Farkındalık seviyeni keşfet.">
+<meta property="og:url" content="https://unalbuyuksungur.com/farkindalikmetre/">
+<meta property="og:type" content="website">
+<title>Farkındalıkmetre</title>
+<style>
+  :root{
+    --bg:#05060a; --card:#0d0f17; --ink:#e5e7eb; --muted:#8b93a7;
+    --accent:#a78bfa; --accent2:#6d28d9; --line:#1f2333;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    background:radial-gradient(circle at 50% 0%,#1a1440 0%,#05060a 60%);
+    min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    padding:20px;color:var(--ink);
+  }
+  .card{
+    background:var(--card);width:100%;max-width:560px;border-radius:20px;
+    padding:32px 28px;border:1px solid var(--line);box-shadow:0 20px 60px rgba(0,0,0,.5);
+  }
+  .tag{font-size:12px;letter-spacing:.2em;color:var(--muted);margin-bottom:10px;text-transform:uppercase}
+  h1{font-size:30px;color:#fff;margin-bottom:10px;letter-spacing:-.01em}
+  .lead{color:var(--muted);line-height:1.65;margin-bottom:26px}
+  .btn{
+    display:inline-block;border:none;cursor:pointer;font-size:16px;font-weight:600;
+    padding:14px 28px;border-radius:12px;background:linear-gradient(90deg,var(--accent2),var(--accent));color:#fff;
+    transition:transform .1s,opacity .2s;
+  }
+  .btn:hover{opacity:.9}.btn:active{transform:scale(.97)}
+  .btn.ghost{background:transparent;color:var(--muted);padding:10px 0;font-weight:500}
+  .progress{height:6px;background:var(--line);border-radius:99px;overflow:hidden;margin-bottom:10px}
+  .bar{height:100%;width:0;background:linear-gradient(90deg,var(--accent2),var(--accent));transition:width .3s}
+  .count{font-size:13px;color:var(--muted);margin-bottom:20px;letter-spacing:.05em}
+  .q{font-size:20px;font-weight:600;line-height:1.45;margin-bottom:22px;min-height:58px;color:#fff}
+  .opts{display:flex;flex-direction:column;gap:10px}
+  .opt{
+    text-align:left;font-size:16px;padding:14px 16px;border-radius:12px;cursor:pointer;
+    border:1px solid var(--line);background:#121522;color:var(--ink);transition:all .15s;
+  }
+  .opt:hover{border-color:var(--accent)}
+  .opt.sel{border-color:var(--accent);background:#221a44}
+  .nav{display:flex;justify-content:space-between;margin-top:18px}
+  .hidden{display:none}
+  .gauge{position:relative;width:220px;height:120px;margin:10px auto 6px}
+  .score{text-align:center;font-size:44px;font-weight:800;color:#fff}
+  .level{text-align:center;font-size:22px;font-weight:700;margin:4px 0 16px;color:var(--accent)}
+  .desc{line-height:1.65;color:var(--ink);margin-bottom:18px}
+  .tips{background:#121522;border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin-bottom:22px}
+  .tips h3{font-size:15px;margin-bottom:8px;color:var(--accent)}
+  .tips li{margin-left:18px;line-height:1.6;color:var(--ink)}
+  .areas{margin-bottom:22px}
+  .area{margin-bottom:10px}
+  .area .lbl{display:flex;justify-content:space-between;font-size:14px;margin-bottom:4px}
+  .area .track{height:6px;background:var(--line);border-radius:99px;overflow:hidden}
+  .area .fill{height:100%;background:var(--accent);border-radius:99px}
+  .center{text-align:center}
+  footer{margin-top:22px;font-size:12px;color:var(--muted);text-align:center;letter-spacing:.05em}
+</style>
+</head>
+<body>
+<div class="card">
+
+  <!-- Giriş -->
+  <section id="intro">
+    <div class="tag">Self Awareness</div>
+    <h1>Farkındalıkmetre</h1>
+    <p class="lead">
+      Kendini ne kadar fark ediyorsun? Duygularını, düşüncelerini, bedenini ve çevreni?<br><br>
+      20 kısa soru var. Her birini düşünmeden, sana en yakın gelen seçenekle cevapla.
+      Doğru ya da yanlış cevap yok. Yaklaşık 3 dakika sürer.<br><br>
+      <small>Her testte 60 soruluk havuzdan farklı sorular gelir.</small>
+    </p>
+    <button class="btn" onclick="start()">Başla</button>
+  </section>
+
+  <!-- Sorular -->
+  <section id="quiz" class="hidden">
+    <div class="progress"><div class="bar" id="bar"></div></div>
+    <div class="count" id="count"></div>
+    <div class="q" id="question"></div>
+    <div class="opts" id="opts"></div>
+    <div class="nav">
+      <button class="btn ghost" id="backBtn" onclick="back()">← Geri</button>
+    </div>
+  </section>
+
+  <!-- Sonuç -->
+  <section id="result" class="hidden">
+    <h1 class="center">Sonucun</h1>
+    <div class="gauge"><svg viewBox="0 0 220 120" width="220" height="120">
+      <path d="M20 110 A90 90 0 0 1 200 110" fill="none" stroke="#1f2333" stroke-width="18" stroke-linecap="round"/>
+      <path id="arc" d="M20 110 A90 90 0 0 1 200 110" fill="none" stroke="url(#g)" stroke-width="18" stroke-linecap="round"
+            stroke-dasharray="283" stroke-dashoffset="283" style="transition:stroke-dashoffset 1s ease"/>
+      <defs><linearGradient id="g"><stop offset="0" stop-color="#6d28d9"/><stop offset="1" stop-color="#a78bfa"/></linearGradient></defs>
+    </svg></div>
+    <div class="score" id="score"></div>
+    <div class="level" id="level"></div>
+    <p class="desc" id="desc"></p>
+    <div class="areas" id="areas"></div>
+    <div class="tips"><h3>Sana önerim</h3><ul id="tips"></ul></div>
+    <div class="center" style="display:flex;flex-direction:column;gap:10px;align-items:center">
+      <a class="btn" id="mailBtn" href="#" style="text-decoration:none">📧 Sonucumu e-postama gönder</a>
+      <button class="btn ghost" id="copyBtn" onclick="copyResult()">📋 Sonucu kopyala</button>
+      <button class="btn ghost" onclick="restart()">Tekrar Yap</button>
+    </div>
+  </section>
+
+</div>
+<footer>Farkındalıkmetre · Created by Ünal Büyüksungur</footer>
+
+<script>
+// SORU HAVUZU — 5 alan × 12 soru = 60 soru
+// ters:true olan sorularda "Her zaman" düşük puan alır
+const pool = {
+  "Duygusal": [
+    {t:"Gün içinde ne hissettiğimi isimlendirebilirim (kızgınlık, endişe, sevinç gibi)."},
+    {t:"Sinirlendiğimi ancak iş işten geçtikten sonra fark ederim.", ters:true},
+    {t:"Bir duygunun beni neden etkilediğini anlamaya çalışırım."},
+    {t:"Ruh halimin çevremdekileri nasıl etkilediğinin farkındayım."},
+    {t:"Bazen neden mutsuz olduğumu hiç anlayamam.", ters:true},
+    {t:"Kıskançlık, utanç gibi hoş olmayan duygularımı kendime itiraf edebilirim."},
+    {t:"Duygularıma kapılıp sonradan pişman olacağım şeyler söylerim.", ters:true},
+    {t:"Bir karar verirken o anki ruh halimin kararımı etkileyip etkilemediğine bakarım."},
+    {t:"Aynı anda birden fazla duyguyu hissettiğimi fark edebilirim."},
+    {t:"Üzgün olduğumda bunu bastırıp yokmuş gibi davranırım.", ters:true},
+    {t:"Hangi durumların beni gerdiğini önceden bilirim."},
+    {t:"Mutlu olduğum anların farkına varır, onların tadını çıkarırım."}
+  ],
+  "Anda Kalma": [
+    {t:"Bir işi yaparken aklım sık sık başka yerlere gider.", ters:true},
+    {t:"Yemek yerken tadına, kokusuna dikkat ederim."},
+    {t:"Konuşurken karşımdakini gerçekten dinlerim, cevabımı kafamda hazırlamam."},
+    {t:"Günün nasıl geçtiğini anlamadan akşam olur.", ters:true},
+    {t:"Telefonumu nedensiz yere, otomatik olarak elime alırım.", ters:true},
+    {t:"Yürürken çevremdeki sesleri, kokuları, renkleri fark ederim."},
+    {t:"Okurken birkaç satır sonra ne okuduğumu hatırlamadığım olur.", ters:true},
+    {t:"Bulaşık, duş gibi sıradan işleri yaparken bile o ana odaklanabilirim."},
+    {t:"Geçmişi ya da geleceği düşünmekten şu anı kaçırırım.", ters:true},
+    {t:"Gün içinde birkaç kez durup sadece etrafıma bakarım."},
+    {t:"Aynı anda birçok iş yapmak yerine tek bir işe odaklanırım."},
+    {t:"Sevdiklerimle birlikteyken aklım da onlarla birliktedir."}
+  ],
+  "Bedensel": [
+    {t:"Yorulduğumu, gerildiğimi bedenimden (omuz, mide, nefes) fark ederim."},
+    {t:"Aç, susuz ya da uykusuz olduğumu çoğu zaman geç anlarım.", ters:true},
+    {t:"Stresliyken nefesimin değiştiğini fark ederim."},
+    {t:"Bedenimin dinlenmeye ihtiyacı olduğunda bunu dikkate alırım."},
+    {t:"Gün içinde nasıl oturduğumu, duruşumu fark ederim."},
+    {t:"Bir ağrı ancak çok şiddetlendiğinde dikkatimi çeker.", ters:true},
+    {t:"Hangi yiyeceklerin bana iyi gelmediğini bilirim."},
+    {t:"Heyecanlandığımda kalp atışımın hızlandığını hissederim."},
+    {t:"Saatlerce aynı pozisyonda kaldığımı sonradan fark ederim.", ters:true},
+    {t:"Gerildiğimde çenemi sıktığımı ya da omuzlarımı kaldırdığımı yakalarım."},
+    {t:"Bir duyguya bedenimin verdiği tepkiyi (mide kasılması, terleme) tanırım."},
+    {t:"Bedenim 'yeter' dese bile kendimi zorlamaya devam ederim.", ters:true}
+  ],
+  "Düşünsel": [
+    {t:"Aynı hataları neden tekrar ettiğimi düşünürüm."},
+    {t:"Bir düşüncenin gerçek mi yoksa sadece bir varsayım mı olduğunu sorgularım."},
+    {t:"Olumsuz düşünceler bir kez başladı mı, kendimi kaptırırım.", ters:true},
+    {t:"Güçlü ve zayıf yönlerimi rahatça sayabilirim."},
+    {t:"Önyargılarımın farkındayım."},
+    {t:"Emin olduğum konularda bile yanılıyor olabileceğimi düşünürüm."},
+    {t:"İçimden kendime nasıl konuştuğumu (ne kadar sert ya da nazik) fark ederim."},
+    {t:"Bir fikri neden savunduğumu açıklamakta zorlanırım.", ters:true},
+    {t:"Eleştiri aldığımda savunmaya geçmeden önce durup düşünürüm."},
+    {t:"Kafamda aynı senaryoları tekrar tekrar kurarım.", ters:true},
+    {t:"Alışkanlıklarımın beni nereye götürdüğünü düşünürüm."},
+    {t:"Bir konuda fikrimi değiştirdiğimde bunu rahatça kabul edebilirim."}
+  ],
+  "Çevresel": [
+    {t:"Başkalarının söylemediği ama hissettiği şeyleri sezebilirim."},
+    {t:"Bulunduğum ortamın (ses, ışık, kalabalık) beni nasıl etkilediğini fark ederim."},
+    {t:"Davranışlarımın başkaları üzerindeki etkisini düşünürüm."},
+    {t:"Söylediğim bir sözün birini kırdığını çok sonra fark ederim.", ters:true},
+    {t:"Karşımdakinin beden dilini fark ederim."},
+    {t:"Birinin canının sıkkın olduğunu o söylemeden anlarım."},
+    {t:"Kalabalık ortamlarda başkalarının ihtiyaçlarını gözden kaçırırım.", ters:true},
+    {t:"Tükettiğim şeylerin (alışveriş, yemek, enerji) doğaya etkisini düşünürüm."},
+    {t:"Bir tartışmada karşı tarafın neden öyle düşündüğünü anlamaya çalışırım."},
+    {t:"Yakınlarımın hayatında neler olup bittiğinden habersiz kaldığım olur.", ters:true},
+    {t:"İnsanların ses tonundaki küçük değişiklikleri fark ederim."},
+    {t:"Bir grupta kimin dışlandığını ya da sessiz kaldığını fark ederim."}
+  ]
+};
+
+const PER_AREA = 4; // her alandan kaç soru gelsin
+const options = ["Hiçbir zaman","Nadiren","Bazen","Sık sık","Her zaman"];
+let questions = [], i = 0, answers = [];
+
+const $ = id => document.getElementById(id);
+const shuffle = arr => { const a=[...arr]; for(let k=a.length-1;k>0;k--){const j=Math.floor(Math.random()*(k+1));[a[k],a[j]]=[a[j],a[k]];} return a; };
+
+function buildTest(){
+  let list = [];
+  Object.entries(pool).forEach(([area,qs])=>{
+    shuffle(qs).slice(0,PER_AREA).forEach(q=>list.push({...q, a:area}));
+  });
+  return shuffle(list);
+}
+
+function start(){
+  questions = buildTest(); i = 0; answers = []; busy = false;
+  $("intro").classList.add("hidden");
+  $("quiz").classList.remove("hidden");
+  render();
+}
+
+function render(){
+  const q = questions[i];
+  $("bar").style.width = (i/questions.length*100)+"%";
+  $("count").textContent = `Soru ${i+1} / ${questions.length}`;
+  $("question").textContent = q.t;
+  $("backBtn").style.visibility = i===0 ? "hidden" : "visible";
+  $("opts").innerHTML = "";
+  options.forEach((o,k)=>{
+    const b = document.createElement("button");
+    b.className = "opt" + (answers[i]===k ? " sel" : "");
+    b.textContent = o;
+    b.onclick = ()=>choose(k);
+    $("opts").appendChild(b);
+  });
+}
+
+let busy = false; // geçiş sırasında ikinci dokunuşu engeller
+
+function choose(k){
+  if(busy) return;
+  busy = true;
+  answers[i] = k;
+  [...$("opts").children].forEach((b,idx)=>b.classList.toggle("sel",idx===k));
+  setTimeout(()=>{
+    busy = false;
+    const next = firstUnanswered();
+    if(next === -1) showResult();
+    else { i = (i < questions.length-1 && answers[i+1]===undefined) ? i+1 : next; render(); }
+  },220);
+}
+
+function firstUnanswered(){
+  for(let k=0;k<questions.length;k++) if(answers[k]===undefined) return k;
+  return -1;
+}
+
+function back(){ if(busy) return; if(i>0){ i--; render(); } }
+
+function points(idx){
+  const v = answers[idx]; // 0-4
+  return questions[idx].ters ? 4-v : v;
+}
+
+function showResult(){
+  $("quiz").classList.add("hidden");
+  $("result").classList.remove("hidden");
+
+  let total = 0; const areas = {};
+  questions.forEach((q,idx)=>{
+    const p = points(idx); total += p;
+    areas[q.a] = areas[q.a] || {sum:0,max:0};
+    areas[q.a].sum += p; areas[q.a].max += 4;
+  });
+  const pct = Math.round(total/(questions.length*4)*100);
+
+  $("score").textContent = pct + " / 100";
+  setTimeout(()=>{ $("arc").style.strokeDashoffset = 283 - 283*pct/100; },50);
+
+  let level, desc, tips;
+  if(pct < 40){
+    level="🌱 Uyanış Aşaması";
+    desc="Günlük koşturma içinde kendini fark etmeye pek fırsat bulamıyor olabilirsin. Bu bir eksiklik değil, bir başlangıç noktası. Farkındalık bir kas gibidir; çalıştıkça güçlenir.";
+    tips=["Günde 3 kez durup kendine sor: 'Şu an ne hissediyorum?'","Telefonsuz 5 dakikalık bir yürüyüş yap.","Akşamları günün tek bir anını not et."];
+  } else if(pct < 60){
+    level="🌿 Gelişen Farkındalık";
+    desc="Kendini fark ettiğin anlar var ama bunlar daha çok kendiliğinden oluyor. Biraz bilinçli çabayla bu farkındalığı günlük bir alışkanlığa çevirebilirsin.";
+    tips=["Her gün 5 dakika sadece nefesine odaklan.","Bir duygu yükseldiğinde ona bir isim ver.","Bir öğünü yavaş, dikkatle ve ekransız ye."];
+  } else if(pct < 80){
+    level="🌳 Yüksek Farkındalık";
+    desc="Kendini, duygularını ve çevreni iyi tanıyorsun. Çoğu zaman tepki vermeden önce durup fark edebiliyorsun. Bu, ilişkilerinde ve kararlarında sana güç veriyor.";
+    tips=["En düşük çıkan alanına odaklan, orada küçük bir hedef koy.","Haftalık bir öz-değerlendirme notu tut.","Farkındalığını zor anlarda da korumayı dene."];
+  } else {
+    level="✨ Derin Farkındalık";
+    desc="İç dünyanla ve çevrenle güçlü bir bağın var. Anı yaşayabiliyor, düşüncelerini gözlemleyebiliyor ve bedenini dinleyebiliyorsun. Bu farkındalık çevrene de ilham verir.";
+    tips=["Bildiklerini çevrendekilerle paylaş.","Meditasyon ya da günlük yazma pratiğini derinleştir.","Farkındalığını yeni ve zorlayıcı alanlarda sına."];
+  }
+  $("level").textContent = level;
+  $("desc").textContent = desc;
+  $("tips").innerHTML = tips.map(t=>`<li>${t}</li>`).join("");
+
+  $("areas").innerHTML = Object.keys(pool).map(name=>{
+    const v = areas[name];
+    const p = Math.round(v.sum/v.max*100);
+    return `<div class="area"><div class="lbl"><span>${name} Farkındalık</span><b>${p}%</b></div>
+            <div class="track"><div class="fill" style="width:${p}%"></div></div></div>`;
+  }).join("");
+  $("copyBtn").textContent = "📋 Sonucu kopyala";
+  prepareShare();
+}
+
+function resultText(){
+  const lines = [...document.querySelectorAll("#areas .area")].map(a=>{
+    const s = a.querySelectorAll("span,b"); return `- ${s[0].textContent}: ${s[1].textContent}`;
+  });
+  const tips = [...document.querySelectorAll("#tips li")].map(l=>"- "+l.textContent);
+  return `Farkındalıkmetre sonucum\n\nPuan: ${$("score").textContent}\nSeviye: ${$("level").textContent}\n\n${$("desc").textContent}\n\nAlanlar:\n${lines.join("\n")}\n\nÖneriler:\n${tips.join("\n")}\n\nSen de dene: https://unalbuyuksungur.com/farkindalikmetre/`;
+}
+
+function prepareShare(){
+  $("mailBtn").href = "mailto:?subject=" + encodeURIComponent("Farkındalıkmetre sonucum") + "&body=" + encodeURIComponent(resultText());
+}
+
+function copyResult(){
+  try{
+    navigator.clipboard.writeText(resultText()).then(
+      ()=>{ $("copyBtn").textContent="✅ Kopyalandı"; },
+      ()=>{ $("copyBtn").textContent="Kopyalanamadı"; });
+  }catch(e){ $("copyBtn").textContent="Kopyalanamadı"; }
+}
+
+function restart(){
+  $("arc").style.strokeDashoffset = 283;
+  $("result").classList.add("hidden");
+  $("intro").classList.remove("hidden");
+}
+</script>
+</body>
+</html>
