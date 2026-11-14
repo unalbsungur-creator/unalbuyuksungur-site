@@ -148,11 +148,15 @@ class BuildPublicationTests(unittest.TestCase):
         self.assertEqual(section.count('<figure class="project-media">'), 5)
         self.assertEqual(section.count("https://mind-ot.com/"), 2)
         self.assertEqual(section.count("https://nextpointtr.com/"), 2)
-        self.assertIn("Football Academy Operating System — ", section)
+        self.assertIn("Football Academy Operating System — akademinin ritmi tek yerde.", section)
         # Görev 243: kısa Next Point Monitor metni; masaüstü 3 sütunda son satır ortalanır (yalnız proje ızgarası).
         self.assertIn('<p class="project-description">Tur operatörleri ve acenteler için turizm istihbaratı ve olay '
                       'izleme platformu.</p>', section)
         style = source.split("<style>", 1)[1].split("</style>", 1)[0]
+        # Görev 244: proje açıklaması 3 satırda kesilir.
+        clamp = style.split(".project-description {", 1)[1].split("}", 1)[0]
+        self.assertIn("-webkit-line-clamp: 3;", clamp)
+        self.assertIn("line-clamp: 3;", clamp)
         center = style.split("@media (min-width: 1101px) {", 1)[1].split("\n        }\n", 1)[0]
         self.assertRegex(center, r"\.project-grid \{\s*grid-template-columns: repeat\(6, minmax\(0, 1fr\)\);")
         self.assertRegex(center, r"\.project-grid > li \{\s*grid-column: span 2;")
@@ -190,11 +194,12 @@ class BuildPublicationTests(unittest.TestCase):
                 self.assertEqual(version, "?v=" + digest[:bp.VERSION_LENGTH], (page, name))
         en = tree["en/index.html"].decode("utf-8")
         self.assertIn("<h3>Next Point Monitor</h3>", en)
-        self.assertIn("Tourism intelligence and incident monitoring for tour operators and agencies.", en)  # Görev 243
+        self.assertIn("Tourism intelligence and incident monitoring for tour operators.", en)  # Görev 244
         self.assertIn("<h3>FAOS</h3>", en)
-        self.assertIn("Football Academy Operating System — Bringing", en)
+        self.assertIn("Football Academy Operating System — academy life in one place.", en)
         de = tree["de/index.html"].decode("utf-8")
-        self.assertIn("Tourismus-Intelligence und Vorfallmonitoring für Reiseveranstalter und Reisebüros.", de)
+        self.assertIn("Tourismus-Intelligence und Vorfallmonitoring für Reiseveranstalter.", de)
+        self.assertIn("Football Academy Operating System — der Akademiealltag an einem Ort.", de)
         self.assertIn("FAOS-Logo und Markengrafik", de)
 
     def test_excluded_files_absent(self):

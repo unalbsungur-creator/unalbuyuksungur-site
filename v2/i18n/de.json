@@ -56,7 +56,7 @@
     "projects.nextpoint.category": "Reisen und Entdecken",
     "projects.nextpoint.description": "Entdecke Routen durch die Türkei und die Geschichten dahinter.",
     "projects.faos.category": "Fußballakademie",
-    "projects.faos.description": "Football Academy Operating System — Der Alltag einer Akademie – auf und neben dem Platz.",
+    "projects.faos.description": "Football Academy Operating System — der Akademiealltag an einem Ort.",
     "projects.tralvid.category": "Reiseerlebnis",
     "projects.tralvid.description": "Ein Ansatz für ein reibungsloseres Erlebnis für Gäste.",
     "projects.istec.category": "Karriere und Talente",
@@ -338,5 +338,5 @@
     "video.faq.a8": "Der Clip ist für die persönliche, private Nutzung lizenziert; Sie können ihn mit Ihren Liebsten und auf Ihren persönlichen Social-Media-Konten teilen. Kommerzielle Nutzung bedarf einer Genehmigung.",
     "projects.npm.image": "Next-Point-Monitor-Logo und Markengrafik",
     "projects.npm.category": "Tourismus-Intelligence",
-    "projects.npm.description": "Tourismus-Intelligence und Vorfallmonitoring für Reiseveranstalter und Reisebüros."
+    "projects.npm.description": "Tourismus-Intelligence und Vorfallmonitoring für Reiseveranstalter."
 }
