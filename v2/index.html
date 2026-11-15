@@ -1566,6 +1566,151 @@
             }
         }
 
+        /* ---------- Kariyer (Görev 245) ---------- */
+        .career {
+            scroll-margin-top: var(--header-height);
+            margin-top: clamp(48px, 6vw, 80px);
+            padding-top: clamp(40px, 5vw, 64px);
+            border-top: 1px solid rgba(201, 166, 107, 0.12);
+        }
+
+        .career-title {
+            margin: 0;
+            font-family: var(--font-serif);
+            font-size: clamp(30px, 3.4vw, 48px);
+            font-weight: 400;
+            line-height: 1.1;
+            color: var(--text);
+        }
+
+        .career-lead {
+            max-width: 860px;
+        }
+
+        .career-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+            gap: clamp(32px, 5vw, 72px);
+            margin-top: 40px;
+        }
+
+        .career-subtitle {
+            margin: 0 0 18px;
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: var(--gold);
+        }
+
+        .timeline {
+            margin: 0;
+            padding: 0;
+            list-style: none;
+            border-left: 1px solid var(--line);
+        }
+
+        .timeline-item {
+            position: relative;
+            padding: 0 0 26px 26px;
+        }
+
+        .timeline-item:last-child {
+            padding-bottom: 0;
+        }
+
+        .timeline-item::before {
+            content: "";
+            position: absolute;
+            top: 6px;
+            left: -5px;
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            background: var(--gold);
+            box-shadow: 0 0 0 4px #0E1522;
+        }
+
+        .timeline-date {
+            display: block;
+            font-size: 13px;
+            letter-spacing: 0.5px;
+            color: var(--gold);
+        }
+
+        .timeline-role {
+            display: block;
+            margin-top: 4px;
+            font-family: var(--font-serif);
+            font-size: clamp(19px, 1.6vw, 23px);
+            line-height: 1.25;
+            color: var(--text);
+        }
+
+        .timeline-org {
+            display: block;
+            margin-top: 2px;
+            font-size: 15px;
+            color: var(--muted);
+        }
+
+        .timeline-org a {
+            color: inherit;
+            text-decoration: underline;
+            text-decoration-color: var(--line);
+            text-underline-offset: 3px;
+        }
+
+        .timeline-org a:hover {
+            color: var(--gold);
+        }
+
+        .career-side > section + section {
+            margin-top: 36px;
+        }
+
+        .skill-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin: 0;
+            padding: 0;
+            list-style: none;
+        }
+
+        .skill-chips li {
+            padding: 7px 14px;
+            border: 1px solid rgba(201, 166, 107, 0.28);
+            border-radius: 999px;
+            background: rgba(23, 35, 56, 0.72);
+            font-size: 14px;
+            line-height: 1.35;
+            color: var(--text);
+        }
+
+        .career-list {
+            margin: 0;
+            padding: 0;
+            list-style: none;
+            color: var(--muted);
+        }
+
+        .career-list li + li {
+            margin-top: 14px;
+        }
+
+        .career-list strong {
+            display: block;
+            font-weight: 500;
+            color: var(--text);
+        }
+
+        @media (max-width: 900px) {
+            .career-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
         /* V1 adres koruması: eski #sosyal, #blog ve #satis bağlantılarının hedefleri */
         .anchor-target {
             display: block;
@@ -2071,6 +2216,67 @@
                     prodüksiyonu, dijital içerik üretimi ve yazılım projeleriyle yeni fikirleri hayata geçiriyorum.
                     Ünal Büyüksungur Dijital Dünyası, ürettiklerimi paylaştığım, keşfetmeye ve öğrenmeye devam ettiğim
                     kişisel yolculuğumun bir yansıması.</p>
+                <section class="career" id="kariyer" aria-labelledby="kariyer-baslik">
+                    <h3 class="career-title" id="kariyer-baslik">Kariyer</h3>
+                    <p class="section-lead career-lead">Turizmde 35 yılı aşkın deneyim. Otel temsilciliğiyle başlayan
+                        yolculuğum, uluslararası tur operatörlerinde kalite, operasyon ve misafir deneyimi yönetimiyle
+                        devam etti. Bugün bu birikimi turizm ve dijital projelere taşıyorum.</p>
+                    <div class="career-grid">
+                        <ol class="timeline" aria-label="Kariyer zaman çizelgesi">
+                            <li class="timeline-item"><span class="timeline-date">2025 – bugün</span><span
+                                    class="timeline-role">Bağımsız dijital projeler</span><span class="timeline-org"><a href="#projeler">UNAI Music Studio, Next Point TR, İŞTEÇ, TRALVID ve diğerleri</a></span></li>
+                            <li class="timeline-item"><span class="timeline-date">Haziran 2025 – Kasım 2025</span><span
+                                    class="timeline-role">Quality &amp; Operation Manager</span><span class="timeline-org">Holiday Destination Services</span></li>
+                            <li class="timeline-item"><span class="timeline-date">Kasım 2024 – Haziran 2025</span><span
+                                    class="timeline-role">Quality Manager</span><span class="timeline-org">Holiday Destination Services</span></li>
+                            <li class="timeline-item"><span class="timeline-date">Kasım 2022 – Kasım 2024</span><span
+                                    class="timeline-role">Customer Feedback, Compliance, Health &amp; Safety Manager</span><span class="timeline-org">Meeting Point Turkey</span></li>
+                            <li class="timeline-item"><span class="timeline-date">Ağustos 2012 – Kasım 2022</span><span
+                                    class="timeline-role">Quality Manager Türkiye</span><span class="timeline-org">Meeting Point Turkey</span></li>
+                            <li class="timeline-item"><span class="timeline-date">Mart 2012 – Ağustos 2012</span><span
+                                    class="timeline-role">Assistant Quality Manager Türkiye</span><span class="timeline-org">Meeting Point Turkey</span></li>
+                            <li class="timeline-item"><span class="timeline-date">Mart 2006 – Mart 2012</span><span
+                                    class="timeline-role">Assistant Destination Manager</span><span class="timeline-org">FTI Touristik AG</span></li>
+                            <li class="timeline-item"><span class="timeline-date">Mayıs 2004 – Mart 2006</span><span
+                                    class="timeline-role">Head of Representatives (Belek, Antalya, Kemer)</span><span class="timeline-org">Polar West Tourism</span></li>
+                        </ol>
+                        <div class="career-side">
+                            <section aria-labelledby="yetkinlikler-baslik">
+                                <h4 class="career-subtitle" id="yetkinlikler-baslik">Yetkinlikler</h4>
+                                <ul class="skill-chips">
+                                    <li>Kalite yönetimi ve hizmet standartları</li>
+                                    <li>Müşteri deneyimi ve memnuniyet yönetimi</li>
+                                    <li>Kriz yönetimi ve problem çözme</li>
+                                    <li>Misafir ilişkileri ve şikâyet yönetimi</li>
+                                    <li>Turizm operasyonları ve koordinasyon</li>
+                                    <li>Ekip yönetimi ve liderlik</li>
+                                    <li>Süreç iyileştirme ve performans takibi</li>
+                                    <li>Uluslararası ve kültürlerarası iletişim</li>
+                                    <li>Analitik düşünme ve karar verme</li>
+                                    <li>Yapay zekâ araçları ve dijital dönüşüm</li>
+                                    <li>Proje yönetimi ve dijital ürün geliştirme</li>
+                                </ul>
+                            </section>
+                            <section aria-labelledby="diller-baslik">
+                                <h4 class="career-subtitle" id="diller-baslik">Diller</h4>
+                                <ul class="career-list">
+                                    <li><strong>Türkçe</strong>ana dil</li>
+                                    <li><strong>Almanca</strong>ana dil seviyesinde</li>
+                                    <li><strong>İngilizce</strong>B2</li>
+                                </ul>
+                            </section>
+                            <section aria-labelledby="egitim-baslik">
+                                <h4 class="career-subtitle" id="egitim-baslik">Eğitim</h4>
+                                <ul class="career-list">
+                                    <li><span class="timeline-date">1996 – 2000</span><strong>Hacettepe
+                                            Üniversitesi</strong>Lisans, Eğitim Fakültesi, Alman Dili Eğitimi</li>
+                                    <li><span class="timeline-date">1994 – 1996</span><strong>Atatürk
+                                            Üniversitesi</strong>Ön lisans, Almanca Öğretmenliği</li>
+                                </ul>
+                            </section>
+                        </div>
+                    </div>
+                </section>
                 <ul class="social-links" aria-label="Sosyal medya bağlantıları">
                     <li><a class="social-link" data-external-link="linkedin"
                             data-external-label="Ünal Büyüksungur LinkedIn profilini aç"><span class="platform-icon"

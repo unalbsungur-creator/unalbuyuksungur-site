@@ -513,6 +513,33 @@ class MultilingualTests(unittest.TestCase):
             finally:
                 render_site.FEATURED_WORKS = original
 
+    def test_home_career_block(self):
+        """Görev 245: Hakkımda metninin ardından 3 dilde Kariyer bloğu; 8 madde, en yeni üstte; kişisel iletişim yok."""
+        _, messages = render_site.load_messages(SOURCES.__getitem__)
+        firsts = {"tr": "Haziran 2025 – Kasım 2025", "en": "June 2025 – November 2025", "de": "Juni 2025 – November 2025"}
+        for locale in ("tr", "en", "de"):
+            page = self.pages["v2/" + ("" if locale == "tr" else locale + "/") + "index.html"].decode("utf-8")
+            about = page.split('id="hakkimda"', 1)[1].split("</section>\n    </main>", 1)[0]
+            with self.subTest(locale=locale):
+                self.assertLess(about.index("about-text"), about.index('id="kariyer"'))
+                self.assertLess(about.index('id="kariyer"'), about.index('class="social-links"'))
+                career = about.split('id="kariyer"', 1)[1]
+                self.assertIn(f'>{messages[locale]["home.career.title"]}</h3>', career)
+                dates = re.findall(r'<span class="timeline-date">([^<]+)</span><span\s+class="timeline-role">', career)
+                self.assertEqual(len(dates), 8)
+                self.assertEqual(dates[1], firsts[locale])
+                self.assertEqual(dates[0], messages[locale]["home.career.d1"])
+                self.assertIn('<a href="#projeler">' + messages[locale]["home.career.indieOrg"] + "</a>", career)
+                self.assertEqual(len(re.findall(r"<li>[^<]+</li>", career.split('class="skill-chips"', 1)[1]
+                                                .split("</ul>", 1)[0])), 11)
+                self.assertIn("Hacettepe", career)
+                lowered = page.lower()
+                for banned in ("hotmail", "tel:", "+90", "doğum", "geburt", "date of birth", "cv.pdf"):
+                    self.assertNotIn(banned, lowered)
+                if locale != "tr":
+                    for tr_text in ("Kariyer", "Haziran", "Kasım", "ana dil", "Yetkinlikler"):
+                        self.assertNotIn(">" + tr_text, career)
+
     def test_turkish_only_pages_and_links(self):
         """Görev 221: blog ve yazı sayfaları yalnız TR; EN/DE sayfaları TR sayfalarına bağlanır.
         Görev 231: gizlilik üç dillidir; EN/DE sayfaları kendi dilindeki gizlilik sayfasına bağlanır."""
